@@ -1,0 +1,26 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.repository == 'mergen-institute/fastapi-mergen' && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: latest-known
+      - run: uv build
+      - uses: pypa/gh-action-pypi-publish@v1.14.1
