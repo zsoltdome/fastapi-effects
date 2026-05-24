@@ -14,14 +14,20 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
-      - uses: astral-sh/setup-uv@v10
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: latest-known
+          version: "0.12.4"
           enable-cache: true
-      - run: uv sync --locked --group dev
-      - run: uv run pip-audit
-      - run: uv run bandit -q -r src
+      - name: Install security environment
+        run: uv sync --locked --group security
+      - name: Audit dependencies
+        run: uv run pip-audit
+      - name: Scan source
+        run: uv run bandit -q -r src
