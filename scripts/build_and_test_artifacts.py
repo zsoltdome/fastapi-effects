@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""Build and smoke-test sdist and wheel in isolated virtual environments."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import venv
+import zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+DIST = ROOT / "dist"
+
+
+def run(*command: str, cwd: Path = ROOT) -> None:
+    print(f"+ {' '.join(command)}", flush=True)
+    subprocess.run(command, cwd=cwd, check=True)
+
+
+def python_in(environment: Path) -> Path:
+    scripts = "Scripts" if os.name == "nt" else "bin"
+    executable = "python.exe" if os.name == "nt" else "python"
+    return environment / scripts / executable
+
+
+def create_environment(path: Path, *, system_site_packages: bool = False) -> Path:
+    venv.EnvBuilder(
+        with_pip=True,
+        clear=True,
+        system_site_packages=system_site_packages,
+    ).create(path)
+    return python_in(path)
+
+
+def assert_uninstalled_import_fails(python: Path, empty_directory: Path) -> None:
+    code = "import importlib.util; assert importlib.util.find_spec('fastapi_mergen') is None"
+    run(str(python), "-c", code, cwd=empty_directory)
+
+
+def requirement_for(artifact: Path, extra: str | None) -> str:
+    if extra:
+        return f"fastapi-mergen[{extra}] @ {artifact.resolve().as_uri()}"
+    return str(artifact.resolve())
+
+
+def smoke_install(
+    artifact: Path,
+    extra: str | None,
+    *,
+    system_site_packages: bool,
+    no_deps: bool,
+) -> None:
+    with tempfile.TemporaryDirectory(prefix="mergen-artifact-") as raw:
+        root = Path(raw)
+        environment = root / "venv"
+        python = create_environment(environment, system_site_packages=system_site_packages)
+        assert_uninstalled_import_fails(python, root)
+        command = [
+            str(python),
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+        ]
+        if no_deps:
+            command.append("--no-deps")
+        command.append(requirement_for(artifact, extra))
+        run(*command, cwd=root)
+        code = [
+            "import fastapi_mergen",
+            "from pathlib import Path",
+            "assert Path(fastapi_mergen.__file__).with_name('py.typed').is_file()",
+            "assert not Path(fastapi_mergen.__file__).parents[1].joinpath('mergen').exists()",
+        ]
+        if extra == "webhooks":
+            code.append("import fastapi_mergen.webhooks")
+        elif extra == "otel":
+            code.append("import fastapi_mergen.observability")
+        run(str(python), "-c", ";".join(code), cwd=root)
+        if not no_deps:
+            run(str(python), "-m", "pip", "check", cwd=root)
+
+
+def inspect_wheel(wheel: Path) -> None:
+    with zipfile.ZipFile(wheel) as archive:
+        names = set(archive.namelist())
+    if "fastapi_mergen/py.typed" not in names:
+        raise AssertionError("wheel does not contain fastapi_mergen/py.typed")
+    if any(name.startswith("mergen/") for name in names):
+        raise AssertionError("wheel contains the occupied top-level mergen package")
+
+
+def build_with_available_backend() -> None:
+    if shutil.which("uv"):
+        run("uv", "build", "--no-sources")
+        return
+    try:
+        import build  # noqa: F401
+    except ImportError:
+        run(
+            sys.executable,
+            "-m",
+            "pip",
+            "wheel",
+            ".",
+            "--no-deps",
+            "--no-build-isolation",
+            "--wheel-dir",
+            str(DIST),
+        )
+        run(
+            sys.executable,
+            "-c",
+            "from setuptools.build_meta import build_sdist; build_sdist('dist')",
+        )
+    else:
+        run(sys.executable, "-m", "build")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--skip-build", action="store_true")
+    parser.add_argument(
+        "--offline-system-packages",
+        action="store_true",
+        help="Use existing system packages and --no-deps for local offline smoke tests.",
+    )
+    args = parser.parse_args()
+    if not args.skip_build:
+        shutil.rmtree(DIST, ignore_errors=True)
+        DIST.mkdir(parents=True, exist_ok=True)
+        build_with_available_backend()
+
+    wheels = sorted(DIST.glob("*.whl"))
+    sdists = sorted(DIST.glob("*.tar.gz"))
+    if len(wheels) != 1 or len(sdists) != 1:
+        raise AssertionError("expected exactly one wheel and one sdist")
+    wheel = wheels[0]
+    inspect_wheel(wheel)
+
+    offline = args.offline_system_packages
+    smoke_install(wheel, None, system_site_packages=offline, no_deps=offline)
+    if not offline:
+        smoke_install(wheel, "webhooks", system_site_packages=False, no_deps=False)
+        smoke_install(wheel, "otel", system_site_packages=False, no_deps=False)
+        smoke_install(sdists[0], None, system_site_packages=False, no_deps=False)
+    print("Clean artifact smoke tests passed")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
