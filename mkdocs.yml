@@ -22,6 +22,7 @@ nav:
       - Route Snapshots: reference/route-snapshot-schema.md
       - Failure Taxonomy: reference/failure-taxonomy.md
       - Public API Spike: reference/public-api-spike.md
+      - Conformance Map: reference/conformance-map.md
   - Decisions: adr/README.md
   - Milestone 1 Review: milestone-1-review.md
 markdown_extensions:
