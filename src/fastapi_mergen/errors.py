@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 
 class MergenError(Exception):
     """Base class for documented FastAPI-Mergen errors."""
@@ -27,3 +29,58 @@ class OptionalDependencyError(MergenConfigurationError, ImportError):
 
 class MilestoneNotImplementedError(MergenError, NotImplementedError):
     """Raised when the Milestone 1 API spike reaches Milestone 2 behavior."""
+
+
+class AuthorizationExpired(MergenError):
+    """Raised when snapshotted authority exceeds its allowed age."""
+
+
+class AuthorizationDenied(MergenError):
+    """Raised when effective authority lacks a required capability."""
+
+
+class RetryableDeliveryError(MergenError):
+    """Classify an execution failure as retryable under immutable policy."""
+
+    def __init__(self, *, code: str, summary: str) -> None:
+        self.code = code
+        self.summary = summary[:512]
+        super().__init__(f"Retryable delivery failure ({code}): {self.summary}")
+
+
+class PermanentDeliveryError(MergenError):
+    """Classify an execution failure as terminal."""
+
+    def __init__(self, *, code: str, summary: str) -> None:
+        self.code = code
+        self.summary = summary[:512]
+        super().__init__(f"Permanent delivery failure ({code}): {self.summary}")
+
+
+class DedupeConflict(MergenError):
+    """Report a dedupe-key collision without exposing payload content."""
+
+    def __init__(self, *, namespace: str, key: str) -> None:
+        self.namespace = namespace
+        self.key = key
+        super().__init__(f"Dedupe key conflicts in namespace {namespace!r}.")
+
+
+class LeaseLost(MergenError):
+    """Report a stale lease token without mutating current delivery state."""
+
+    def __init__(self, *, delivery_id: UUID) -> None:
+        self.delivery_id = delivery_id
+        super().__init__(f"Lease ownership was lost for delivery {delivery_id}.")
+
+
+class SchemaRevisionMismatch(MergenError):
+    """Report an unsupported durable schema or snapshot revision."""
+
+    def __init__(self, *, component: str, expected: int, actual: int) -> None:
+        self.component = component
+        self.expected = expected
+        self.actual = actual
+        super().__init__(
+            f"Unsupported {component} revision: expected {expected}, received {actual}."
+        )

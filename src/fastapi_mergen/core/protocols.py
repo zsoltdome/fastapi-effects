@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeAlias, TypeVar
 
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .policy import AuthorizationMode
 from .principal import Principal
+
+PayloadT = TypeVar("PayloadT")
 
 
 class PrincipalProvider(Protocol):
@@ -50,10 +53,11 @@ class HandlerSessionProvider(Protocol):
 
 
 class EffectStore(Protocol):
-    """Marker protocol for a future transactional effect-store implementation."""
+    """Future transactional store boundary without exposing persistence internals."""
 
     @property
     def name(self) -> str: ...
 
 
-HandlerCallable = Any
+HandlerCallable: TypeAlias = Callable[[Any], Awaitable[None]]
+SessionDependency: TypeAlias = Callable[..., AsyncSession]

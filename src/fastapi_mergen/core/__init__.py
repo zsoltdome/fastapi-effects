@@ -1,1 +1,1 @@
-"""Storage-agnostic contracts; implementation begins in Milestone 2."""
+"""Storage-agnostic contracts and provisional immutable values."""
