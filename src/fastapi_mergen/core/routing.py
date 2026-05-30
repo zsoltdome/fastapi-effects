@@ -5,13 +5,13 @@ from __future__ import annotations
 import re
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 from fastapi_mergen.core.policy import AuthorizationMode
 from fastapi_mergen.core.retry import RetryPolicy
 from fastapi_mergen.errors import MergenConfigurationError
 
-if False:  # pragma: no cover - type-checking-only circular name
+if TYPE_CHECKING:
     from fastapi_mergen.api import EffectContext
 
 PayloadT = TypeVar("PayloadT")
@@ -140,7 +140,9 @@ class HandlerRouteBuilder(Generic[PayloadT]):
                     "Snapshot authorization requires a positive maximum snapshot age."
                 )
             if service_policy is not None:
-                raise MergenConfigurationError("Snapshot authorization cannot name a service policy.")
+                raise MergenConfigurationError(
+                    "Snapshot authorization cannot name a service policy."
+                )
         elif mode is AuthorizationMode.REVALIDATE:
             if maximum_snapshot_age_seconds is not None or service_policy is not None:
                 raise MergenConfigurationError(
@@ -169,7 +171,7 @@ class HandlerRouteBuilder(Generic[PayloadT]):
             maximum_snapshot_age_seconds=maximum_snapshot_age_seconds,
             retry_policy=policy,
         )
-        self._registry.register_route(spec, handler)  # type: ignore[arg-type]
+        self._registry.register_route(spec, cast(Handler, handler))
         return handler
 
 

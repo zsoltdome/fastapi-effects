@@ -57,7 +57,9 @@ class Principal:
 
         normalized_scopes = frozenset(self.scopes)
         if len(normalized_scopes) > _MAX_SCOPES:
-            raise MergenConfigurationError(f"Principal scopes may contain at most {_MAX_SCOPES} items.")
+            raise MergenConfigurationError(
+                f"Principal scopes may contain at most {_MAX_SCOPES} items."
+            )
         invalid = sorted(scope for scope in normalized_scopes if not _SCOPE_PATTERN.fullmatch(scope))
         if invalid:
             raise MergenConfigurationError("Principal contains an invalid scope name.")

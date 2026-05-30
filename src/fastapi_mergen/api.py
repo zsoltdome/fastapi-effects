@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
+from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, Generic, TypeVar
 from uuid import UUID
 
 from fastapi import Depends, Request
