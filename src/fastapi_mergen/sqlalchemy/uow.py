@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import TracebackType
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +18,7 @@ class MergenUnitOfWork:
     """Milestone 1 shape of the explicit outer transaction boundary.
 
     Transaction ownership, tenant binding, and persistence intentionally begin in
-    Milestone 2. Calling the operational methods now fails closed.
+    Milestone 2. Entering the context or emitting now fails before performing SQL.
     """
 
     session: AsyncSession
@@ -32,8 +33,9 @@ class MergenUnitOfWork:
         self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
-        traceback: Any,
+        traceback: TracebackType | None,
     ) -> bool:
+        del exc_type, exc_value, traceback
         return False
 
     async def emit(

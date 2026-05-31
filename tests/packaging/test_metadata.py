@@ -12,7 +12,7 @@ def test_distribution_identity() -> None:
     metadata = importlib.metadata.metadata("fastapi-mergen")
     assert metadata["Name"] == "fastapi-mergen"
     assert metadata["Author"] == "mergen-institute"
-    assert SpecifierSet(metadata["Requires-Python"]) == SpecifierSet(">=3.11,<3.15")
+    assert SpecifierSet(metadata["Requires-Python"] or "") == SpecifierSet(">=3.11,<3.15")
     assert fastapi_mergen.__version__ == importlib.metadata.version("fastapi-mergen")
 
 
