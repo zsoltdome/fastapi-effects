@@ -60,7 +60,9 @@ class Principal:
             raise MergenConfigurationError(
                 f"Principal scopes may contain at most {_MAX_SCOPES} items."
             )
-        invalid = sorted(scope for scope in normalized_scopes if not _SCOPE_PATTERN.fullmatch(scope))
+        invalid = sorted(
+            scope for scope in normalized_scopes if not _SCOPE_PATTERN.fullmatch(scope)
+        )
         if invalid:
             raise MergenConfigurationError("Principal contains an invalid scope name.")
         object.__setattr__(self, "scopes", normalized_scopes)

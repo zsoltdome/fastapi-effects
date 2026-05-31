@@ -25,7 +25,9 @@ class RetryPolicy:
         if not self.name.strip() or self.name != self.name.strip() or len(self.name) > 128:
             raise MergenConfigurationError("Retry policy name must be trimmed and non-blank.")
         if self.version < 1 or self.max_attempts < 1:
-            raise MergenConfigurationError("Retry policy version and max_attempts must be positive.")
+            raise MergenConfigurationError(
+                "Retry policy version and max_attempts must be positive."
+            )
         if self.maximum_elapsed_seconds <= 0:
             raise MergenConfigurationError("Retry maximum elapsed time must be positive.")
         if self.base_delay_seconds < 0 or self.maximum_delay_seconds < self.base_delay_seconds:

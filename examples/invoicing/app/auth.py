@@ -19,14 +19,20 @@ class DemoPrincipalProvider:
 
     async def __call__(self, request: Request) -> Principal:
         if request.headers.get("authorization") != "Bearer milestone-one-demo":
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid demo token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="invalid demo token",
+            )
         raw_tenant = request.headers.get("x-tenant-id")
         if raw_tenant is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="missing tenant")
         try:
             tenant_id = UUID(raw_tenant)
         except ValueError as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid tenant") from exc
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid tenant",
+            ) from exc
         return Principal(
             tenant_id=tenant_id,
             subject_id="demo-user",
