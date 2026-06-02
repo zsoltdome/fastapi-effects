@@ -59,7 +59,8 @@ def smoke_install(
         root = Path(raw)
         environment = root / "venv"
         python = create_environment(environment, system_site_packages=system_site_packages)
-        assert_uninstalled_import_fails(python, root)
+        if not system_site_packages:
+            assert_uninstalled_import_fails(python, root)
         command = [
             str(python),
             "-m",
@@ -76,6 +77,8 @@ def smoke_install(
             "from pathlib import Path",
             "assert Path(fastapi_mergen.__file__).with_name('py.typed').is_file()",
             "assert not Path(fastapi_mergen.__file__).parents[1].joinpath('mergen').exists()",
+            "import sys",
+            "assert str(Path(fastapi_mergen.__file__).resolve()).startswith(str(Path(sys.prefix).resolve()))",
         ]
         if extra == "webhooks":
             code.append("import fastapi_mergen.webhooks")
@@ -95,7 +98,25 @@ def inspect_wheel(wheel: Path) -> None:
         raise AssertionError("wheel contains the occupied top-level mergen package")
 
 
-def build_with_available_backend() -> None:
+def build_with_available_backend(*, offline: bool) -> None:
+    if offline:
+        run(
+            sys.executable,
+            "-m",
+            "pip",
+            "wheel",
+            ".",
+            "--no-deps",
+            "--no-build-isolation",
+            "--wheel-dir",
+            str(DIST),
+        )
+        run(
+            sys.executable,
+            "-c",
+            "from setuptools.build_meta import build_sdist; build_sdist('dist')",
+        )
+        return
     if shutil.which("uv"):
         run("uv", "build", "--no-sources")
         return
@@ -134,7 +155,7 @@ def main() -> int:
     if not args.skip_build:
         shutil.rmtree(DIST, ignore_errors=True)
         DIST.mkdir(parents=True, exist_ok=True)
-        build_with_available_backend()
+        build_with_available_backend(offline=args.offline_system_packages)
 
     wheels = sorted(DIST.glob("*.whl"))
     sdists = sorted(DIST.glob("*.tar.gz"))
