@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import site
 import subprocess
 import sys
 import tempfile
@@ -28,13 +29,26 @@ def python_in(environment: Path) -> Path:
     return environment / scripts / executable
 
 
-def create_environment(path: Path, *, system_site_packages: bool = False) -> Path:
-    venv.EnvBuilder(
-        with_pip=True,
-        clear=True,
-        system_site_packages=system_site_packages,
-    ).create(path)
-    return python_in(path)
+def create_environment(path: Path, *, parent_dependencies: bool = False) -> Path:
+    venv.EnvBuilder(with_pip=True, clear=True).create(path)
+    python = python_in(path)
+    if parent_dependencies:
+        if os.name == "nt":
+            purelib = path / "Lib" / "site-packages"
+        else:
+            purelib = (
+                path
+                / "lib"
+                / f"python{sys.version_info.major}.{sys.version_info.minor}"
+                / "site-packages"
+            )
+        purelib.mkdir(parents=True, exist_ok=True)
+        parent_paths = [entry for entry in site.getsitepackages() if Path(entry).is_dir()]
+        (purelib / "offline-parent-dependencies.pth").write_text(
+            "\n".join(parent_paths) + "\n",
+            encoding="utf-8",
+        )
+    return python
 
 
 def assert_uninstalled_import_fails(python: Path, empty_directory: Path) -> None:
@@ -58,9 +72,8 @@ def smoke_install(
     with tempfile.TemporaryDirectory(prefix="mergen-artifact-") as raw:
         root = Path(raw)
         environment = root / "venv"
-        python = create_environment(environment, system_site_packages=system_site_packages)
-        if not system_site_packages:
-            assert_uninstalled_import_fails(python, root)
+        python = create_environment(environment, parent_dependencies=system_site_packages)
+        assert_uninstalled_import_fails(python, root)
         command = [
             str(python),
             "-m",

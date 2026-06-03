@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from tests.integration.postgres import TestDatabase
+from tests.integration.postgres import ProvisionedDatabase
 
 pytestmark = pytest.mark.integration
 
@@ -16,7 +16,7 @@ async def connect(dsn: str) -> Any:
 
 
 @pytest.mark.asyncio
-async def test_fixture_exposes_expected_role_flags(test_database: TestDatabase) -> None:
+async def test_fixture_exposes_expected_role_flags(test_database: ProvisionedDatabase) -> None:
     for dsn, expected_user, bypass in (
         (test_database.migration_dsn, test_database.migration_role, False),
         (test_database.app_dsn, test_database.app_role, False),
@@ -39,7 +39,7 @@ async def test_fixture_exposes_expected_role_flags(test_database: TestDatabase) 
 
 @pytest.mark.asyncio
 async def test_only_migration_owner_can_create_application_schema(
-    test_database: TestDatabase,
+    test_database: ProvisionedDatabase,
 ) -> None:
     owner = await connect(test_database.migration_dsn)
     try:

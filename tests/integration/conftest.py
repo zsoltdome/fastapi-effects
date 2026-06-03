@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator
 import pytest
 import pytest_asyncio
 
-from tests.integration.postgres import TestDatabase, provision_test_database
+from tests.integration.postgres import ProvisionedDatabase, provision_test_database
 
 
 @pytest.fixture(scope="session")
@@ -22,6 +22,6 @@ def postgres_admin_dsn() -> str:
 
 
 @pytest_asyncio.fixture
-async def test_database(postgres_admin_dsn: str) -> AsyncIterator[TestDatabase]:
+async def test_database(postgres_admin_dsn: str) -> AsyncIterator[ProvisionedDatabase]:
     async with provision_test_database(postgres_admin_dsn) as database:
         yield database

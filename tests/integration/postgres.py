@@ -41,7 +41,7 @@ def sqlalchemy_async_dsn(dsn: str) -> str:
 
 
 @dataclass(frozen=True, slots=True)
-class TestDatabase:
+class ProvisionedDatabase:
     """Isolated database with all roles required by the planned trust model."""
 
     admin_dsn: str
@@ -130,7 +130,7 @@ async def provision_test_database(admin_dsn: str):
     else:
         await admin.close()
 
-    fixture = TestDatabase(
+    fixture = ProvisionedDatabase(
         admin_dsn=admin_dsn,
         database=database,
         migration_role=migration_role,

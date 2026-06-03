@@ -7,14 +7,14 @@ from sqlalchemy import text
 
 from examples.invoicing.app.db import get_async_session
 from examples.invoicing.app.main import app
-from tests.integration.postgres import TestDatabase
+from tests.integration.postgres import ProvisionedDatabase
 
 pytestmark = pytest.mark.integration
 
 
 @pytest.mark.asyncio
 async def test_reference_app_boots_with_disposable_postgres(
-    test_database: TestDatabase,
+    test_database: ProvisionedDatabase,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("MERGEN_EXAMPLE_DATABASE_URL", test_database.app_sqlalchemy_dsn)
