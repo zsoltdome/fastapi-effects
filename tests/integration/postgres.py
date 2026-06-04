@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import secrets
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
@@ -27,6 +28,8 @@ def _quote_literal(value: str) -> str:
 def _dsn_with_credentials(admin_dsn: str, *, user: str, password: str, database: str) -> str:
     parsed = urlsplit(admin_dsn)
     host = parsed.hostname or "127.0.0.1"
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
     port = f":{parsed.port}" if parsed.port is not None else ""
     netloc = f"{quote(user, safe='')}:{quote(password, safe='')}@{host}{port}"
     return urlunsplit((parsed.scheme, netloc, f"/{database}", parsed.query, ""))
@@ -72,7 +75,7 @@ async def _connect(dsn: str) -> Any:
     try:
         import asyncpg
     except ImportError as exc:  # pragma: no cover - actionable environment failure
-        raise RuntimeError('Install test dependencies with "fastapi-mergen[test]".') from exc
+        raise RuntimeError('Install test dependencies with `uv sync --group test`.') from exc
     return await asyncpg.connect(dsn)
 
 
@@ -89,7 +92,9 @@ async def _cleanup(admin_dsn: str, *, database: str, roles: tuple[str, ...]) -> 
 
 
 @asynccontextmanager
-async def provision_test_database(admin_dsn: str):
+async def provision_test_database(
+    admin_dsn: str,
+) -> AsyncIterator[ProvisionedDatabase]:
     """Create unique roles/database and remove them even after a failed test."""
     suffix = f"{os.getpid()}_{uuid4().hex[:10]}"
     database = f"mergen_test_{suffix}"

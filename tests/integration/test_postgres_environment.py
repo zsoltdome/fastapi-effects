@@ -33,6 +33,8 @@ async def test_fixture_exposes_expected_role_flags(test_database: ProvisionedDat
             assert row["database"] == test_database.database
             assert row["rolsuper"] is False
             assert row["rolbypassrls"] is bypass
+            server_version = connection.get_server_version()
+            assert 16 <= server_version.major <= 18
         finally:
             await connection.close()
 
@@ -49,10 +51,12 @@ async def test_only_migration_owner_can_create_application_schema(
     finally:
         await owner.close()
 
+    import asyncpg
+
     for dsn in (test_database.app_dsn, test_database.relay_dsn):
         connection = await connect(dsn)
         try:
-            with pytest.raises(Exception, match="permission denied"):
+            with pytest.raises(asyncpg.InsufficientPrivilegeError):
                 await connection.fetchval("SELECT id FROM application.private_value")
         finally:
             await connection.close()

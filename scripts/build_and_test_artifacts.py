@@ -82,7 +82,7 @@ def smoke_install(
             "--disable-pip-version-check",
         ]
         if no_deps:
-            command.append("--no-deps")
+            command.extend(("--no-deps", "--ignore-installed"))
         command.append(requirement_for(artifact, extra))
         run(*command, cwd=root)
         code = [
