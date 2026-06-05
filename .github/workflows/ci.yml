@@ -33,7 +33,7 @@ jobs:
           version: "0.12.4"
           enable-cache: true
       - name: Install quality environment
-        run: uv sync --locked --extra test --group dev
+        run: uv sync --group dev
       - name: Check formatting
         run: uv run ruff format --check .
       - name: Lint source
@@ -83,6 +83,6 @@ jobs:
           version: "0.12.4"
           enable-cache: true
       - name: Install integration environment
-        run: uv sync --locked --extra test
+        run: uv sync --group test
       - name: Run PostgreSQL tests
         run: uv run pytest -q -m integration

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import site
 import subprocess
 import sys
 import tempfile
@@ -28,13 +29,26 @@ def python_in(environment: Path) -> Path:
     return environment / scripts / executable
 
 
-def create_environment(path: Path, *, system_site_packages: bool = False) -> Path:
-    venv.EnvBuilder(
-        with_pip=True,
-        clear=True,
-        system_site_packages=system_site_packages,
-    ).create(path)
-    return python_in(path)
+def create_environment(path: Path, *, parent_dependencies: bool = False) -> Path:
+    venv.EnvBuilder(with_pip=True, clear=True).create(path)
+    python = python_in(path)
+    if parent_dependencies:
+        if os.name == "nt":
+            purelib = path / "Lib" / "site-packages"
+        else:
+            purelib = (
+                path
+                / "lib"
+                / f"python{sys.version_info.major}.{sys.version_info.minor}"
+                / "site-packages"
+            )
+        purelib.mkdir(parents=True, exist_ok=True)
+        parent_paths = [entry for entry in site.getsitepackages() if Path(entry).is_dir()]
+        (purelib / "offline-parent-dependencies.pth").write_text(
+            "\n".join(parent_paths) + "\n",
+            encoding="utf-8",
+        )
+    return python
 
 
 def assert_uninstalled_import_fails(python: Path, empty_directory: Path) -> None:
@@ -58,7 +72,7 @@ def smoke_install(
     with tempfile.TemporaryDirectory(prefix="mergen-artifact-") as raw:
         root = Path(raw)
         environment = root / "venv"
-        python = create_environment(environment, system_site_packages=system_site_packages)
+        python = create_environment(environment, parent_dependencies=system_site_packages)
         assert_uninstalled_import_fails(python, root)
         command = [
             str(python),
@@ -68,7 +82,7 @@ def smoke_install(
             "--disable-pip-version-check",
         ]
         if no_deps:
-            command.append("--no-deps")
+            command.extend(("--no-deps", "--ignore-installed"))
         command.append(requirement_for(artifact, extra))
         run(*command, cwd=root)
         code = [
@@ -76,6 +90,8 @@ def smoke_install(
             "from pathlib import Path",
             "assert Path(fastapi_mergen.__file__).with_name('py.typed').is_file()",
             "assert not Path(fastapi_mergen.__file__).parents[1].joinpath('mergen').exists()",
+            "import sys",
+            "assert str(Path(fastapi_mergen.__file__).resolve()).startswith(str(Path(sys.prefix).resolve()))",
         ]
         if extra == "webhooks":
             code.append("import fastapi_mergen.webhooks")
@@ -95,7 +111,25 @@ def inspect_wheel(wheel: Path) -> None:
         raise AssertionError("wheel contains the occupied top-level mergen package")
 
 
-def build_with_available_backend() -> None:
+def build_with_available_backend(*, offline: bool) -> None:
+    if offline:
+        run(
+            sys.executable,
+            "-m",
+            "pip",
+            "wheel",
+            ".",
+            "--no-deps",
+            "--no-build-isolation",
+            "--wheel-dir",
+            str(DIST),
+        )
+        run(
+            sys.executable,
+            "-c",
+            "from setuptools.build_meta import build_sdist; build_sdist('dist')",
+        )
+        return
     if shutil.which("uv"):
         run("uv", "build", "--no-sources")
         return
@@ -134,7 +168,7 @@ def main() -> int:
     if not args.skip_build:
         shutil.rmtree(DIST, ignore_errors=True)
         DIST.mkdir(parents=True, exist_ok=True)
-        build_with_available_backend()
+        build_with_available_backend(offline=args.offline_system_packages)
 
     wheels = sorted(DIST.glob("*.whl"))
     sdists = sorted(DIST.glob("*.tar.gz"))

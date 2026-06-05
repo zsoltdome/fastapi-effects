@@ -1,0 +1,42 @@
+name: fastapi-mergen-tests
+
+services:
+  postgres16:
+    image: postgres:16-alpine
+    profiles: [pg16]
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mergen-test-only
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    ports:
+      - "55416:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    restart: "no"
+
+  postgres18:
+    image: postgres:18-alpine
+    profiles: [pg18]
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mergen-test-only
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    ports:
+      - "55418:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    restart: "no"

@@ -26,7 +26,7 @@ jobs:
           version: "0.12.4"
           enable-cache: true
       - name: Install security environment
-        run: uv sync --locked --group security
+        run: uv sync --group security
       - name: Audit dependencies
         run: uv run pip-audit
       - name: Scan source
