@@ -91,7 +91,9 @@ def smoke_install(
             "assert Path(fastapi_mergen.__file__).with_name('py.typed').is_file()",
             "assert not Path(fastapi_mergen.__file__).parents[1].joinpath('mergen').exists()",
             "import sys",
-            "assert str(Path(fastapi_mergen.__file__).resolve()).startswith(str(Path(sys.prefix).resolve()))",
+            "package_path = str(Path(fastapi_mergen.__file__).resolve())",
+            "prefix_path = str(Path(sys.prefix).resolve())",
+            "assert package_path.startswith(prefix_path)",
         ]
         if extra == "webhooks":
             code.append("import fastapi_mergen.webhooks")
