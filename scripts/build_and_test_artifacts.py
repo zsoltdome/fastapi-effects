@@ -99,6 +99,14 @@ def smoke_install(
             code.append("import fastapi_mergen.webhooks")
         elif extra == "otel":
             code.append("import fastapi_mergen.observability")
+        elif not no_deps:
+            code.extend(
+                (
+                    "import importlib.util",
+                    "assert importlib.util.find_spec('standardwebhooks') is None",
+                    "assert importlib.util.find_spec('opentelemetry.sdk') is None",
+                )
+            )
         run(str(python), "-c", ";".join(code), cwd=root)
         if not no_deps:
             run(str(python), "-m", "pip", "check", cwd=root)
