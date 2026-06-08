@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 import pytest
 from sqlalchemy import text
 
@@ -25,4 +23,3 @@ async def test_reference_app_boots_with_disposable_postgres(
         assert "/invoices" in app.openapi()["paths"]
     finally:
         await session_generator.aclose()
-        os.environ.pop("MERGEN_EXAMPLE_DATABASE_URL", None)
