@@ -104,7 +104,7 @@ def smoke_install(
                 (
                     "import importlib.util",
                     "assert importlib.util.find_spec('standardwebhooks') is None",
-                    "assert importlib.util.find_spec('opentelemetry.sdk') is None",
+                    "assert importlib.util.find_spec('opentelemetry') is None",
                 )
             )
         run(str(python), "-c", ";".join(code), cwd=root)
