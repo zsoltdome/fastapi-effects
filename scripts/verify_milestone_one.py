@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import ast
 import re
 import subprocess
@@ -338,29 +339,13 @@ def check_example_boot() -> None:
     subprocess.run((sys.executable, "-c", code), cwd=ROOT, check=True)
 
 
-def check_git_governance() -> None:
+def check_git_governance(*, require_clean: bool) -> None:
     if not (ROOT / ".git").is_dir():
         fail("Milestone ZIP must preserve the Git repository")
-    dirty = run_git("status", "--porcelain")
-    allowed_review_paths = {
-        "docs/milestone-1-review.md",
-        "scripts/verify_milestone_one.py",
-        "tests/unit/test_milestone_one_gate.py",
-    }
-    if dirty:
-        dirty_paths = {
-            line[3:] for line in dirty.splitlines() if len(line) > 3 and not line.startswith("??")
-        }
-        untracked_paths = {
-            line[3:] for line in dirty.splitlines() if len(line) > 3 and line.startswith("??")
-        }
-        unexpected = (dirty_paths | untracked_paths) - allowed_review_paths
-        if unexpected:
-            unexpected_display = sorted(unexpected)
-            fail(
-                "unexpected working-tree changes during milestone verification: "
-                f"{unexpected_display}"
-            )
+    if require_clean:
+        dirty = run_git("status", "--porcelain")
+        if dirty:
+            fail("working tree must be clean for final milestone verification")
 
     refs = run_git("for-each-ref", "--format=%(refname:short)", "refs/heads").splitlines()
     for branch in refs:
@@ -394,13 +379,21 @@ def check_git_governance() -> None:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--require-clean",
+        action="store_true",
+        help="Fail when tracked or untracked working-tree changes exist.",
+    )
+    args = parser.parse_args()
+
     check_required_paths()
     check_metadata()
     check_public_surface()
     check_contract_documents()
     check_ci_and_postgres_harness()
     check_example_boot()
-    check_git_governance()
+    check_git_governance(require_clean=args.require_clean)
     print("Milestone 1 structural verification passed")
     return 0
 
