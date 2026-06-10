@@ -97,6 +97,51 @@ def test_duplicate_route_and_version_downgrade_fail() -> None:
         ).to_handler(handler)
 
 
+
+def test_only_latest_route_version_is_active_for_new_emission() -> None:
+    mergen = build_mergen()
+
+    async def version_one(context: EffectContext[dict[str, str]]) -> None:
+        del context
+
+    async def version_two(context: EffectContext[dict[str, str]]) -> None:
+        del context
+
+    mergen.route(
+        event_type="invoice.created",
+        route_key="invoice.render_pdf",
+        version=1,
+    ).to_handler(version_one)
+    mergen.route(
+        event_type="invoice.created",
+        route_key="invoice.render_pdf",
+        version=2,
+    ).to_handler(version_two)
+
+    matches = mergen.matching_routes("invoice.created")
+    assert [(route.route_key, route.version) for route in matches] == [
+        ("invoice.render_pdf", 2)
+    ]
+    assert [(route.route_key, route.version) for route in mergen.routes] == [
+        ("invoice.render_pdf", 1),
+        ("invoice.render_pdf", 2),
+    ]
+
+
+def test_route_key_cannot_change_event_type() -> None:
+    mergen = build_mergen()
+    mergen.route(
+        event_type="invoice.created",
+        route_key="invoice.render_pdf",
+        version=1,
+    ).to_handler(handler)
+    with pytest.raises(MergenConfigurationError, match="cannot change its event type"):
+        mergen.route(
+            event_type="invoice.updated",
+            route_key="invoice.render_pdf",
+            version=2,
+        ).to_handler(handler)
+
 def test_mode_specific_route_validation() -> None:
     with pytest.raises(MergenConfigurationError, match="maximum snapshot age"):
         build_mergen().route(

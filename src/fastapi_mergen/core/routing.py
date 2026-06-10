@@ -66,7 +66,16 @@ class RouteRegistry:
             raise MergenConfigurationError(
                 f"Duplicate route registration: {spec.route_key}@{spec.version}."
             )
-        prior_versions = [version for key, version in self._routes if key == spec.route_key]
+        prior_specs = [
+            prior
+            for (key, _version), prior in self._routes.items()
+            if key == spec.route_key
+        ]
+        if any(prior.event_type != spec.event_type for prior in prior_specs):
+            raise MergenConfigurationError(
+                f"Route key {spec.route_key!r} cannot change its event type."
+            )
+        prior_versions = [prior.version for prior in prior_specs]
         if prior_versions and spec.version < max(prior_versions):
             raise MergenConfigurationError(
                 f"Route version downgrade is not allowed for {spec.route_key!r}."
@@ -86,10 +95,17 @@ class RouteRegistry:
         self._frozen = True
 
     def matching(self, event_type: str) -> tuple[RouteSpecification, ...]:
+        latest_by_key: dict[str, RouteSpecification] = {}
+        for spec in self._routes.values():
+            if spec.event_type != event_type:
+                continue
+            current = latest_by_key.get(spec.route_key)
+            if current is None or spec.version > current.version:
+                latest_by_key[spec.route_key] = spec
         return tuple(
             sorted(
-                (spec for spec in self._routes.values() if spec.event_type == event_type),
-                key=lambda spec: (spec.route_key, spec.version, spec.destination_key),
+                latest_by_key.values(),
+                key=lambda spec: (spec.route_key, spec.destination_key),
             )
         )
 
