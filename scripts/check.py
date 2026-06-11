@@ -31,6 +31,7 @@ def main() -> int:
     run("ruff", "check", ".")
     run("mypy")
     run(sys.executable, "scripts/architecture_gate.py")
+    run(sys.executable, "scripts/verify_milestone_one.py")
     run("pytest", "-q", "-m", "not integration")
     run(sys.executable, "scripts/build_and_test_artifacts.py")
     return 0

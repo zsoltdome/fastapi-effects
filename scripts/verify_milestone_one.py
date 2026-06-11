@@ -66,6 +66,7 @@ REQUIRED_PATHS = {
     "docs/operations/roles-and-rls.md",
     "docs/operations/relay.md",
     "docs/operations/retries-and-replay.md",
+    "docs/milestone-1-review.md",
     "examples/invoicing/app/main.py",
     "examples/invoicing/app/models.py",
     "examples/invoicing/app/schemas.py",
@@ -282,6 +283,14 @@ def check_contract_documents() -> None:
     for identifier in ("BC-01", "BC-02", "BC-03", "BC-04", "BC-05", "BC-06", "BC-07"):
         if identifier not in conformance:
             fail(f"conformance map is missing {identifier}")
+    require_phrases(
+        "docs/milestone-1-review.md",
+        (
+            "implementation complete; external matrix certification pending first CI run",
+            "No unverified external gate is represented as having passed locally",
+            "Milestone 1 implementation is signed off",
+        ),
+    )
 
 
 def check_ci_and_postgres_harness() -> None:
