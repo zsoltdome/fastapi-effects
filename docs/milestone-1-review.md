@@ -179,7 +179,7 @@ collisions, incomplete contracts, unsafe workflow drift, and non-compliant Git m
 ```text
 python -m compileall -q src examples scripts tests
 python -m pytest -q -m "not integration"
-# 25 passed, 3 deselected
+# 24 passed, 4 deselected
 
 python scripts/architecture_gate.py
 # Milestone 1 architecture gate passed
