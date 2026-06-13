@@ -31,6 +31,12 @@ class AuthorizationResolver(Protocol):
     ) -> frozenset[str]: ...
 
 
+class ServicePolicyRegistry(Protocol):
+    """Resolve named service authority during startup configuration."""
+
+    def capabilities_for(self, service_policy: str) -> frozenset[str] | None: ...
+
+
 class Clock(Protocol):
     """Return an aware current time for deterministic policy tests."""
 
@@ -54,4 +60,3 @@ class EffectStore(Protocol):
 
     @property
     def name(self) -> str: ...
-

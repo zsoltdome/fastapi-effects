@@ -18,9 +18,14 @@ ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
 
 
-def run(*command: str, cwd: Path = ROOT) -> None:
+def run(*command: str, cwd: Path = ROOT, clean_python: bool = False) -> None:
     print(f"+ {' '.join(command)}", flush=True)
-    subprocess.run(command, cwd=cwd, check=True)
+    environment = None
+    if clean_python:
+        environment = os.environ.copy()
+        environment.pop("PYTHONPATH", None)
+        environment.pop("PYTHONHOME", None)
+    subprocess.run(command, cwd=cwd, check=True, env=environment)
 
 
 def python_in(environment: Path) -> Path:
@@ -53,7 +58,7 @@ def create_environment(path: Path, *, parent_dependencies: bool = False) -> Path
 
 def assert_uninstalled_import_fails(python: Path, empty_directory: Path) -> None:
     code = "import importlib.util; assert importlib.util.find_spec('fastapi_mergen') is None"
-    run(str(python), "-c", code, cwd=empty_directory)
+    run(str(python), "-c", code, cwd=empty_directory, clean_python=True)
 
 
 def requirement_for(artifact: Path, extra: str | None) -> str:
@@ -73,7 +78,8 @@ def smoke_install(
         root = Path(raw)
         environment = root / "venv"
         python = create_environment(environment, parent_dependencies=system_site_packages)
-        assert_uninstalled_import_fails(python, root)
+        if not system_site_packages:
+            assert_uninstalled_import_fails(python, root)
         command = [
             str(python),
             "-m",
@@ -84,7 +90,7 @@ def smoke_install(
         if no_deps:
             command.extend(("--no-deps", "--ignore-installed"))
         command.append(requirement_for(artifact, extra))
-        run(*command, cwd=root)
+        run(*command, cwd=root, clean_python=True)
         code = [
             "import fastapi_mergen",
             "from pathlib import Path",
@@ -107,9 +113,9 @@ def smoke_install(
                     "assert importlib.util.find_spec('opentelemetry') is None",
                 )
             )
-        run(str(python), "-c", ";".join(code), cwd=root)
+        run(str(python), "-c", ";".join(code), cwd=root, clean_python=True)
         if not no_deps:
-            run(str(python), "-m", "pip", "check", cwd=root)
+            run(str(python), "-m", "pip", "check", cwd=root, clean_python=True)
 
 
 def inspect_wheel(wheel: Path) -> None:

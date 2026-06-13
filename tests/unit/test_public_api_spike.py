@@ -34,6 +34,25 @@ class StaticPrincipalProvider:
         )
 
 
+class StaticAuthorizationResolver:
+    async def resolve(
+        self,
+        principal: Principal,
+        required_scopes: frozenset[str],
+        mode: AuthorizationMode,
+        service_policy: str | None,
+    ) -> frozenset[str]:
+        del mode, service_policy
+        return principal.scopes & required_scopes
+
+
+class StaticServicePolicyRegistry:
+    def capabilities_for(self, service_policy: str) -> frozenset[str] | None:
+        if service_policy == "invoice-system":
+            return frozenset({"invoices:read", "invoices:write"})
+        return None
+
+
 class StubStore:
     @property
     def name(self) -> str:
@@ -45,7 +64,12 @@ async def handler(context: EffectContext[dict[str, str]]) -> None:
 
 
 def build_mergen() -> Mergen:
-    return Mergen(principal_provider=StaticPrincipalProvider(), store=StubStore())
+    return Mergen(
+        principal_provider=StaticPrincipalProvider(),
+        store=StubStore(),
+        authorization_resolver=StaticAuthorizationResolver(),
+        service_policy_registry=StaticServicePolicyRegistry(),
+    )
 
 
 def test_route_registration_and_exact_lookup() -> None:
@@ -154,6 +178,46 @@ def test_mode_specific_route_validation() -> None:
             event_type="invoice.created",
             route_key="invoice.service",
         ).to_handler(handler, authorization="service_policy")
+
+
+def test_freeze_requires_authorization_resolver() -> None:
+    mergen = Mergen(principal_provider=StaticPrincipalProvider(), store=StubStore())
+    mergen.route(
+        event_type="invoice.created",
+        route_key="invoice.render_pdf",
+    ).to_handler(handler, authorization="revalidate")
+    with pytest.raises(MergenConfigurationError, match="authorization resolver"):
+        mergen.freeze()
+
+
+def test_freeze_validates_named_service_policy() -> None:
+    mergen = build_mergen()
+    mergen.route(
+        event_type="invoice.created",
+        route_key="invoice.service",
+    ).to_handler(
+        handler,
+        authorization="service_policy",
+        service_policy="unknown-service",
+    )
+    with pytest.raises(MergenConfigurationError, match="not registered"):
+        mergen.freeze()
+
+
+def test_service_policy_capabilities_are_snapshotted() -> None:
+    mergen = build_mergen()
+    mergen.route(
+        event_type="invoice.created",
+        route_key="invoice.service",
+    ).to_handler(
+        handler,
+        authorization="service_policy",
+        service_policy="invoice-system",
+        required_scopes={"invoices:read"},
+    )
+    mergen.freeze()
+    route = mergen.routes[0]
+    assert route.service_capabilities == ("invoices:read", "invoices:write")
 
 
 def test_value_objects_validate_shape() -> None:
