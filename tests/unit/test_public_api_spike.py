@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import cast
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -180,6 +180,22 @@ def test_mode_specific_route_validation() -> None:
         ).to_handler(handler, authorization="service_policy")
 
 
+def test_route_rejects_sync_handlers_and_string_scopes() -> None:
+    def sync_handler(context: EffectContext[dict[str, str]]) -> None:
+        del context
+
+    with pytest.raises(MergenConfigurationError, match="asynchronous"):
+        build_mergen().route(
+            event_type="invoice.created",
+            route_key="invoice.sync",
+        ).to_handler(cast(Any, sync_handler))
+    with pytest.raises(MergenConfigurationError, match="collection of strings"):
+        build_mergen().route(
+            event_type="invoice.created",
+            route_key="invoice.bad_scopes",
+        ).to_handler(handler, required_scopes=cast(Any, "invoices:read"))
+
+
 def test_freeze_requires_authorization_resolver() -> None:
     mergen = Mergen(principal_provider=StaticPrincipalProvider(), store=StubStore())
     mergen.route(
@@ -243,6 +259,20 @@ def test_value_objects_validate_shape() -> None:
             handler_timeout_seconds=60,
             lease_duration_seconds=60,
         )
+    with pytest.raises(MergenConfigurationError, match="positive integer"):
+        Event(type="invoice.created", version=cast(Any, True), data={})
+    with pytest.raises(MergenConfigurationError, match="tenant_id"):
+        Principal(tenant_id=cast(Any, "tenant"), subject_id="user:1")
+    with pytest.raises(MergenConfigurationError, match="iterable of strings"):
+        Principal(
+            tenant_id=TENANT_ID,
+            subject_id="user:1",
+            scopes=cast(Any, "invoices:read"),
+        )
+    with pytest.raises(MergenConfigurationError, match="finite numbers"):
+        RetryPolicy(name="bad", base_delay_seconds=float("inf"))
+    with pytest.raises(MergenConfigurationError, match="Unsupported authorization"):
+        AuthorizationMode.parse(cast(Any, []))
 
 
 @pytest.mark.asyncio

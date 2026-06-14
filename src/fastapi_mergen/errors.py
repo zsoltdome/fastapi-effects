@@ -2,7 +2,17 @@
 
 from __future__ import annotations
 
+import re
 from uuid import UUID
+
+_CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _bounded_text(value: object, *, maximum: int) -> str:
+    if not isinstance(value, str):
+        return "invalid"
+    cleaned = _CONTROL_CHARACTERS.sub("?", value).strip()
+    return cleaned[:maximum] or "unspecified"
 
 
 class MergenError(Exception):
@@ -43,27 +53,27 @@ class RetryableDeliveryError(MergenError):
     """Classify an execution failure as retryable under immutable policy."""
 
     def __init__(self, *, code: str, summary: str) -> None:
-        self.code = code
-        self.summary = summary[:512]
-        super().__init__(f"Retryable delivery failure ({code}): {self.summary}")
+        self.code = _bounded_text(code, maximum=128)
+        self.summary = _bounded_text(summary, maximum=512)
+        super().__init__(f"Retryable delivery failure ({self.code}).")
 
 
 class PermanentDeliveryError(MergenError):
     """Classify an execution failure as terminal."""
 
     def __init__(self, *, code: str, summary: str) -> None:
-        self.code = code
-        self.summary = summary[:512]
-        super().__init__(f"Permanent delivery failure ({code}): {self.summary}")
+        self.code = _bounded_text(code, maximum=128)
+        self.summary = _bounded_text(summary, maximum=512)
+        super().__init__(f"Permanent delivery failure ({self.code}).")
 
 
 class DedupeConflict(MergenError):
     """Report a dedupe-key collision without exposing payload content."""
 
     def __init__(self, *, namespace: str, key: str) -> None:
-        self.namespace = namespace
-        self.key = key
-        super().__init__(f"Dedupe key conflicts in namespace {namespace!r}.")
+        self.namespace = _bounded_text(namespace, maximum=128)
+        self.key = _bounded_text(key, maximum=512)
+        super().__init__(f"Dedupe key conflicts in namespace {self.namespace!r}.")
 
 
 class LeaseLost(MergenError):
@@ -78,9 +88,9 @@ class SchemaRevisionMismatch(MergenError):
     """Report an unsupported durable schema or snapshot revision."""
 
     def __init__(self, *, component: str, expected: int, actual: int) -> None:
-        self.component = component
+        self.component = _bounded_text(component, maximum=128)
         self.expected = expected
         self.actual = actual
         super().__init__(
-            f"Unsupported {component} revision: expected {expected}, received {actual}."
+            f"Unsupported {self.component} revision: expected {expected}, received {actual}."
         )

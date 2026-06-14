@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from enum import StrEnum
-
 from fastapi_mergen.errors import MergenConfigurationError
 
 
@@ -19,5 +18,7 @@ class AuthorizationMode(StrEnum):
         """Parse a public string without accepting undocumented aliases."""
         try:
             return cls(value)
-        except ValueError as exc:
-            raise MergenConfigurationError(f"Unsupported authorization mode: {value!r}.") from exc
+        except (TypeError, ValueError) as exc:
+            raise MergenConfigurationError(
+                f"Unsupported authorization mode: {value!r}."
+            ) from exc
