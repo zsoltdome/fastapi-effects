@@ -1,13 +1,11 @@
 """Intentionally narrow public API for the Milestone 1 design spike."""
 
-from __future__ import annotations
-
 import inspect
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
-from typing import Any, Generic, TypeVar
+from typing import Annotated, Any, Generic, TypeVar
 from uuid import UUID
 
 from fastapi import Depends, Request
@@ -37,6 +35,7 @@ from fastapi_mergen.sqlalchemy.uow import MergenUnitOfWork
 
 PayloadT = TypeVar("PayloadT", covariant=True)
 SessionDependency = Callable[..., Any]
+PrincipalDependency = Callable[[Request], Awaitable[Principal]]
 _ROUTE_KEY = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 
 
@@ -69,6 +68,10 @@ class EffectContext(Generic[PayloadT]):
             raise MergenConfigurationError("Effect context route_version must be positive.")
         if not _is_positive_integer(self.attempt_number):
             raise MergenConfigurationError("Effect context attempt_number must be positive.")
+        if self._application_session_provider is not None and not callable(
+            self._application_session_provider
+        ):
+            raise MergenConfigurationError("Application session provider must be callable.")
 
     def application_session(self) -> AbstractAsyncContextManager[AsyncSession]:
         """Open a fresh tenant-bound app session, never the relay control session."""
@@ -113,6 +116,8 @@ class Mergen:
                 raise MergenConfigurationError(
                     "service_policy_registry.capabilities_for must be synchronous."
                 )
+        if handler_session_provider is not None and not callable(handler_session_provider):
+            raise MergenConfigurationError("handler_session_provider must be callable.")
         self._principal_provider = principal_provider
         self._store = store
         self._authorization_resolver = authorization_resolver
@@ -125,7 +130,12 @@ class Mergen:
     @property
     def store_name(self) -> str | None:
         """Expose only the declared store identity, not persistence internals."""
-        return None if self._store is None else self._store.name
+        if self._store is None:
+            return None
+        name = self._store.name
+        if not isinstance(name, str) or not name:
+            raise MergenConfigurationError("Effect store name must be a non-empty string.")
+        return name
 
     @property
     def routes(self) -> tuple[RouteSpecification, ...]:
@@ -187,25 +197,36 @@ class Mergen:
         """Return deterministic exact matches for API-spike evaluation."""
         return self._registry.matching(event_type)
 
-    def uow_dependency(
-        self,
-        session_dependency: SessionDependency,
-    ) -> Callable[..., Awaitable[MergenUnitOfWork]]:
-        """Build a FastAPI dependency that resolves principal before UoW entry.
+    def principal_dependency(self) -> PrincipalDependency:
+        """Build the trusted request-edge dependency without creating a DB session."""
 
-        The supplied session dependency owns session creation/finalization. This
-        wrapper performs no application SQL and does not enter a transaction.
-        """
-
-        async def dependency(
-            request: Request,
-            session: AsyncSession = Depends(session_dependency),
-        ) -> MergenUnitOfWork:
+        async def dependency(request: Request) -> Principal:
             principal = await self._principal_provider(request)
             if not isinstance(principal, Principal):
                 raise MergenConfigurationError(
                     "Principal provider must return a validated Principal instance."
                 )
+            return principal
+
+        return dependency
+
+    def uow_dependency(
+        self,
+        session_dependency: SessionDependency,
+    ) -> Callable[..., Awaitable[MergenUnitOfWork]]:
+        """Resolve principal before constructing the application session dependency.
+
+        The supplied session dependency owns session creation/finalization. This
+        wrapper performs no application SQL and does not enter a transaction.
+        FastAPI resolves dependencies in declaration order, so authentication and
+        tenant membership fail before the session dependency is entered.
+        """
+        resolve_principal = self.principal_dependency()
+
+        async def dependency(
+            principal: Annotated[Principal, Depends(resolve_principal)],
+            session: Annotated[AsyncSession, Depends(session_dependency)],
+        ) -> MergenUnitOfWork:
             return MergenUnitOfWork(session=session, principal=principal)
 
         return dependency
@@ -231,8 +252,7 @@ class Mergen:
     def _prepare_authorization_snapshots(self) -> None:
         specifications = self._registry.specifications()
         if any(
-            spec.authorization is AuthorizationMode.REVALIDATE
-            for spec in specifications
+            spec.authorization is AuthorizationMode.REVALIDATE for spec in specifications
         ) and self._authorization_resolver is None:
             raise MergenConfigurationError(
                 "Revalidate routes require an authorization resolver."
@@ -251,7 +271,7 @@ class Mergen:
                 "Service-policy routes require a service policy registry."
             )
 
-        resolved: list[tuple[str, int, frozenset[str]]] = []
+        resolved: dict[tuple[str, int], Iterable[str]] = {}
         for spec in service_routes:
             policy = spec.service_policy
             if policy is None:
@@ -266,14 +286,9 @@ class Mergen:
                 ) from exc
             if capabilities is None:
                 raise MergenConfigurationError("Named service policy is not registered.")
-            resolved.append((spec.route_key, spec.version, capabilities))
+            resolved[(spec.route_key, spec.version)] = capabilities
 
-        for route_key, version, capabilities in resolved:
-            self._registry.snapshot_service_capabilities(
-                route_key=route_key,
-                version=version,
-                capabilities=capabilities,
-            )
+        self._registry.snapshot_service_capabilities(resolved)
 
 
 def _is_async_callable(value: object) -> bool:

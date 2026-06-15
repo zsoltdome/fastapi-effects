@@ -3,20 +3,12 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 
 from fastapi_mergen.errors import MergenConfigurationError
 
-
-def _is_positive_integer(value: object) -> bool:
-    return isinstance(value, int) and not isinstance(value, bool) and value > 0
-
-
-def _finite_number(value: object) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    converted = float(value)
-    return converted if math.isfinite(converted) else None
+_POLICY_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,13 +26,10 @@ class RetryPolicy:
     jitter: str = "full"
 
     def __post_init__(self) -> None:
-        if (
-            not isinstance(self.name, str)
-            or not self.name.strip()
-            or self.name != self.name.strip()
-            or len(self.name) > 128
-        ):
-            raise MergenConfigurationError("Retry policy name must be trimmed and non-blank.")
+        if not isinstance(self.name, str) or not _POLICY_NAME_PATTERN.fullmatch(self.name):
+            raise MergenConfigurationError(
+                "Retry policy name must be a lower-case stable key."
+            )
         if not _is_positive_integer(self.version) or not _is_positive_integer(
             self.max_attempts
         ):
@@ -52,19 +41,36 @@ class RetryPolicy:
                 "Retry maximum elapsed time must be a positive integer."
             )
 
-        base_delay = _finite_number(self.base_delay_seconds)
-        maximum_delay = _finite_number(self.maximum_delay_seconds)
-        handler_timeout = _finite_number(self.handler_timeout_seconds)
-        lease_duration = _finite_number(self.lease_duration_seconds)
-        if base_delay is None or maximum_delay is None:
-            raise MergenConfigurationError("Retry delay bounds must be finite numbers.")
+        base_delay = _finite_number("base delay", self.base_delay_seconds)
+        maximum_delay = _finite_number("maximum delay", self.maximum_delay_seconds)
+        handler_timeout = _finite_number("handler timeout", self.handler_timeout_seconds)
+        lease_duration = _finite_number("lease duration", self.lease_duration_seconds)
         if base_delay < 0 or maximum_delay < base_delay:
             raise MergenConfigurationError("Retry delay bounds are invalid.")
-        if handler_timeout is None or lease_duration is None:
-            raise MergenConfigurationError("Timeout and lease duration must be finite numbers.")
         if handler_timeout <= 0 or lease_duration <= 0:
             raise MergenConfigurationError("Timeout and lease duration must be positive.")
         if lease_duration <= handler_timeout:
             raise MergenConfigurationError("Lease duration must exceed the handler timeout.")
-        if not isinstance(self.jitter, str) or self.jitter != "full":
+        if maximum_delay > self.maximum_elapsed_seconds:
+            raise MergenConfigurationError(
+                "Retry maximum delay must not exceed maximum elapsed time."
+            )
+        if handler_timeout > self.maximum_elapsed_seconds:
+            raise MergenConfigurationError(
+                "Handler timeout must not exceed maximum elapsed time."
+            )
+        if self.jitter != "full":
             raise MergenConfigurationError("Milestone 1 permits only full-jitter retry policy.")
+
+
+def _is_positive_integer(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _finite_number(name: str, value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise MergenConfigurationError(f"Retry {name} must be numeric.")
+    numeric = float(value)
+    if not math.isfinite(numeric):
+        raise MergenConfigurationError(f"Retry {name} must be finite.")
+    return numeric

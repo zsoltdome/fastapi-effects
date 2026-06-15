@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from contextlib import AbstractAsyncContextManager
 from datetime import datetime
 from typing import Protocol
@@ -34,7 +35,7 @@ class AuthorizationResolver(Protocol):
 class ServicePolicyRegistry(Protocol):
     """Resolve named service authority during startup configuration."""
 
-    def capabilities_for(self, service_policy: str) -> frozenset[str] | None: ...
+    def capabilities_for(self, service_policy: str) -> Iterable[str] | None: ...
 
 
 class Clock(Protocol):

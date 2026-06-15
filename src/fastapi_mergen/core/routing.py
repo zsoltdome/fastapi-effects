@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 import re
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 PayloadT = TypeVar("PayloadT")
 Handler = Callable[["EffectContext[Any]"], Awaitable[None]]
+RouteIdentity = tuple[str, int]
 _ROUTE_KEY = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 _SCOPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
@@ -42,8 +43,8 @@ class RouteRegistry:
     """Register exact routes and handlers, then freeze before startup."""
 
     def __init__(self) -> None:
-        self._routes: dict[tuple[str, int], RouteSpecification] = {}
-        self._handlers: dict[tuple[str, int], Handler] = {}
+        self._routes: dict[RouteIdentity, RouteSpecification] = {}
+        self._handlers: dict[RouteIdentity, Handler] = {}
         self._frozen = False
 
     @property
@@ -56,7 +57,7 @@ class RouteRegistry:
         if not _is_async_callable(handler):
             raise MergenConfigurationError("Handlers must be asynchronous callables.")
         if not _is_positive_integer(version):
-            raise MergenConfigurationError("Handler version must be positive.")
+            raise MergenConfigurationError("Handler version must be a positive integer.")
         identity = (key, version)
         existing = self._handlers.get(identity)
         if existing is not None and existing is not handler:
@@ -71,9 +72,7 @@ class RouteRegistry:
                 f"Duplicate route registration: {spec.route_key}@{spec.version}."
             )
         prior_specs = [
-            prior
-            for (key, _version), prior in self._routes.items()
-            if key == spec.route_key
+            prior for (key, _version), prior in self._routes.items() if key == spec.route_key
         ]
         if any(prior.event_type != spec.event_type for prior in prior_specs):
             raise MergenConfigurationError(
@@ -89,23 +88,24 @@ class RouteRegistry:
 
     def snapshot_service_capabilities(
         self,
-        *,
-        route_key: str,
-        version: int,
-        capabilities: Iterable[str],
+        snapshots: Mapping[RouteIdentity, Iterable[str]],
     ) -> None:
-        """Pin validated service capabilities into one immutable route definition."""
+        """Atomically pin validated service capabilities into route definitions."""
         self._require_mutable()
-        identity = (route_key, version)
-        spec = self._routes.get(identity)
-        if spec is None or spec.authorization is not AuthorizationMode.SERVICE_POLICY:
-            raise MergenConfigurationError("Service capabilities target an unknown route.")
-        normalized = _normalize_scopes(capabilities)
-        if not set(spec.required_scopes).issubset(normalized):
-            raise MergenConfigurationError(
-                "Named service policy lacks a required route capability."
-            )
-        self._routes[identity] = replace(spec, service_capabilities=normalized)
+        staged: dict[RouteIdentity, RouteSpecification] = {}
+        for identity, capabilities in snapshots.items():
+            spec = self._routes.get(identity)
+            if spec is None or spec.authorization is not AuthorizationMode.SERVICE_POLICY:
+                raise MergenConfigurationError(
+                    "Service capabilities target an unknown service-policy route."
+                )
+            normalized = _normalize_scopes(capabilities)
+            if not set(spec.required_scopes).issubset(normalized):
+                raise MergenConfigurationError(
+                    "Named service policy lacks a required route capability."
+                )
+            staged[identity] = replace(spec, service_capabilities=normalized)
+        self._routes.update(staged)
 
     def freeze(self) -> None:
         if self._frozen:
@@ -126,6 +126,7 @@ class RouteRegistry:
         self._frozen = True
 
     def matching(self, event_type: str) -> tuple[RouteSpecification, ...]:
+        _validate_event_type(event_type)
         latest_by_key: dict[str, RouteSpecification] = {}
         for spec in self._routes.values():
             if spec.event_type != event_type:
@@ -196,7 +197,7 @@ class HandlerRouteBuilder(Generic[PayloadT]):
                     "Revalidate authorization does not accept snapshot age or service policy."
                 )
         else:
-            if not service_policy:
+            if service_policy is None:
                 raise MergenConfigurationError(
                     "Service-policy authorization requires a named service policy."
                 )
@@ -227,15 +228,19 @@ class HandlerRouteBuilder(Generic[PayloadT]):
 
 
 def validate_route_declaration(*, event_type: str, route_key: str, version: int) -> None:
+    _validate_event_type(event_type)
+    _validate_key("Route key", route_key)
+    if not _is_positive_integer(version):
+        raise MergenConfigurationError("Route version must be a positive integer.")
+
+
+def _validate_event_type(event_type: str) -> None:
     from fastapi_mergen.core.event import Event
 
     Event(type=event_type, version=1, data=None)
-    _validate_key("Route key", route_key)
-    if not _is_positive_integer(version):
-        raise MergenConfigurationError("Route version must be positive.")
 
 
-def _validate_key(name: str, value: str) -> None:
+def _validate_key(name: str, value: object) -> None:
     if not isinstance(value, str) or not _ROUTE_KEY.fullmatch(value):
         raise MergenConfigurationError(
             f"{name} must use lower-case letters, digits, dots, underscores, or hyphens."
@@ -252,8 +257,7 @@ def _normalize_scopes(scopes: Iterable[str]) -> tuple[str, ...]:
             "Route scopes must be an iterable of hashable strings."
         ) from exc
     if len(unique_scopes) > 256 or any(
-        not isinstance(scope, str) or not _SCOPE.fullmatch(scope)
-        for scope in unique_scopes
+        not isinstance(scope, str) or not _SCOPE.fullmatch(scope) for scope in unique_scopes
     ):
         raise MergenConfigurationError("Route contains invalid required scopes.")
     return tuple(sorted(unique_scopes))

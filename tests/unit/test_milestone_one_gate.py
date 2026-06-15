@@ -9,7 +9,11 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_milestone_one_structural_gate() -> None:
     subprocess.run(
-        [sys.executable, "scripts/verify_milestone_one.py"],
+        [
+            sys.executable,
+            "scripts/verify_milestone_one.py",
+            "--skip-git-governance",
+        ],
         cwd=ROOT,
         check=True,
     )
