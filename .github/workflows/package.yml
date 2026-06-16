@@ -33,7 +33,7 @@ jobs:
       - name: Build and test artifacts
         run: uv run python scripts/build_and_test_artifacts.py
       - name: Upload distributions
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
         with:
           name: distributions
           path: dist/*

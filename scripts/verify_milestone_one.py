@@ -33,6 +33,7 @@ REQUIRED_PATHS = {
     "SECURITY.md",
     "CONTRIBUTING.md",
     "CHANGELOG.md",
+    "IMPLEMENTATION_REPORT.md",
     "compose.yaml",
     ".env.example",
     ".github/workflows/ci.yml",
@@ -44,6 +45,9 @@ REQUIRED_PATHS = {
     "src/fastapi_mergen/errors.py",
     "src/fastapi_mergen/py.typed",
     "src/fastapi_mergen/core/protocols.py",
+    "src/fastapi_mergen/postgres/__init__.py",
+    "src/fastapi_mergen/postgres/store.py",
+    "src/fastapi_mergen/sqlalchemy/__init__.py",
     "src/fastapi_mergen/sqlalchemy/uow.py",
     "scripts/check.py",
     "scripts/architecture_gate.py",
@@ -284,6 +288,14 @@ def check_contract_documents() -> None:
         if identifier not in conformance:
             fail(f"conformance map is missing {identifier}")
     require_phrases(
+        "docs/reference/public-api-spike.md",
+        (
+            "from fastapi_mergen.postgres import PostgresStore",
+            "from fastapi_mergen.sqlalchemy import MergenUnitOfWork",
+            "fail-closed Milestone 1 declaration",
+        ),
+    )
+    require_phrases(
         "docs/milestone-1-review.md",
         (
             "implementation complete; external matrix certification pending first CI run",
@@ -394,6 +406,11 @@ def main() -> int:
         action="store_true",
         help="Fail when tracked or untracked working-tree changes exist.",
     )
+    parser.add_argument(
+        "--skip-git-governance",
+        action="store_true",
+        help="Skip local branch/author checks in detached or contributor CI checkouts.",
+    )
     args = parser.parse_args()
 
     check_required_paths()
@@ -402,7 +419,8 @@ def main() -> int:
     check_contract_documents()
     check_ci_and_postgres_harness()
     check_example_boot()
-    check_git_governance(require_clean=args.require_clean)
+    if not args.skip_git_governance:
+        check_git_governance(require_clean=args.require_clean)
     print("Milestone 1 structural verification passed")
     return 0
 

@@ -32,7 +32,7 @@ claimed as locally certified.
 |---|---|---|
 | Event/delivery identity, route snapshots, dedupe, replay, RLS trust, authorization, and lease behavior are unambiguous | **Complete** | Boundary Contract, five ADRs, data-model reference, route-snapshot schema, UoW lifecycle, failure taxonomy, and conformance map |
 | API spike compiles, boots, and reaches no application SQL when Milestone 2 behavior is requested | **Complete** | `tests/unit/test_public_api_spike.py`, `tests/unit/test_error_safety.py`, reference-app boot tests |
-| Clean source/wheel import and optional-feature boundaries are exercised | **Locally certified for base wheel; CI certification pending for all extras/sdist** | `scripts/build_and_test_artifacts.py`, packaging tests, Package workflow |
+| Clean source/wheel import and optional-feature boundaries are exercised | **Locally certified for the base wheel and artifact contents; networked extra/sdist installation pending CI** | `scripts/build_and_test_artifacts.py`, packaging tests, Package workflow |
 | PostgreSQL 16 and 18 environment exists with migration, app, relay, and misconfigured roles | **Implemented; CI certification pending** | `compose.yaml`, disposable role/database fixtures, pairwise PostgreSQL CI jobs |
 | Remaining implementation work is represented in M2/M3 backlog | **Complete** | M2: 100–130 h; M3: 80–110 h; combined 18–22 part-time weeks, within the 21–26 week MDP envelope including M1 and reserve |
 
@@ -149,7 +149,8 @@ matrix. Handler or network I/O while claim locks are held is prohibited.
 
 The spike includes immutable `Principal`, typed `Event`, route/handler registration,
 `RetryPolicy`, authorization modes, `EffectContext`, explicit `MergenUnitOfWork`, narrow
-protocols, and a public exception taxonomy. Exact routes, active-version selection, and
+protocols, documented `postgres`/`sqlalchemy` integration namespaces, and a public exception
+taxonomy. Exact routes, active-version selection, service-capability snapshotting, and
 duplicate/downgrade/freeze checks execute; persistence-dependent calls fail closed.
 
 ### M1.12 — PostgreSQL test environment
@@ -179,7 +180,7 @@ collisions, incomplete contracts, unsafe workflow drift, and non-compliant Git m
 ```text
 python -m compileall -q src examples scripts tests
 python -m pytest -q -m "not integration"
-# 24 passed, 4 deselected
+# 37 passed, 3 deselected
 
 python scripts/architecture_gate.py
 # Milestone 1 architecture gate passed
@@ -188,7 +189,10 @@ python scripts/verify_milestone_one.py
 # Milestone 1 structural verification passed
 
 python scripts/build_and_test_artifacts.py --offline-system-packages
-# wheel + sdist built; base wheel clean-installed and imported
+# wheel + sdist built and inspected; base wheel clean-installed and imported
+
+python -m pytest -q -m integration
+# 3 skipped because MERGEN_TEST_ADMIN_DSN was unavailable
 
 git diff --check
 git fsck --full

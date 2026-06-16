@@ -9,12 +9,11 @@ permissions:
 
 jobs:
   publish:
-    if: >-
-      github.repository == 'mergen-institute/fastapi-mergen' &&
-      !github.event.release.prerelease
+    if: github.repository == 'mergen-institute/fastapi-mergen'
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
+      contents: read
       id-token: write
     steps:
       - name: Checkout
@@ -27,7 +26,13 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "0.12.4"
-      - name: Build distributions
-        run: uv build --no-sources
+      - name: Install packaging environment
+        run: uv sync --group dev
+      - name: Verify release version
+        run: |
+          package_version="$(uv run python -c 'from fastapi_mergen import __version__; print(__version__)')"
+          test "v${package_version}" = "${GITHUB_REF_NAME}"
+      - name: Build and test distributions
+        run: uv run python scripts/build_and_test_artifacts.py
       - name: Publish with trusted identity
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
