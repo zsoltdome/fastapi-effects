@@ -9,6 +9,7 @@ import shutil
 import site
 import subprocess
 import sys
+import tarfile
 import tempfile
 import venv
 import zipfile
@@ -16,11 +17,29 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
+OPTIONAL_MODULES = (
+    "cryptography",
+    "httpx",
+    "standardwebhooks",
+    "opentelemetry",
+    "opentelemetry.sdk",
+)
 
 
-def run(*command: str, cwd: Path = ROOT) -> None:
+def run(
+    *command: str,
+    cwd: Path = ROOT,
+    clean_python: bool = False,
+) -> None:
     print(f"+ {' '.join(command)}", flush=True)
-    subprocess.run(command, cwd=cwd, check=True)
+    environment = None
+    if clean_python:
+        environment = os.environ.copy()
+        environment.pop("PYTHONHOME", None)
+        environment.pop("PYTHONPATH", None)
+        environment["PIP_NO_INPUT"] = "1"
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    subprocess.run(command, cwd=cwd, check=True, env=environment)
 
 
 def python_in(environment: Path) -> Path:
@@ -53,7 +72,7 @@ def create_environment(path: Path, *, parent_dependencies: bool = False) -> Path
 
 def assert_uninstalled_import_fails(python: Path, empty_directory: Path) -> None:
     code = "import importlib.util; assert importlib.util.find_spec('fastapi_mergen') is None"
-    run(str(python), "-c", code, cwd=empty_directory)
+    run(str(python), "-c", code, cwd=empty_directory, clean_python=True)
 
 
 def requirement_for(artifact: Path, extra: str | None) -> str:
@@ -73,33 +92,69 @@ def smoke_install(
         root = Path(raw)
         environment = root / "venv"
         python = create_environment(environment, parent_dependencies=system_site_packages)
-        assert_uninstalled_import_fails(python, root)
+        if not system_site_packages:
+            assert_uninstalled_import_fails(python, root)
         command = [
             str(python),
             "-m",
             "pip",
             "install",
             "--disable-pip-version-check",
+            "--no-input",
+            "--no-cache-dir",
         ]
         if no_deps:
             command.extend(("--no-deps", "--ignore-installed"))
         command.append(requirement_for(artifact, extra))
-        run(*command, cwd=root)
+        run(*command, cwd=root, clean_python=True)
+
         code = [
-            "import fastapi_mergen",
-            "from pathlib import Path",
-            "assert Path(fastapi_mergen.__file__).with_name('py.typed').is_file()",
-            "assert not Path(fastapi_mergen.__file__).parents[1].joinpath('mergen').exists()",
+            "import importlib.metadata",
+            "import importlib.util",
             "import sys",
-            "assert str(Path(fastapi_mergen.__file__).resolve()).startswith(str(Path(sys.prefix).resolve()))",
+            "from pathlib import Path",
+            "import fastapi_mergen",
+            "package_path = Path(fastapi_mergen.__file__).resolve()",
+            "prefix_path = Path(sys.prefix).resolve()",
+            "assert package_path.is_relative_to(prefix_path), package_path",
+            "assert package_path.with_name('py.typed').is_file()",
+            "assert not package_path.parents[1].joinpath('mergen').exists()",
+            "metadata = importlib.metadata.metadata('fastapi-mergen')",
+            "assert metadata['Name'] == 'fastapi-mergen'",
+            "assert metadata['Author'] == 'mergen-institute'",
         ]
         if extra == "webhooks":
             code.append("import fastapi_mergen.webhooks")
         elif extra == "otel":
             code.append("import fastapi_mergen.observability")
-        run(str(python), "-c", ";".join(code), cwd=root)
+        elif not no_deps:
+            code.extend(
+                (
+                    f"optional_modules = {OPTIONAL_MODULES!r}",
+                    "for module in optional_modules:\n"
+                    "    try:\n"
+                    "        available = importlib.util.find_spec(module) is not None\n"
+                    "    except (ImportError, ModuleNotFoundError, ValueError):\n"
+                    "        available = False\n"
+                    "    assert not available, module",
+                )
+            )
+        run(
+            str(python),
+            "-c",
+            "\n".join(code),
+            cwd=root,
+            clean_python=True,
+        )
         if not no_deps:
-            run(str(python), "-m", "pip", "check", cwd=root)
+            run(
+                str(python),
+                "-m",
+                "pip",
+                "check",
+                cwd=root,
+                clean_python=True,
+            )
 
 
 def inspect_wheel(wheel: Path) -> None:
@@ -109,6 +164,17 @@ def inspect_wheel(wheel: Path) -> None:
         raise AssertionError("wheel does not contain fastapi_mergen/py.typed")
     if any(name.startswith("mergen/") for name in names):
         raise AssertionError("wheel contains the occupied top-level mergen package")
+    if any("/.git/" in name or name.startswith(".git/") for name in names):
+        raise AssertionError("wheel contains Git repository metadata")
+
+
+def inspect_sdist(sdist: Path) -> None:
+    with tarfile.open(sdist, "r:gz") as archive:
+        names = set(archive.getnames())
+    if not any(name.endswith("/src/fastapi_mergen/py.typed") for name in names):
+        raise AssertionError("sdist does not contain fastapi_mergen/py.typed")
+    if any("/.git/" in name or name.endswith("/.git") for name in names):
+        raise AssertionError("sdist contains Git repository metadata")
 
 
 def build_with_available_backend(*, offline: bool) -> None:
@@ -175,14 +241,16 @@ def main() -> int:
     if len(wheels) != 1 or len(sdists) != 1:
         raise AssertionError("expected exactly one wheel and one sdist")
     wheel = wheels[0]
+    sdist = sdists[0]
     inspect_wheel(wheel)
+    inspect_sdist(sdist)
 
     offline = args.offline_system_packages
     smoke_install(wheel, None, system_site_packages=offline, no_deps=offline)
     if not offline:
         smoke_install(wheel, "webhooks", system_site_packages=False, no_deps=False)
         smoke_install(wheel, "otel", system_site_packages=False, no_deps=False)
-        smoke_install(sdists[0], None, system_site_packages=False, no_deps=False)
+        smoke_install(sdist, None, system_site_packages=False, no_deps=False)
     print("Clean artifact smoke tests passed")
     return 0
 

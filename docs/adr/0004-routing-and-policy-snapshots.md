@@ -14,7 +14,10 @@ configuration can silently alter committed intent or expand authority.
 - Give each route an explicit stable key and positive version.
 - Validate handlers, retry profiles, authorization resolvers, and service policies,
   then freeze the registry.
-- Resolve deterministic routes during `emit()`.
+- Retain registered historical handler versions for already-snapshotted deliveries,
+  but select only the highest registered version of each stable route key for new
+  emissions. A route key cannot change its event type.
+- Resolve deterministic active routes during `emit()`.
 - Store route key/version, destination snapshot, policy snapshot, retry values, and
   snapshot schema version per delivery.
 - Store no Python callable, raw credential, or plaintext secret.

@@ -22,6 +22,20 @@ __version__
 Repository, ORM model, SQL expression, DBAPI connection, relay-session, and HTTP client
 internals are not root exports.
 
+## Documented integration namespaces
+
+The root remains intentionally small. Integration-specific declarations are imported from
+their owned namespaces:
+
+```python
+from fastapi_mergen.postgres import PostgresStore
+from fastapi_mergen.sqlalchemy import MergenUnitOfWork
+```
+
+`PostgresStore` is a fail-closed Milestone 1 declaration. Calling its persistence guard
+raises `MilestoneNotImplementedError`; it does not imply that schema, RLS, or event
+persistence already exists.
+
 ## Route declaration
 
 ```python
@@ -38,7 +52,10 @@ mergen.route(
 ```
 
 Registration freezes before serving. Exact event-type matching and explicit
-key/version are deliberate; wildcard/filter DSLs are outside the MDP.
+key/version are deliberate. The highest registered version of a stable route key is
+active for new emissions; older registered handlers remain available only for
+already-snapshotted deliveries. A route key cannot change event type. Wildcard/filter
+DSLs are outside the MDP.
 
 ## Request unit of work
 

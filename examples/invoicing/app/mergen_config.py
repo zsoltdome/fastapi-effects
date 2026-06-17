@@ -2,26 +2,35 @@
 
 from __future__ import annotations
 
-from fastapi_mergen import AuthorizationMode, EffectContext, Mergen, RetryPolicy
+from fastapi_mergen import AuthorizationMode, EffectContext, Mergen, Principal, RetryPolicy
+from fastapi_mergen.postgres import PostgresStore
 
 from .auth import DemoPrincipalProvider
 from .schemas import InvoiceCreated
 
 
-class MilestoneOneStore:
-    @property
-    def name(self) -> str:
-        return "milestone-one-safety-stub"
+class DemoAuthorizationResolver:
+    async def resolve(
+        self,
+        principal: Principal,
+        required_scopes: frozenset[str],
+        mode: AuthorizationMode,
+        service_policy: str | None,
+    ) -> frozenset[str]:
+        del mode, service_policy
+        return principal.scopes & required_scopes
 
 
 async def render_invoice_pdf(context: EffectContext[InvoiceCreated]) -> None:
     """Future tenant-bound handler; no task queue is implied."""
+
     del context
 
 
 mergen = Mergen(
     principal_provider=DemoPrincipalProvider(),
-    store=MilestoneOneStore(),
+    store=PostgresStore(),
+    authorization_resolver=DemoAuthorizationResolver(),
 )
 
 mergen.route(

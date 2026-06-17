@@ -16,8 +16,8 @@ class AuthorizationMode(StrEnum):
 
     @classmethod
     def parse(cls, value: AuthorizationMode | str) -> AuthorizationMode:
-        """Parse a public string without accepting undocumented aliases."""
+        """Parse a public string without accepting aliases or echoing unsafe input."""
         try:
             return cls(value)
-        except ValueError as exc:
-            raise MergenConfigurationError(f"Unsupported authorization mode: {value!r}.") from exc
+        except (TypeError, ValueError) as exc:
+            raise MergenConfigurationError("Unsupported authorization mode.") from exc

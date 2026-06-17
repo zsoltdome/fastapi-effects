@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from tests.integration.postgres import _dsn_with_credentials, _quote_identifier, sqlalchemy_async_dsn
+from tests.integration.postgres import (
+    _dsn_with_credentials,
+    _quote_identifier,
+    sqlalchemy_async_dsn,
+)
 
 
 def test_generated_identifier_validation() -> None:

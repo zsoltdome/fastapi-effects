@@ -10,21 +10,33 @@ from uuid import UUID
 from fastapi_mergen.errors import MergenConfigurationError
 
 _SCOPE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+_CONTROL_CHARACTER_PATTERN = re.compile(r"[\x00-\x1f\x7f]")
 _MAX_SCOPES = 256
 _MAX_ID_LENGTH = 512
 
 
-def _validate_identifier(*, name: str, value: str | None) -> None:
+def _validate_identifier(*, name: str, value: object) -> None:
     if value is None:
         return
-    if not value.strip() or value != value.strip() or len(value) > _MAX_ID_LENGTH:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or len(value) > _MAX_ID_LENGTH
+        or _CONTROL_CHARACTER_PATTERN.search(value) is not None
+    ):
         raise MergenConfigurationError(
-            f"Principal {name} must be non-blank, trimmed, and at most {_MAX_ID_LENGTH} characters."
+            f"Principal {name} must be a safe, trimmed string of at most "
+            f"{_MAX_ID_LENGTH} characters."
         )
 
 
-def _require_aware(name: str, value: datetime | None) -> None:
-    if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+def _require_aware(name: str, value: object, *, optional: bool = False) -> None:
+    if value is None and optional:
+        return
+    if not isinstance(value, datetime):
+        raise MergenConfigurationError(f"Principal {name} must be a datetime.")
+    if value.tzinfo is None or value.utcoffset() is None:
         raise MergenConfigurationError(f"Principal {name} must be timezone-aware.")
 
 
@@ -47,23 +59,32 @@ class Principal:
     credential_ref: str | None = None
 
     def __post_init__(self) -> None:
+        if not isinstance(self.tenant_id, UUID):
+            raise MergenConfigurationError("Principal tenant_id must be a UUID.")
         _validate_identifier(name="subject_id", value=self.subject_id)
         _validate_identifier(name="actor_id", value=self.actor_id)
         _validate_identifier(name="client_id", value=self.client_id)
         _validate_identifier(name="credential_ref", value=self.credential_ref)
         _require_aware("issued_at", self.issued_at)
-        _require_aware("authentication_time", self.authentication_time)
-        _require_aware("expires_at", self.expires_at)
+        _require_aware("authentication_time", self.authentication_time, optional=True)
+        _require_aware("expires_at", self.expires_at, optional=True)
 
-        normalized_scopes = frozenset(self.scopes)
+        if isinstance(self.scopes, str):
+            raise MergenConfigurationError("Principal scopes must be a collection of strings.")
+        try:
+            normalized_scopes = frozenset(self.scopes)
+        except TypeError as exc:
+            raise MergenConfigurationError(
+                "Principal scopes must be an iterable of hashable strings."
+            ) from exc
         if len(normalized_scopes) > _MAX_SCOPES:
             raise MergenConfigurationError(
                 f"Principal scopes may contain at most {_MAX_SCOPES} items."
             )
-        invalid = sorted(
-            scope for scope in normalized_scopes if not _SCOPE_PATTERN.fullmatch(scope)
-        )
-        if invalid:
+        if any(
+            not isinstance(scope, str) or not _SCOPE_PATTERN.fullmatch(scope)
+            for scope in normalized_scopes
+        ):
             raise MergenConfigurationError("Principal contains an invalid scope name.")
         object.__setattr__(self, "scopes", normalized_scopes)
 
