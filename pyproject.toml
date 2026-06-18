@@ -92,7 +92,7 @@ include = ["fastapi_mergen*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-fastapi_mergen = ["py.typed"]
+fastapi_mergen = ["py.typed", "conformance/spec/*.json"]
 
 [tool.setuptools.dynamic]
 version = { attr = "fastapi_mergen._version.__version__" }
