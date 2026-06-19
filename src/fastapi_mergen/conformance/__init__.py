@@ -11,6 +11,7 @@ from fastapi_mergen.conformance.contract import (
     CertificationProfile,
     Invariant,
 )
+from fastapi_mergen.conformance.certification import CertificationDecision, decide
 from fastapi_mergen.conformance.manifest import CapabilityManifest
 from fastapi_mergen.conformance.models import (
     CheckResult,
@@ -18,15 +19,20 @@ from fastapi_mergen.conformance.models import (
     ConformanceReport,
     Severity,
 )
+from fastapi_mergen.conformance.runner import ConformanceRunner, RunnerConfiguration
 
 __all__ = [
     "CONTRACT_VERSION",
     "Capability",
     "CapabilityManifest",
+    "CertificationDecision",
     "CertificationProfile",
+    "ConformanceRunner",
     "CheckResult",
     "CheckStatus",
     "ConformanceReport",
     "Invariant",
+    "RunnerConfiguration",
     "Severity",
+    "decide",
 ]
