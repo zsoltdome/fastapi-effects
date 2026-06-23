@@ -19,6 +19,7 @@ from fastapi_mergen.conformance.models import (
     ConformanceReport,
     Severity,
 )
+from fastapi_mergen.conformance.reporters import ReportFormat, render_report, report_digest
 from fastapi_mergen.conformance.runner import ConformanceRunner, RunnerConfiguration
 
 __all__ = [
@@ -32,7 +33,10 @@ __all__ = [
     "CheckStatus",
     "ConformanceReport",
     "Invariant",
+    "ReportFormat",
     "RunnerConfiguration",
     "Severity",
     "decide",
+    "render_report",
+    "report_digest",
 ]
