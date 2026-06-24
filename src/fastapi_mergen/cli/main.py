@@ -25,6 +25,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="command")
 
+    from fastapi_mergen.conformance.cli import configure_parser
+
+    configure_parser(commands)
+
     commands.add_parser("doctor", help="Run live deployment diagnostics (Milestone 2)")
 
     schema = commands.add_parser("schema", help="Inspect schema compatibility")
@@ -44,6 +48,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command is None:
         parser.print_help()
         return 0
+    if args.command == "conformance":
+        from fastapi_mergen.conformance.cli import execute
+
+        return execute(args)
     if args.command == "doctor":
         return _not_available("fastapi-mergen doctor")
     if args.command == "schema" and args.schema_command == "check":
