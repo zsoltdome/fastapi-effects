@@ -131,6 +131,31 @@ class CapabilityManifest:
         }
         if set(value) != expected:
             raise MergenConfigurationError("Capability manifest fields are incomplete or unknown.")
+        if (
+            not isinstance(value["schema_version"], int)
+            or isinstance(value["schema_version"], bool)
+        ):
+            raise MergenConfigurationError("Capability manifest schema_version is invalid.")
+        for field_name in (
+            "contract_version",
+            "adapter_name",
+            "adapter_version",
+            "implementation",
+        ):
+            if not isinstance(value[field_name], str):
+                raise MergenConfigurationError(
+                    f"Capability manifest {field_name} is invalid."
+                )
+        if not isinstance(value["capabilities"], list) or not isinstance(
+            value["invariants"], list
+        ):
+            raise MergenConfigurationError(
+                "Capability manifest capabilities and invariants must be arrays."
+            )
+        if len(value["capabilities"]) != len(set(value["capabilities"])):
+            raise MergenConfigurationError("Capability manifest repeats a capability.")
+        if len(value["invariants"]) != len(set(value["invariants"])):
+            raise MergenConfigurationError("Capability manifest repeats an invariant.")
         try:
             capabilities = frozenset(Capability(item) for item in value["capabilities"])
             invariants = frozenset(Invariant(item) for item in value["invariants"])

@@ -54,13 +54,23 @@ class CertificationProfile(StrEnum):
 INVARIANT_CAPABILITIES = MappingProxyType(
     {
         Invariant.ATOMIC_INTENT: frozenset({Capability.TRANSACTIONAL_EFFECTS}),
-        Invariant.TENANT_CONTINUITY: frozenset({Capability.TENANT_ISOLATION}),
+        Invariant.TENANT_CONTINUITY: frozenset(
+            {Capability.TENANT_ISOLATION, Capability.TRANSACTIONAL_EFFECTS}
+        ),
         Invariant.AUTHORITY_PROVENANCE: frozenset({Capability.AUTHORIZATION}),
-        Invariant.STABLE_RETRY_IDENTITY: frozenset({Capability.DELIVERY_LEASES}),
-        Invariant.INDEPENDENT_FANOUT: frozenset({Capability.TRANSACTIONAL_EFFECTS}),
+        Invariant.STABLE_RETRY_IDENTITY: frozenset(
+            {Capability.TRANSACTIONAL_EFFECTS, Capability.DELIVERY_LEASES}
+        ),
+        Invariant.INDEPENDENT_FANOUT: frozenset(
+            {Capability.TRANSACTIONAL_EFFECTS, Capability.DELIVERY_LEASES}
+        ),
         Invariant.CAUSAL_LINEAGE: frozenset({Capability.TRANSACTIONAL_EFFECTS}),
-        Invariant.REPLAY_ACCOUNTABILITY: frozenset({Capability.DELIVERY_LEASES}),
-        Invariant.LEASE_FENCING: frozenset({Capability.DELIVERY_LEASES}),
+        Invariant.REPLAY_ACCOUNTABILITY: frozenset(
+            {Capability.TRANSACTIONAL_EFFECTS, Capability.DELIVERY_LEASES}
+        ),
+        Invariant.LEASE_FENCING: frozenset(
+            {Capability.TRANSACTIONAL_EFFECTS, Capability.DELIVERY_LEASES}
+        ),
         Invariant.CONTEXT_CLEANUP: frozenset({Capability.CONTEXT_LIFECYCLE}),
         Invariant.SECRET_MINIMIZATION: frozenset(),
         Invariant.COMMAND_IDENTITY: frozenset({Capability.COMMAND_IDEMPOTENCY}),

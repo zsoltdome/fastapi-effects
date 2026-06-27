@@ -128,11 +128,11 @@ class ReferenceBoundaryDriver:
         self._deliveries.clear()
         self._commands.clear()
         self._command_locks.clear()
-        self._principal.set(None)
+        self._principal = ContextVar("mergen_reference_principal", default=None)
         self._closed = False
 
     async def close(self) -> None:
-        self._principal.set(None)
+        self._principal = ContextVar("mergen_reference_principal", default=None)
         self._closed = True
 
     async def public_evidence(self) -> Mapping[str, object]:

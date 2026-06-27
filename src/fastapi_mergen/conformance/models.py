@@ -14,6 +14,7 @@ from fastapi_mergen.conformance.contract import (
     REPORT_SCHEMA_VERSION,
     CertificationProfile,
     Invariant,
+    profile_invariants,
 )
 from fastapi_mergen.conformance.safety import JsonValue, clean_text, safe_json
 from fastapi_mergen.errors import MergenConfigurationError
@@ -111,6 +112,14 @@ class ConformanceReport:
     def __post_init__(self) -> None:
         if not isinstance(self.profile, CertificationProfile):
             raise MergenConfigurationError("Conformance profile is invalid.")
+        if (
+            not isinstance(self.schema_version, int)
+            or isinstance(self.schema_version, bool)
+            or self.schema_version != REPORT_SCHEMA_VERSION
+        ):
+            raise MergenConfigurationError("Conformance report schema version is invalid.")
+        if self.contract_version != CONTRACT_VERSION:
+            raise MergenConfigurationError("Conformance report contract version is invalid.")
         if not isinstance(self.manifest_digest, str) or not _DIGEST.fullmatch(
             self.manifest_digest
         ):
@@ -126,6 +135,9 @@ class ConformanceReport:
             not isinstance(result, CheckResult) for result in self.results
         ):
             raise MergenConfigurationError("Conformance results must be CheckResult values.")
+        check_ids = tuple(result.check_id for result in self.results)
+        if len(check_ids) != len(set(check_ids)):
+            raise MergenConfigurationError("Conformance report repeats a check_id.")
         normalized = safe_json(self.environment)
         if not isinstance(normalized, dict):
             raise MergenConfigurationError("Conformance environment must be a mapping.")
@@ -146,9 +158,17 @@ class ConformanceReport:
 
     @property
     def certified(self) -> bool:
-        """Return whether every selected check passed without skips or errors."""
+        """Return whether every selected invariant has passing, complete evidence."""
 
-        return bool(self.results) and all(result.status is CheckStatus.PASS for result in self.results)
+        required = profile_invariants(self.profile)
+        passed = {
+            result.invariant
+            for result in self.results
+            if result.status is CheckStatus.PASS
+        }
+        return required.issubset(passed) and bool(self.results) and all(
+            result.status is CheckStatus.PASS for result in self.results
+        )
 
     def counts(self) -> dict[str, int]:
         """Count results by status."""
