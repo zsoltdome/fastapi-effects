@@ -23,6 +23,7 @@ from fastapi_mergen.conformance.models import (
     Severity,
 )
 from fastapi_mergen.conformance.protocols import BoundaryDriver
+from fastapi_mergen.conformance.safety import scan_for_secret_values
 from fastapi_mergen.conformance.scenarios import SCENARIOS, Scenario
 from fastapi_mergen.errors import MergenConfigurationError
 
@@ -34,6 +35,7 @@ class RunnerConfiguration:
     profile: CertificationProfile = CertificationProfile.CORE
     check_timeout_seconds: float | None = None
     fail_fast: bool = False
+    secret_canaries: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.profile, CertificationProfile):
@@ -45,6 +47,13 @@ class RunnerConfiguration:
             or self.check_timeout_seconds > 300
         ):
             raise MergenConfigurationError("Runner check timeout must be within 0 and 300 seconds.")
+        if not isinstance(self.secret_canaries, tuple):
+            raise MergenConfigurationError("Runner secret canaries must be a tuple.")
+        if len(self.secret_canaries) > 32:
+            raise MergenConfigurationError("Runner accepts at most 32 secret canaries.")
+        for canary in self.secret_canaries:
+            if not isinstance(canary, str) or not canary or len(canary) > 4096:
+                raise MergenConfigurationError("Runner secret canary is invalid.")
 
 
 class ConformanceRunner:
@@ -140,6 +149,18 @@ class ConformanceRunner:
         try:
             await asyncio.wait_for(driver.reset(), timeout=timeout)
             observation = await asyncio.wait_for(scenario.execute(driver), timeout=timeout)
+            leaked = scan_for_secret_values(
+                observation.evidence,
+                self.configuration.secret_canaries,
+            )
+            if leaked:
+                return self._result(
+                    scenario,
+                    CheckStatus.FAIL,
+                    started,
+                    "Conformance evidence exposed a configured secret canary.",
+                    evidence={"leaked_canary_count": len(leaked)},
+                )
         except asyncio.TimeoutError:
             return self._result(
                 scenario,
