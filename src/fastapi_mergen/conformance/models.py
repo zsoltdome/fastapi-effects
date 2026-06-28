@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import StrEnum
@@ -93,6 +95,44 @@ class CheckResult:
             "remediation": self.remediation,
             "exception_type": self.exception_type,
         }
+
+    @classmethod
+    def from_dict(cls, value: dict[str, Any]) -> CheckResult:
+        """Parse one strict, machine-readable check result."""
+
+        expected = {
+            "check_id",
+            "invariant",
+            "status",
+            "severity",
+            "summary",
+            "duration_ms",
+            "evidence",
+            "remediation",
+            "exception_type",
+        }
+        if set(value) != expected:
+            raise MergenConfigurationError("Conformance check fields are incomplete or unknown.")
+        try:
+            invariant = Invariant(value["invariant"])
+            status = CheckStatus(value["status"])
+            severity = Severity(value["severity"])
+        except (TypeError, ValueError) as exc:
+            raise MergenConfigurationError("Conformance check enumeration is invalid.") from exc
+        evidence = value["evidence"]
+        if not isinstance(evidence, dict):
+            raise MergenConfigurationError("Conformance check evidence must be an object.")
+        return cls(
+            check_id=value["check_id"],
+            invariant=invariant,
+            status=status,
+            severity=severity,
+            summary=value["summary"],
+            duration_ms=value["duration_ms"],
+            evidence=evidence,
+            remediation=value["remediation"],
+            exception_type=value["exception_type"],
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,3 +235,102 @@ class ConformanceReport:
             "environment": self.environment,
             "results": [result.as_dict() for result in self.results],
         }
+
+    def canonical_bytes(self) -> bytes:
+        """Return deterministic bytes used for report artifact identity."""
+
+        return json.dumps(
+            self.as_dict(),
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+    @property
+    def digest(self) -> str:
+        """Return the SHA-256 identity of this exact report."""
+
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    @classmethod
+    def from_dict(cls, value: dict[str, Any]) -> ConformanceReport:
+        """Parse a rendered report and verify every derived field."""
+
+        expected = {
+            "schema_version",
+            "contract_version",
+            "run_id",
+            "profile",
+            "manifest_digest",
+            "started_at",
+            "finished_at",
+            "status",
+            "certified",
+            "counts",
+            "environment",
+            "results",
+        }
+        supplied_digest = value.get("report_digest")
+        if supplied_digest is not None:
+            value = dict(value)
+            del value["report_digest"]
+        if set(value) != expected:
+            raise MergenConfigurationError("Conformance report fields are incomplete or unknown.")
+        if not isinstance(value["results"], list):
+            raise MergenConfigurationError("Conformance report results must be an array.")
+        if not isinstance(value["environment"], dict):
+            raise MergenConfigurationError("Conformance report environment must be an object.")
+        try:
+            profile = CertificationProfile(value["profile"])
+            run_id = UUID(value["run_id"])
+            started_at = datetime.fromisoformat(value["started_at"])
+            finished_at = datetime.fromisoformat(value["finished_at"])
+            results = tuple(CheckResult.from_dict(item) for item in value["results"])
+        except (TypeError, ValueError, KeyError) as exc:
+            raise MergenConfigurationError("Conformance report value is invalid.") from exc
+        report = cls(
+            schema_version=value["schema_version"],
+            contract_version=value["contract_version"],
+            run_id=run_id,
+            profile=profile,
+            manifest_digest=value["manifest_digest"],
+            started_at=started_at,
+            finished_at=finished_at,
+            environment=value["environment"],
+            results=results,
+        )
+        if value["status"] != report.status.value:
+            raise MergenConfigurationError("Conformance report status is inconsistent.")
+        if value["certified"] is not report.certified:
+            raise MergenConfigurationError("Conformance report certification is inconsistent.")
+        if value["counts"] != report.counts():
+            raise MergenConfigurationError("Conformance report counts are inconsistent.")
+        if supplied_digest is not None and supplied_digest != report.digest:
+            raise MergenConfigurationError("Conformance report digest is inconsistent.")
+        return report
+
+    @classmethod
+    def from_json(cls, payload: str | bytes) -> ConformanceReport:
+        """Parse strict UTF-8 JSON and reject duplicate object keys."""
+
+        def reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            result: dict[str, Any] = {}
+            for key, item in pairs:
+                if key in result:
+                    raise MergenConfigurationError(
+                        "Conformance report contains duplicate object keys."
+                    )
+                result[key] = item
+            return result
+
+        try:
+            decoded = payload.decode("utf-8") if isinstance(payload, bytes) else payload
+            value = json.loads(decoded, object_pairs_hook=reject_duplicates)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise MergenConfigurationError(
+                "Conformance report is not valid UTF-8 JSON."
+            ) from exc
+        if not isinstance(value, dict):
+            raise MergenConfigurationError("Conformance report root must be an object.")
+        return cls.from_dict(value)

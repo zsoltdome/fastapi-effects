@@ -1,0 +1,63 @@
+{
+  "$id": "https://mergen.institute/spec/fastapi-mergen/report-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "$defs": {
+    "check": {
+      "additionalProperties": false,
+      "properties": {
+        "check_id": {"maxLength": 160, "minLength": 1, "type": "string"},
+        "duration_ms": {"minimum": 0, "type": "integer"},
+        "evidence": {"type": "object"},
+        "exception_type": {"type": ["string", "null"]},
+        "invariant": {
+          "enum": [
+            "BC-01", "BC-02", "BC-03", "BC-04", "BC-05", "BC-06",
+            "BC-07", "BC-08", "BC-09", "BC-10", "BC-11", "BC-12"
+          ]
+        },
+        "remediation": {"type": ["string", "null"]},
+        "severity": {"enum": ["info", "warning", "error", "critical"]},
+        "status": {"enum": ["pass", "fail", "skip", "error"]},
+        "summary": {"maxLength": 512, "minLength": 1, "type": "string"}
+      },
+      "required": [
+        "check_id", "invariant", "status", "severity", "summary",
+        "duration_ms", "evidence", "remediation", "exception_type"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "certified": {"type": "boolean"},
+    "contract_version": {"const": "1.0"},
+    "counts": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {"minimum": 0, "type": "integer"},
+        "fail": {"minimum": 0, "type": "integer"},
+        "pass": {"minimum": 0, "type": "integer"},
+        "skip": {"minimum": 0, "type": "integer"}
+      },
+      "required": ["pass", "fail", "skip", "error"],
+      "type": "object"
+    },
+    "environment": {"type": "object"},
+    "finished_at": {"format": "date-time", "type": "string"},
+    "manifest_digest": {"pattern": "^[a-f0-9]{64}$", "type": "string"},
+    "profile": {"enum": ["core", "security", "delivery", "complete"]},
+    "report_digest": {"pattern": "^[a-f0-9]{64}$", "type": "string"},
+    "results": {"items": {"$ref": "#/$defs/check"}, "type": "array"},
+    "run_id": {"format": "uuid", "type": "string"},
+    "schema_version": {"const": 1},
+    "started_at": {"format": "date-time", "type": "string"},
+    "status": {"enum": ["pass", "fail", "skip", "error"]}
+  },
+  "required": [
+    "schema_version", "contract_version", "run_id", "profile",
+    "manifest_digest", "started_at", "finished_at", "status", "certified",
+    "counts", "environment", "results"
+  ],
+  "title": "FastAPI-Mergen conformance report v1",
+  "type": "object"
+}

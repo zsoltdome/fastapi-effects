@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 from fastapi_mergen.conformance.contract import CertificationProfile, profile_invariants
 from fastapi_mergen.conformance.models import CheckStatus, ConformanceReport
+from fastapi_mergen.conformance.manifest import CapabilityManifest
+from fastapi_mergen.errors import MergenConfigurationError
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,3 +49,21 @@ def decide(report: ConformanceReport) -> CertificationDecision:
         errored_checks=errored,
         skipped_checks=skipped,
     )
+
+
+def verify_evidence(
+    report: ConformanceReport,
+    manifest: CapabilityManifest,
+) -> CertificationDecision:
+    """Bind archived evidence to its exact capability declaration."""
+
+    if report.manifest_digest != manifest.digest:
+        raise MergenConfigurationError(
+            "Conformance report does not match the supplied capability manifest."
+        )
+    required = profile_invariants(report.profile)
+    if not required.issubset(manifest.invariants):
+        raise MergenConfigurationError(
+            "Capability manifest does not declare every invariant in the report profile."
+        )
+    return decide(report)

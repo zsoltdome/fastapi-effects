@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import stat
@@ -29,19 +28,13 @@ class ReportFormat(StrEnum):
 def canonical_report_bytes(report: ConformanceReport) -> bytes:
     """Return deterministic JSON bytes used for artifact identity."""
 
-    return json.dumps(
-        report.as_dict(),
-        ensure_ascii=False,
-        allow_nan=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
+    return report.canonical_bytes()
 
 
 def report_digest(report: ConformanceReport) -> str:
     """Return the report SHA-256 digest."""
 
-    return hashlib.sha256(canonical_report_bytes(report)).hexdigest()
+    return report.digest
 
 
 def render_report(report: ConformanceReport, format: ReportFormat | str) -> str:
