@@ -10,9 +10,11 @@ from importlib.resources import files
 from pathlib import Path
 from typing import cast
 
+from fastapi_mergen.conformance.certification import verify_evidence
 from fastapi_mergen.conformance.contract import CertificationProfile, SPEC_RESOURCE
 from fastapi_mergen.conformance.loading import load_driver
 from fastapi_mergen.conformance.manifest import CapabilityManifest
+from fastapi_mergen.conformance.models import ConformanceReport
 from fastapi_mergen.conformance.reporters import ReportFormat, render_report, write_report
 from fastapi_mergen.conformance.runner import ConformanceRunner, RunnerConfiguration
 from fastapi_mergen.conformance.protocols import BoundaryDriver
@@ -67,6 +69,13 @@ def configure_parser(commands: argparse._SubParsersAction[argparse.ArgumentParse
     manifest_source.add_argument("--reference", action="store_true")
     manifest.add_argument("--input", help="Validate a manifest JSON file instead of the driver")
 
+    verify = subcommands.add_parser(
+        "verify",
+        help="Verify an archived JSON report against its exact manifest",
+    )
+    verify.add_argument("--manifest", required=True, help="Capability manifest JSON path")
+    verify.add_argument("--report", required=True, help="Conformance report JSON path")
+
     subcommands.add_parser("spec", help="Print the packaged machine-readable contract")
 
 
@@ -107,6 +116,16 @@ def execute(args: argparse.Namespace) -> int:
         package = files("fastapi_mergen.conformance")
         print(package.joinpath(SPEC_RESOURCE).read_text(encoding="utf-8"), end="")
         return 0
+    if args.conformance_command == "verify":
+        try:
+            manifest = CapabilityManifest.from_json(Path(args.manifest).read_bytes())
+            report = ConformanceReport.from_json(Path(args.report).read_bytes())
+            decision = verify_evidence(report, manifest)
+            print("certified" if decision.certified else "not-certified")
+            return 0 if decision.certified else 1
+        except (OSError, MergenConfigurationError) as exc:
+            print(f"verification error: {exc}", file=sys.stderr)
+            return 2
     return 2
 
 

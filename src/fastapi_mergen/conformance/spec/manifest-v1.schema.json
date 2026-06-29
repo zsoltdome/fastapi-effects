@@ -1,0 +1,48 @@
+{
+  "$id": "https://mergen.institute/spec/fastapi-mergen/manifest-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adapter_name": {"maxLength": 128, "minLength": 1, "type": "string"},
+    "adapter_version": {"maxLength": 64, "minLength": 1, "type": "string"},
+    "capabilities": {
+      "items": {
+        "enum": [
+          "authorization",
+          "command_idempotency",
+          "context_lifecycle",
+          "delegation",
+          "delivery_leases",
+          "external_executor",
+          "tenant_isolation",
+          "transactional_effects",
+          "webhooks"
+        ],
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "contract_version": {"const": "1.0"},
+    "implementation": {"maxLength": 128, "minLength": 1, "type": "string"},
+    "invariants": {
+      "items": {
+        "enum": [
+          "BC-01", "BC-02", "BC-03", "BC-04", "BC-05", "BC-06",
+          "BC-07", "BC-08", "BC-09", "BC-10", "BC-11", "BC-12"
+        ],
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "metadata": {"type": "object"},
+    "schema_version": {"const": 1}
+  },
+  "required": [
+    "schema_version", "contract_version", "adapter_name", "adapter_version",
+    "implementation", "capabilities", "invariants", "metadata"
+  ],
+  "title": "FastAPI-Mergen capability manifest v1",
+  "type": "object"
+}

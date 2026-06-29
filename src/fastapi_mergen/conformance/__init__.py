@@ -11,7 +11,11 @@ from fastapi_mergen.conformance.contract import (
     CertificationProfile,
     Invariant,
 )
-from fastapi_mergen.conformance.certification import CertificationDecision, decide
+from fastapi_mergen.conformance.certification import (
+    CertificationDecision,
+    decide,
+    verify_evidence,
+)
 from fastapi_mergen.conformance.manifest import CapabilityManifest
 from fastapi_mergen.conformance.models import (
     CheckResult,
@@ -39,4 +43,5 @@ __all__ = [
     "decide",
     "render_report",
     "report_digest",
+    "verify_evidence",
 ]
