@@ -38,6 +38,7 @@ class ScenarioObservation:
 
     summary: str
     evidence: dict[str, Any]
+    audit_material: object | None = None
 
 
 ScenarioCallable = Callable[[BoundaryDriver], Awaitable[ScenarioObservation]]
@@ -386,6 +387,7 @@ async def secret_minimization(driver: BoundaryDriver) -> ScenarioObservation:
     return ScenarioObservation(
         "Public evidence excluded configured secret canaries.",
         {"evidence_key_count": len(evidence)},
+        audit_material=evidence,
     )
 
 

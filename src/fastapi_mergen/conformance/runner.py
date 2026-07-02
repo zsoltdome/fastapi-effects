@@ -150,7 +150,7 @@ class ConformanceRunner:
             await asyncio.wait_for(driver.reset(), timeout=timeout)
             observation = await asyncio.wait_for(scenario.execute(driver), timeout=timeout)
             leaked = scan_for_secret_values(
-                observation.evidence,
+                (observation.evidence, observation.audit_material),
                 self.configuration.secret_canaries,
             )
             if leaked:
