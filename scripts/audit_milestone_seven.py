@@ -1,0 +1,399 @@
+#!/usr/bin/env python3
+"""Audit the Milestone 7 Boundary Contract assurance implementation."""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import ast
+import json
+import os
+import re
+import stat
+import subprocess
+import sys
+import tempfile
+import tomllib
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from fastapi_mergen._version import __version__  # noqa: E402
+from fastapi_mergen.conformance import (  # noqa: E402
+    CONTRACT_VERSION,
+    Capability,
+    CapabilityManifest,
+    CertificationProfile,
+    ConformanceReport,
+    ConformanceRunner,
+    Invariant,
+    RunnerConfiguration,
+    decide,
+    verify_evidence,
+)
+from fastapi_mergen.conformance.reporters import (  # noqa: E402
+    ReportFormat,
+    render_report,
+    write_report,
+)
+from fastapi_mergen.testing import Fault, ReferenceBoundaryDriver  # noqa: E402
+
+EXPECTED_VERSION = "0.6.0a1"
+AUTHOR_NAME = "mergen-institute"
+AUTHOR_EMAIL = "mergen-institute@users.noreply.github.com"
+ALLOWED_BRANCH_PREFIXES = {
+    "build",
+    "chore",
+    "ci",
+    "docs",
+    "feat",
+    "fix",
+    "refactor",
+    "test",
+}
+REQUIRED_PATHS = {
+    "src/fastapi_mergen/conformance/__init__.py",
+    "src/fastapi_mergen/conformance/certification.py",
+    "src/fastapi_mergen/conformance/cli.py",
+    "src/fastapi_mergen/conformance/contract.py",
+    "src/fastapi_mergen/conformance/loading.py",
+    "src/fastapi_mergen/conformance/manifest.py",
+    "src/fastapi_mergen/conformance/models.py",
+    "src/fastapi_mergen/conformance/protocols.py",
+    "src/fastapi_mergen/conformance/reporters.py",
+    "src/fastapi_mergen/conformance/runner.py",
+    "src/fastapi_mergen/conformance/safety.py",
+    "src/fastapi_mergen/conformance/scenarios.py",
+    "src/fastapi_mergen/conformance/spec/boundary-contract-v1.json",
+    "src/fastapi_mergen/conformance/spec/manifest-v1.schema.json",
+    "src/fastapi_mergen/conformance/spec/report-v1.schema.json",
+    "src/fastapi_mergen/testing/assertions.py",
+    "src/fastapi_mergen/testing/reference.py",
+    "tests/conformance/test_contract_models.py",
+    "tests/conformance/test_fault_detection.py",
+    "tests/conformance/test_reporters.py",
+    "tests/conformance/test_runner_reference.py",
+    "tests/security/test_conformance_redaction.py",
+    "docs/concepts/conformance.md",
+    "docs/operations/certification.md",
+    "docs/reference/conformance-api.md",
+    "docs/adr/0006-conformance-evidence.md",
+    ".github/workflows/conformance.yml",
+    "IMPLEMENTATION_REPORT_M7.md",
+}
+_ACTION_PIN = re.compile(r"uses:\s*[^\s@]+@[0-9a-f]{40}(?:\s*#.*)?$")
+_BRANCH = re.compile(r"^(main|(?:build|chore|ci|docs|feat|fix|refactor|test)/[a-z0-9][a-z0-9-]{1,63})$")
+
+
+@dataclass(slots=True)
+class Gate:
+    name: str
+    required: bool
+    status: str = "NOT_RUN"
+    detail: str = ""
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "required": self.required,
+            "status": self.status,
+            "detail": self.detail,
+        }
+
+
+def run_git(*args: str) -> str:
+    completed = subprocess.run(
+        ("git", *args),
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.rstrip()
+
+
+def check_paths() -> str:
+    missing = sorted(path for path in REQUIRED_PATHS if not (ROOT / path).is_file())
+    if missing:
+        raise AssertionError(f"missing required paths: {missing}")
+    return f"{len(REQUIRED_PATHS)} required files present"
+
+
+def check_metadata() -> str:
+    with (ROOT / "pyproject.toml").open("rb") as stream:
+        project: dict[str, Any] = tomllib.load(stream)
+    metadata = project["project"]
+    if metadata["name"] != "fastapi-mergen":
+        raise AssertionError("distribution name changed")
+    if metadata.get("authors") != [{"name": AUTHOR_NAME}]:
+        raise AssertionError("project author must be mergen-institute only")
+    if __version__ != EXPECTED_VERSION:
+        raise AssertionError(f"version is {__version__}, expected {EXPECTED_VERSION}")
+    package_data = project["tool"]["setuptools"]["package-data"]["fastapi_mergen"]
+    if "conformance/spec/*.json" not in package_data:
+        raise AssertionError("conformance specifications are not packaged")
+    return f"distribution metadata and version {__version__} are valid"
+
+
+def check_specifications() -> str:
+    spec_root = ROOT / "src" / "fastapi_mergen" / "conformance" / "spec"
+    contract = json.loads((spec_root / "boundary-contract-v1.json").read_text())
+    manifest_schema = json.loads((spec_root / "manifest-v1.schema.json").read_text())
+    report_schema = json.loads((spec_root / "report-v1.schema.json").read_text())
+    if contract["contract_version"] != CONTRACT_VERSION:
+        raise AssertionError("packaged contract version differs from runtime")
+    if set(contract["capabilities"]) != {item.value for item in Capability}:
+        raise AssertionError("packaged capability set differs from runtime")
+    if set(contract["invariants"]) != {item.value for item in Invariant}:
+        raise AssertionError("packaged invariant set differs from runtime")
+    if manifest_schema.get("type") != "object" or report_schema.get("type") != "object":
+        raise AssertionError("machine-readable schemas are not object schemas")
+    return "contract descriptor and evidence schemas match runtime enumerations"
+
+
+async def reference_evidence() -> tuple[dict[str, ConformanceReport], dict[str, tuple[str, ...]]]:
+    reports: dict[str, ConformanceReport] = {}
+    for profile in CertificationProfile:
+        driver = ReferenceBoundaryDriver()
+        report = await ConformanceRunner(RunnerConfiguration(profile=profile)).run(driver)
+        if not report.certified or not decide(report).certified:
+            raise AssertionError(f"reference driver failed profile {profile.value}")
+        loaded = ConformanceReport.from_json(render_report(report, ReportFormat.JSON))
+        decision = verify_evidence(loaded, ReferenceBoundaryDriver().manifest)
+        if not decision.certified:
+            raise AssertionError(f"archived evidence failed profile {profile.value}")
+        reports[profile.value] = report
+
+    detected: dict[str, tuple[str, ...]] = {}
+    for fault in Fault:
+        report = await ConformanceRunner(
+            RunnerConfiguration(profile=CertificationProfile.COMPLETE)
+        ).run(ReferenceBoundaryDriver(faults=(fault,)))
+        failing = tuple(
+            item.check_id for item in report.results if item.status.value != "pass"
+        )
+        if report.certified or not failing:
+            raise AssertionError(f"fault was not detected: {fault.value}")
+        detected[fault.value] = failing
+    return reports, detected
+
+
+def check_reference_suite() -> str:
+    reports, detected = asyncio.run(reference_evidence())
+    complete = reports[CertificationProfile.COMPLETE.value]
+    return (
+        f"{len(reports)} profiles certified; {len(complete.results)} complete-profile checks; "
+        f"{len(detected)} injected faults detected"
+    )
+
+
+def check_reporters() -> str:
+    async def build() -> ConformanceReport:
+        return await ConformanceRunner(
+            RunnerConfiguration(profile=CertificationProfile.COMPLETE)
+        ).run(ReferenceBoundaryDriver())
+
+    report = asyncio.run(build())
+    json_report = render_report(report, ReportFormat.JSON)
+    loaded = ConformanceReport.from_json(json_report)
+    if loaded != report:
+        raise AssertionError("JSON report round trip changed evidence")
+    junit = ET.fromstring(render_report(report, ReportFormat.JUNIT))
+    if junit.tag != "testsuite":
+        raise AssertionError("JUnit reporter produced an unexpected root")
+    sarif = json.loads(render_report(report, ReportFormat.SARIF))
+    if sarif.get("version") != "2.1.0":
+        raise AssertionError("SARIF reporter version is invalid")
+    markdown = render_report(report, ReportFormat.MARKDOWN)
+    if "Certified: **yes**" not in markdown:
+        raise AssertionError("Markdown reporter omitted certification decision")
+    with tempfile.TemporaryDirectory(prefix="mergen-m7-report-") as raw:
+        destination = write_report(Path(raw) / "report.json", json_report)
+        if stat.S_IMODE(destination.stat().st_mode) != 0o600:
+            raise AssertionError("written report is not private by default")
+    canary = "conformance-secret-canary-reference-key"
+    for rendered in (json_report, ET.tostring(junit, encoding="unicode"), json.dumps(sarif), markdown):
+        if canary in rendered:
+            raise AssertionError("reporter exposed the reference signing canary")
+    return "JSON, JUnit, SARIF, Markdown, digest, and private-write gates passed"
+
+
+def literal_all(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets):
+            continue
+        if not isinstance(node.value, (ast.List, ast.Tuple)):
+            raise AssertionError(f"{path} __all__ must be a literal sequence")
+        return {
+            element.value
+            for element in node.value.elts
+            if isinstance(element, ast.Constant) and isinstance(element.value, str)
+        }
+    raise AssertionError(f"{path} does not define __all__")
+
+
+def check_public_surface() -> str:
+    root_exports = literal_all(ROOT / "src" / "fastapi_mergen" / "__init__.py")
+    conformance_exports = literal_all(
+        ROOT / "src" / "fastapi_mergen" / "conformance" / "__init__.py"
+    )
+    if root_exports & conformance_exports:
+        raise AssertionError("Milestone 7 leaked assurance symbols into the root API")
+    required = {
+        "CapabilityManifest",
+        "CertificationProfile",
+        "ConformanceRunner",
+        "ConformanceReport",
+        "verify_evidence",
+    }
+    if not required.issubset(conformance_exports):
+        raise AssertionError("conformance subpackage public API is incomplete")
+    return "root API remains narrow and conformance API is explicit"
+
+
+def check_workflow_pins() -> str:
+    workflows = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+    failures: list[str] = []
+    action_count = 0
+    for workflow in workflows:
+        for line_number, line in enumerate(workflow.read_text().splitlines(), start=1):
+            if "uses:" not in line:
+                continue
+            action_count += 1
+            if not _ACTION_PIN.search(line.strip()):
+                failures.append(f"{workflow.name}:{line_number}:{line.strip()}")
+    if failures:
+        raise AssertionError(f"GitHub Actions are not SHA-pinned: {failures}")
+    return f"{action_count} GitHub Action references are SHA-pinned"
+
+
+def check_git_governance() -> str:
+    identities = set(run_git("log", "--all", "--format=%an%x00%ae%x00%cn%x00%ce").splitlines())
+    expected = f"{AUTHOR_NAME}\x00{AUTHOR_EMAIL}\x00{AUTHOR_NAME}\x00{AUTHOR_EMAIL}"
+    if identities != {expected}:
+        raise AssertionError(f"unexpected Git identities: {sorted(identities)}")
+    bad_subjects: list[str] = []
+    for line in run_git("log", "--all", "--format=%H%x00%s").splitlines():
+        commit, subject = line.split("\x00", 1)
+        words = subject.split()
+        if not 3 <= len(words) <= 7:
+            bad_subjects.append(f"{commit[:10]}:{subject}")
+    if bad_subjects:
+        raise AssertionError(f"commit subjects outside 3-7 words: {bad_subjects}")
+    branches = run_git("for-each-ref", "--format=%(refname:short)", "refs/heads").splitlines()
+    bad_branches = [branch for branch in branches if not _BRANCH.fullmatch(branch)]
+    if bad_branches:
+        raise AssertionError(f"invalid branch names: {bad_branches}")
+    unmerged = [
+        branch
+        for branch in branches
+        if branch != "main"
+        and subprocess.run(
+            ("git", "merge-base", "--is-ancestor", branch, "main"),
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+        ).returncode
+        != 0
+    ]
+    if unmerged:
+        raise AssertionError(f"branches not merged into main: {unmerged}")
+    if run_git("status", "--porcelain"):
+        raise AssertionError("Git working tree is not clean")
+    subprocess.run(("git", "fsck", "--full"), cwd=ROOT, check=True, capture_output=True)
+    return f"{len(branches)} branches, sole identity, clean tree, and Git integrity passed"
+
+
+def execute_gate(gate: Gate, callback: Callable[[], str]) -> None:
+    try:
+        gate.detail = callback()
+        gate.status = "PASS"
+    except Exception as exc:  # noqa: BLE001 - audit captures bounded type and detail
+        gate.status = "FAIL"
+        gate.detail = f"{type(exc).__name__}: {exc}"
+
+
+def render_markdown(gates: list[Gate]) -> str:
+    mandatory = all(gate.status == "PASS" for gate in gates if gate.required)
+    lines = [
+        "# FastAPI-Mergen Milestone 7 audit",
+        "",
+        f"**Version:** `{__version__}`  ",
+        f"**Overall mandatory result:** {'PASS' if mandatory else 'FAIL'}",
+        "",
+        "| Gate | Result | Required | Detail |",
+        "|---|---:|---:|---|",
+    ]
+    for gate in gates:
+        detail = gate.detail.replace("|", "\\|").replace("\n", " ")
+        lines.append(
+            f"| `{gate.name}` | **{gate.status}** | {'yes' if gate.required else 'no'} | {detail} |"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--skip-git-governance", action="store_true")
+    parser.add_argument("--json-output")
+    parser.add_argument("--markdown-output")
+    args = parser.parse_args()
+
+    gates = [
+        Gate("required_paths", True),
+        Gate("metadata", True),
+        Gate("specifications", True),
+        Gate("reference_suite", True),
+        Gate("reporters", True),
+        Gate("public_surface", True),
+        Gate("workflow_pins", True),
+        Gate("git_governance", not args.skip_git_governance),
+    ]
+    callbacks: dict[str, Callable[[], str]] = {
+        "required_paths": check_paths,
+        "metadata": check_metadata,
+        "specifications": check_specifications,
+        "reference_suite": check_reference_suite,
+        "reporters": check_reporters,
+        "public_surface": check_public_surface,
+        "workflow_pins": check_workflow_pins,
+        "git_governance": check_git_governance,
+    }
+    for gate in gates:
+        if gate.name == "git_governance" and args.skip_git_governance:
+            gate.status = "NOT_RUN"
+            gate.detail = "explicitly skipped"
+            continue
+        execute_gate(gate, callbacks[gate.name])
+
+    payload = {
+        "version": __version__,
+        "contract_version": CONTRACT_VERSION,
+        "overall": (
+            "PASS" if all(gate.status == "PASS" for gate in gates if gate.required) else "FAIL"
+        ),
+        "gates": [gate.as_dict() for gate in gates],
+    }
+    markdown = render_markdown(gates)
+    if args.json_output:
+        Path(args.json_output).write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    if args.markdown_output:
+        Path(args.markdown_output).write_text(markdown, encoding="utf-8")
+    print(markdown, end="")
+    return 0 if payload["overall"] == "PASS" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

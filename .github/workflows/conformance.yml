@@ -1,0 +1,61 @@
+name: Boundary conformance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: conformance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reference-suite:
+    name: Reference assurance suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+          enable-cache: true
+      - name: Install test environment
+        run: uv sync --group test
+      - name: Run conformance tests
+        run: uv run pytest -q tests/conformance tests/security
+      - name: Run milestone audit
+        run: |
+          mkdir -p build/conformance
+          uv run python scripts/audit_milestone_seven.py \
+            --skip-git-governance \
+            --json-output build/conformance/audit.json \
+            --markdown-output build/conformance/audit.md
+      - name: Generate complete evidence
+        run: |
+          uv run fastapi-mergen conformance run \
+            --reference \
+            --profile complete \
+            --format json \
+            --output build/conformance/report.json
+          uv run fastapi-mergen conformance manifest \
+            --reference > build/conformance/manifest.json
+          uv run fastapi-mergen conformance verify \
+            --manifest build/conformance/manifest.json \
+            --report build/conformance/report.json
+      - name: Upload conformance evidence
+        uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+        with:
+          name: boundary-conformance-${{ github.sha }}
+          path: build/conformance
+          if-no-files-found: error
+          retention-days: 14

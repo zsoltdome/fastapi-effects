@@ -107,6 +107,7 @@ asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
 filterwarnings = ["error"]
 markers = [
+  "conformance: exercises the executable Boundary Contract assurance suite",
   "integration: requires a PostgreSQL integration service",
   "packaging: builds or inspects distribution artifacts",
   "security: validates a security invariant",
