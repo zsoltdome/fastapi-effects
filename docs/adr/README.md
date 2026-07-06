@@ -7,6 +7,7 @@
 | [0003](0003-event-delivery-attempt-model.md) | Accepted | Separate immutable event, delivery, and attempt history |
 | [0004](0004-routing-and-policy-snapshots.md) | Accepted | Exact frozen routes and immutable per-delivery policy |
 | [0005](0005-relay-state-machine.md) | Accepted | Polling lease relay with token-checked transitions |
+| [0006](0006-conformance-evidence.md) | Accepted | Versioned executable conformance evidence |
 
 ## Decision rule
 

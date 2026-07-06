@@ -1,72 +1,100 @@
 # FastAPI-Mergen
 
-> **Status:** pre-alpha specification and repository foundation (`0.0.1`).
-> Milestone 1 intentionally contains no production persistence, RLS, relay, or
-> webhook implementation.
+> **Status:** pre-alpha assurance release `0.6.0a1`.
 
-FastAPI-Mergen is the planned transaction boundary for **tenant-safe effects** in
-async FastAPI and PostgreSQL applications.
+FastAPI-Mergen defines and tests the transaction boundary for **tenant-safe effects**
+in async FastAPI and PostgreSQL systems.
 
 > **One commit. Every effect keeps its tenant and authority provenance.**
 
-The product contract is deliberately narrower than a task queue or workflow engine:
+Milestone 7 delivers the executable **Mergen Boundary Contract Conformance and
+Assurance Suite**. It certifies observable transaction, isolation, authority, retry,
+replay, lease, context, idempotency, delegation, and evidence-minimization behavior
+through a trusted application adapter.
 
-- application state, an immutable event, and original delivery intents commit locally
-  in one PostgreSQL transaction;
-- delivery is **at least once**, not generically exactly once;
-- automatic retries keep a stable delivery/message identity;
-- an effectively-once consumer deduplicates that stable identity;
-- manual replay creates a new delivery linked to immutable history;
-- tenant and authorization provenance remain explicit across the boundary.
+## What this release provides
 
-## What Milestone 1 provides
+- Boundary Contract v1 with twelve stable invariants;
+- strict capability manifests and four certification profiles;
+- deterministic asynchronous conformance scenarios;
+- an in-memory reference oracle with fourteen injectable defects;
+- JSON, JUnit, SARIF, and Markdown reports;
+- independently verifiable manifest/report digests;
+- credential-safe bounded evidence and deployment secret canaries;
+- private, atomic report-file output;
+- CLI, testing helpers, JSON schemas, CI workflow, and a cumulative milestone audit.
 
-- a single `fastapi-mergen` distribution and `fastapi_mergen` import package;
-- the normative Boundary Contract, security model, and five architecture decisions;
-- a type-checked, fail-safe public API spike;
-- a PostgreSQL 16/18 integration-test harness and role fixture design;
-- clean-artifact, optional-extra, quality, and security CI gates;
-- a bootable invoicing reference application whose effect operations remain explicit
-  safety stubs until Milestone 2.
+This release does **not** turn the Milestone 1 API spike into a production event store.
+The conformance package is intentionally implementation independent: production
+runtime, PostgreSQL, queue, webhook, and delegation implementations are certified
+through adapters that call their real paths.
 
-## Local setup
+## Run the reference suite
+
+```bash
+PYTHONPATH=src fastapi-mergen conformance run \
+  --reference \
+  --profile complete \
+  --format json \
+  --output build/conformance/report.json
+
+PYTHONPATH=src fastapi-mergen conformance manifest \
+  --reference > build/conformance/manifest.json
+
+PYTHONPATH=src fastapi-mergen conformance verify \
+  --manifest build/conformance/manifest.json \
+  --report build/conformance/report.json
+```
+
+The first two commands normally run from an installed wheel or a `uv` environment, so
+`PYTHONPATH=src` is not needed:
+
+```bash
+uv sync --group test
+uv run fastapi-mergen conformance run --reference --profile complete
+```
+
+## Certify an implementation
+
+```bash
+fastapi-mergen conformance run \
+  --adapter myapp.mergen_conformance:create_driver \
+  --profile core \
+  --format json \
+  --output build/conformance/report.json
+```
+
+The adapter factory is trusted code imported with the authority of the CLI process.
+Never accept its module path from a tenant or other untrusted caller.
+
+## Guarantee language
+
+FastAPI-Mergen does not promise generic exactly-once distributed execution.
+
+- application state and original effect intent: **atomic local commit**;
+- delivery or external execution: **at least once**;
+- consumer-visible effectively-once behavior: requires durable consumer
+  deduplication using the stable message identity;
+- automatic retry: stable delivery/message identity and a new attempt identity;
+- manual replay: a new linked delivery identity.
+
+## Documentation
+
+Start with:
+
+1. [Boundary Contract v1](docs/concepts/boundary-contract.md);
+2. [Conformance architecture](docs/concepts/conformance.md);
+3. [Certification operations](docs/operations/certification.md);
+4. [Conformance API reference](docs/reference/conformance-api.md);
+5. [Security policy](SECURITY.md).
+
+## Development
 
 ```bash
 uv sync --all-extras --all-groups
-uv run python scripts/check.py
+uv run pytest -q tests/conformance tests/security tests/unit
+uv run python scripts/audit_milestone_seven.py --skip-git-governance
 ```
-
-Start one disposable integration database:
-
-```bash
-docker compose --profile pg16 up -d postgres16
-uv run pytest -m integration
-```
-
-PostgreSQL 18 is available through profile `pg18`. Integration tests allocate unique
-roles and databases and do not embed production-like credentials.
-
-## API status
-
-The public spike is importable and type-checkable. Entering `MergenUnitOfWork` or
-calling `emit()` raises `MilestoneNotImplementedError` in `0.0.1`; this is deliberate.
-The package does not pretend to enforce a security invariant before the Milestone 2
-persistence, transaction, role, and RLS suites exist.
-
-## Scope exclusions through the first differentiated product
-
-FastAPI-Mergen does not provide authentication, tenant provisioning, a general task
-queue, workflows, ordering, cancellation, inbound idempotency, MCP, synchronous
-SQLAlchemy, non-PostgreSQL persistence, or an admin UI.
-
-See [the documentation index](docs/index.md), [the Boundary Contract](docs/concepts/boundary-contract.md),
-and [the Milestone 1 review](docs/milestone-1-review.md).
-
-## Security
-
-Read [SECURITY.md](SECURITY.md) and the [threat model](docs/concepts/threat-model.md)
-before evaluating the design. PostgreSQL tenant settings are trusted context
-propagation, not database-native authentication. Milestone 1 is not production code.
 
 ## Licence
 
