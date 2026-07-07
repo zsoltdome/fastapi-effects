@@ -1,8 +1,9 @@
-# Boundary Contract v0.1
+# Mergen Boundary Contract v1.0
 
-**Status:** accepted for Milestone 1.  
-**Applies to:** the Mergen-owned transition from an authenticated tenant-scoped
-application transaction to deferred handler or webhook execution.
+**Status:** accepted and executable through the Milestone 7 assurance suite.
+**Contract version:** `1.0`
+**Applies to:** the Mergen-owned transition from an authenticated, tenant-scoped
+application operation to durable and deferred effects.
 
 The key words **MUST**, **MUST NOT**, **SHALL**, **SHALL NOT**, and **DOES NOT** are
 normative.
@@ -10,22 +11,22 @@ normative.
 ## 1. Boundary
 
 ```text
-authenticated request
+authenticated operation
         │ trusted Principal
         ▼
-MergenUnitOfWork owns outer transaction
-        │ SET LOCAL tenant context before application SQL
+transactional command or MergenUnitOfWork
+        │ tenant context bound before application SQL
         ├── application state
-        ├── immutable event
+        ├── immutable event / command identity
         └── original delivery intents
                  │ commit
                  ▼
-          polling relay / sinks
+       handlers / executors / webhooks / delegated calls
 ```
 
-Mergen owns neither caller authentication nor remote consumer behavior. It accepts a
-trusted `Principal` from the host application and makes transaction, identity,
-policy, and delivery state explicit.
+Mergen owns neither caller authentication nor remote consumer behavior. The host
+application supplies a trusted principal and an adapter that exposes observable
+boundary operations to the conformance suite.
 
 ## 2. Three primitives
 
@@ -33,129 +34,206 @@ policy, and delivery state explicit.
 
 An immutable trusted security context containing at least tenant, subject, optional
 actor/client, origin scopes, authentication timestamps, and non-secret references.
-A `ContextVar` may expose process-local convenience, but durable execution authority
-comes from persisted principal and policy snapshots.
+A `ContextVar` may provide process-local convenience; it is not the durable security
+boundary.
 
 ### Effect
 
-An immutable typed intent whose event record is persisted in the same local
-transaction as the application change. Arbitrary ORM serialization is forbidden.
+An immutable typed intent persisted in the same local transaction as the application
+change. Arbitrary ORM-object serialization and raw credential persistence are
+forbidden.
 
 ### Delivery
 
-One independently retryable route from one effect to one destination. A handler and
-each webhook subscription have separate delivery rows, status, attempts, retry clock,
-and terminal outcome.
+One independently retryable route from one effect to one destination. Every handler,
+queue handoff, webhook subscription, or delegated call owns distinct state, attempts,
+retry identity, and terminal outcome.
 
-## 3. Seven invariants
+## 3. Normative invariants
 
 ### BC-01 — Atomic intent
 
 The implementation **MUST** commit the application mutation, event, and every original
-delivery intent in one local PostgreSQL transaction, or commit none. It **MUST NOT**
-invoke a sink during emission.
+delivery intent in one local transaction, or commit none. It **MUST NOT** invoke a
+sink during effect emission.
 
-Future conformance tests: `C-ATOMIC-COMMIT`, `C-ATOMIC-ROLLBACK`,
-`C-EMIT-ACTIVE-UOW`, `C-EMIT-NO-SINK-BEFORE-COMMIT`.
+Executable checks: `atomicity.commit`, `atomicity.rollback`.
 
 ### BC-02 — Tenant continuity
 
-Event, delivery, attempt, execution principal, and tenant-bound handler session
-**MUST** identify the same tenant. Composite foreign keys and forced RLS **MUST**
-reject cross-tenant references and operations. Missing tenant context **MUST** fail
-closed for the request/handler role.
+Event, delivery, attempt, execution principal, and tenant-bound application session
+**MUST** identify the same tenant. Missing or conflicting tenant context **MUST** fail
+closed, and a principal for one tenant **MUST NOT** inspect another tenant's boundary
+state.
 
-Future tests: `C-RLS-READ`, `C-RLS-WRITE`, `C-RLS-MISSING`, `C-TENANT-FK`,
-`C-CONTEXT-LEAK`.
+Executable check: `isolation.cross_tenant`.
 
 ### BC-03 — Explicit authority provenance
 
-Each delivery **MUST** declare exactly one authorization mode: attenuated snapshot,
-revalidation under the origin ceiling, or named service policy. User-derived modes
-**MUST NOT** expand the origin authority. Service authority **MUST NOT** masquerade as
+Every effect route **MUST** use explicit snapshot, revalidation, or named service
+policy semantics. User-derived authority **MUST NOT** exceed both the historical
+origin ceiling and the route allowance. Service authority **MUST NOT** masquerade as
 user authority.
 
-Future tests: `C-AUTH-SNAPSHOT-NO-EXPAND`, `C-AUTH-REVALIDATE-NO-EXPAND`,
-`C-AUTH-REVOCATION`, `C-AUTH-SERVICE-EXPLICIT`.
+Executable checks: `authority.snapshot_attenuation`,
+`authority.revalidation_ceiling`.
 
 ### BC-04 — Stable retry identity
 
-Automatic retry **MUST** retain the same delivery and consumer-visible message ID and
-create a new attempt ID/number. The system **DOES NOT** promise that a remote effect is
-executed only once.
+Automatic retry **MUST** retain the same delivery and consumer-visible message
+identity and allocate a distinct attempt identity. The implementation **DOES NOT**
+promise that an external effect occurs only once.
 
-Future tests: `C-RETRY-STABLE-ID`, `C-ATTEMPT-APPEND`, `C-CRASH-AFTER-EFFECT`.
+Executable check: `delivery.retry_identity`.
 
 ### BC-05 — Independent fan-out
 
 Each destination **MUST** own independent state, lease, attempts, retry schedule, and
 terminal result. Failure or replay of one destination **MUST NOT** mutate a sibling.
 
-Future tests: `C-FANOUT-INDEPENDENT`, `C-SIBLING-FAILURE`, `C-SIBLING-REPLAY`.
+Executable check: `delivery.independent_fanout`.
 
 ### BC-06 — Causal lineage
 
 Event, delivery, attempt, tenant, subject, optional actor/client, correlation,
 causation, route version, and valid trace context **MUST** remain linkable. Raw
-credentials and plaintext secrets **MUST NOT** be used to achieve lineage.
+credentials **MUST NOT** be used to preserve lineage.
 
-Future tests: `C-LINEAGE`, `C-TRACE-VALIDATION`, `C-NO-CREDENTIAL-PERSISTENCE`.
+Executable check: `lineage.correlation_causation`.
 
 ### BC-07 — Replay accountability
 
-Manual replay **MUST** create a new delivery ID linked to an immutable original
-terminal delivery. The original terminal outcome **MUST NOT** return to pending.
-Replay **MUST** record reason and authorizing subject.
+Manual replay **MUST** create a new delivery identity linked to an immutable original
+terminal delivery. The original outcome **MUST NOT** return to pending.
 
-Future tests: `C-REPLAY-NEW-ID`, `C-REPLAY-LINEAGE`, `C-TERMINAL-IMMUTABLE`.
+Executable check: `replay.accountable_identity`.
 
-## 4. Transaction ownership
+### BC-08 — Lease fencing
 
-For the first implementation, `MergenUnitOfWork` owns the outermost
-`AsyncSession` transaction.
+Every claim and execution lease **MUST** have an unguessable token. Finalization,
+renewal, or recovery **MUST** compare the exact active token. A stale worker **MUST
+NOT** acknowledge or overwrite work reclaimed by another worker.
 
-- Entry **MUST** reject a session already in a transaction.
-- Entry **MUST** bind the tenant before application SQL.
-- Nested Mergen UoWs **MUST** be rejected.
-- Application savepoints after tenant binding are permitted.
-- Exit **MUST** commit once on success or roll back on exception/cancellation.
-- Context and session metadata **MUST** reset in `finally`.
-- The implementation **MUST NOT** depend on a global SQLAlchemy event listener.
+Executable check: `lease.stale_finalization`.
 
-## 5. Delivery contract
+### BC-09 — Context cleanup
 
-- Publication is locally atomic.
-- Delivery is at least once.
-- A cooperating consumer can obtain an effectively-once outcome by durably
-  deduplicating the stable delivery/message ID in the same transaction as its effect.
-- Claim transactions are short; handler/network I/O **MUST NOT** occur while claim
-  locks are held.
-- Finalization and renewal **MUST** compare the exact current lease token.
-- Polling is authoritative through Milestone 3.
-- Ordering and cancellation are undefined and unsupported.
+Principal, dependency, application-session, and executor context **MUST** be reset in
+a `finally` path after success, failure, timeout, and cancellation. Sequential work
+for different tenants in one process **MUST NOT** inherit prior authority.
 
-## 6. Security contract
+Executable check: `lifecycle.context_cleanup`.
 
-- Runtime roles **MUST NOT** be superusers, object owners, or hold `BYPASSRLS`.
-- Request and handler work uses `mergen_app`; control-plane relay work uses
-  `mergen_relay`; DDL uses `mergen_migration_owner`.
-- The relay connection **MUST NOT** enter application handler code.
-- Raw bearer tokens, cookies, API keys, session tokens, and plaintext webhook secrets
-  **MUST NOT** be persisted in Mergen rows or default logs.
-- Tenant-supplied webhook endpoints are hostile by default.
+### BC-10 — Secret minimization
 
-## 7. Contract exclusions
+Raw bearer tokens, cookies, session values, signing keys, private keys, and reusable
+credentials **MUST NOT** appear in public evidence, reports, default logs, metrics, or
+exceptions. Reference identifiers such as `key_id` and `credential_ref` may be
+included when they are non-secret.
 
-The contract **DOES NOT** define generic exactly-once execution, global ordering,
-cancellation, workflow compensation, authentication, tenant provisioning, queue
-broker semantics, inbound request idempotency, or non-PostgreSQL isolation.
+Executable check: `security.secret_minimization`, plus optional deployment-provided
+secret canaries.
 
-## 8. Change control
+### BC-11 — Transactional command identity
 
-A change to any invariant, guarantee, identity rule, role boundary, authorization
-formula, route snapshot, or lease transition requires:
+Inbound command idempotency **MUST** bind tenant, stable route, method, opaque key
+digest, request fingerprint, and originating subject. Concurrent duplicates **MUST**
+converge to one committed transaction and replay, while a different fingerprint or
+subject **MUST** conflict.
 
-1. a new or superseding ADR;
-2. an updated conformance mapping;
-3. a migration/compatibility impact statement;
-4. a roadmap re-estimate before implementation.
+Executable checks: `idempotency.concurrent_duplicate`,
+`idempotency.fingerprint_conflict`.
+
+### BC-12 — Delegation target binding
+
+A delegated credential **MUST** be short lived, scope attenuated, audience bound, and
+bound to the exact canonical method and path. Target mismatch **MUST** fail closed.
+The original browser, MCP, or API bearer credential **MUST NOT** be forwarded as the
+next-hop credential.
+
+Executable checks: `delegation.exact_target`, `delegation.rejection_matrix`.
+
+## 4. Guarantee vocabulary
+
+| Boundary | Contract guarantee |
+|---|---|
+| Application state + event + original deliveries | Atomic local commit |
+| Rolled-back operation | No committed event or original delivery |
+| Delivery execution | At least once |
+| Consumer-visible effect | Effectively once only with consumer deduplication |
+| Automatic retry | Same delivery/message ID, new attempt ID |
+| Manual replay | New linked delivery ID |
+| Fan-out | Independent state per destination |
+| Ordering | Not guaranteed |
+| Tool visibility | Discovery control, not authorization |
+
+Public wording:
+
+> **Atomic publication, at-least-once delivery, and stable identities for
+> effectively-once consumers.**
+
+## 5. Conformance profiles
+
+- **core** — BC-01 through BC-07;
+- **delivery** — retry identity, fan-out, replay, and lease fencing;
+- **security** — tenant continuity, authority, lease fencing, context cleanup,
+  secret minimization, and delegation binding;
+- **complete** — every v1 invariant.
+
+A profile is certified only when every required invariant has at least one passing
+check and there are no failed, skipped, or errored checks. A capability declaration
+cannot substitute for executable evidence.
+
+## 6. Capability manifest
+
+A driver publishes a strict manifest containing:
+
+```text
+schema_version
+contract_version
+adapter_name
+adapter_version
+implementation
+capabilities
+invariants
+metadata
+```
+
+The manifest is canonicalized and identified by SHA-256. Reports bind to that exact
+digest. Unknown fields, duplicate JSON keys, duplicate capability values, sensitive
+metadata keys, unsupported contract versions, and missing capability prerequisites
+fail validation.
+
+## 7. Evidence rules
+
+- Reports are deterministic apart from run identity, timestamps, duration, and
+  declared environment facts.
+- JSON is the authoritative archival representation.
+- JUnit is provided for test systems, SARIF for code-scanning interfaces, and
+  Markdown for human review.
+- Evidence is bounded and normalized before serialization.
+- Exception messages are not copied into public reports because they may contain
+  tenant data or credentials; only bounded exception type names are retained.
+- Output files are atomically replaced, private by default, and may not target a
+  symbolic link.
+- Archived evidence is independently verified against the exact capability manifest.
+
+## 8. Trust boundary of the adapter
+
+A `module:factory` adapter is imported and executed as trusted deployment code. The
+CLI **MUST NOT** load an adapter specification supplied by a tenant or other untrusted
+caller. The conformance suite can detect observable violations but cannot prove that
+an adapter truthfully connects each protocol method to the claimed production path.
+Certification therefore applies to the tested adapter, configuration, and
+implementation version—not to an unrelated deployment.
+
+## 9. Change control
+
+Changing an invariant, guarantee, profile, manifest field, report field, or
+certification rule requires:
+
+1. a superseding ADR;
+2. a contract-version and compatibility decision;
+3. updated descriptor and evidence schemas;
+4. new positive and injected-fault tests;
+5. release notes describing certification impact.

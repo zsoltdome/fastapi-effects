@@ -2,9 +2,9 @@
 
 ## Supported status
 
-FastAPI-Mergen `0.0.x` is a pre-alpha specification and API spike. It must not be
-used as a production security boundary. The first supported security claims begin
-only after Milestone 2 conformance, migration, role, RLS, and crash suites pass.
+FastAPI-Mergen `0.6.0a1` is a pre-alpha assurance release. Its supported claims cover
+the conformance models, runner, evidence formats, CLI, and reference fault matrix.
+It does not itself make the Milestone 1 persistence API spike production ready.
 
 ## Reporting
 
@@ -14,6 +14,19 @@ private repository security advisory when the repository is published.
 
 Do not include real credentials, tenant data, webhook payloads, signing secrets, or
 production DSNs in a report.
+
+## Conformance evidence security
+
+- Adapter factories are trusted code execution and must never be tenant controlled.
+- Public reports omit exception messages and retain only bounded exception types.
+- Evidence fields with credential-like names are redacted; manifest metadata with
+  such names is rejected.
+- Known deployment secrets can be supplied indirectly through
+  `--secret-canary-env`; literal command-line secret values are unsupported.
+- Report destinations must be regular files, are atomically replaced, and default to
+  mode `0600`.
+- Certification applies only to the tested adapter, implementation version,
+  capability manifest, profile, and configuration.
 
 ## Security model summary
 
