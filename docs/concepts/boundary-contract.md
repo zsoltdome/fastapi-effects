@@ -172,6 +172,8 @@ Public wording:
 > **Atomic publication, at-least-once delivery, and stable identities for
 > effectively-once consumers.**
 
+Delivery is at least once. Ordering and cancellation are undefined and unsupported.
+
 ## 5. Conformance profiles
 
 - **core** — BC-01 through BC-07;
