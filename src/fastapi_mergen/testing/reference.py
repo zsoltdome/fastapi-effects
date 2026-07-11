@@ -192,7 +192,11 @@ class ReferenceBoundaryDriver:
             event_id=event_id,
             tenant_id=principal.tenant_id,
             delivery_ids=delivery_ids,
-            correlation_id=(UUID(int=0) if Fault.LINEAGE_DROPPED in self._faults else correlation_id),
+            correlation_id=(
+                UUID(int=0)
+                if Fault.LINEAGE_DROPPED in self._faults
+                else correlation_id
+            ),
             causation_id=(None if Fault.LINEAGE_DROPPED in self._faults else causation_id),
         )
 
@@ -347,7 +351,12 @@ class ReferenceBoundaryDriver:
         identity = (principal.tenant_id, route_id, method.upper(), key_digest)
         if Fault.DUPLICATE_COMMAND in self._faults:
             response = await operation()
-            return CommandResult(executed=True, replayed=False, response_digest=response, generation=1)
+            return CommandResult(
+                executed=True,
+                replayed=False,
+                response_digest=response,
+                generation=1,
+            )
         lock = self._command_locks.setdefault(identity, asyncio.Lock())
         async with lock:
             existing = self._commands.get(identity)

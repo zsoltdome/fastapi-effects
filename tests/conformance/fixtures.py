@@ -11,3 +11,7 @@ def create_driver() -> ReferenceBoundaryDriver:
 
 async def create_async_driver() -> ReferenceBoundaryDriver:
     return ReferenceBoundaryDriver()
+
+
+def failing_factory() -> ReferenceBoundaryDriver:
+    raise RuntimeError("factory-secret-detail")

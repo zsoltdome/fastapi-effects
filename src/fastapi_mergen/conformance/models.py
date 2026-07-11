@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import re
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Any
+from typing import Any, NoReturn
 from uuid import UUID, uuid4
 
 from fastapi_mergen.conformance.contract import (
@@ -66,8 +66,14 @@ class CheckResult:
             raise MergenConfigurationError("Conformance status is invalid.")
         if not isinstance(self.severity, Severity):
             raise MergenConfigurationError("Conformance severity is invalid.")
-        if not isinstance(self.duration_ms, int) or isinstance(self.duration_ms, bool) or self.duration_ms < 0:
+        if (
+            not isinstance(self.duration_ms, int)
+            or isinstance(self.duration_ms, bool)
+            or self.duration_ms < 0
+        ):
             raise MergenConfigurationError("Conformance duration_ms must be non-negative.")
+        if not isinstance(self.summary, str):
+            raise MergenConfigurationError("Conformance summary must be text.")
         summary = clean_text(self.summary, maximum=512)
         if not summary:
             raise MergenConfigurationError("Conformance summary must not be empty.")
@@ -77,9 +83,21 @@ class CheckResult:
             raise MergenConfigurationError("Conformance evidence must be a mapping.")
         object.__setattr__(self, "evidence", normalized)
         if self.remediation is not None:
-            object.__setattr__(self, "remediation", clean_text(self.remediation, maximum=1024))
+            if not isinstance(self.remediation, str):
+                raise MergenConfigurationError("Conformance remediation must be text.")
+            object.__setattr__(
+                self,
+                "remediation",
+                clean_text(self.remediation, maximum=1024),
+            )
         if self.exception_type is not None:
-            object.__setattr__(self, "exception_type", clean_text(self.exception_type, maximum=256))
+            if not isinstance(self.exception_type, str):
+                raise MergenConfigurationError("Conformance exception_type must be text.")
+            object.__setattr__(
+                self,
+                "exception_type",
+                clean_text(self.exception_type, maximum=256),
+            )
 
     def as_dict(self) -> dict[str, JsonValue]:
         """Return a stable public representation."""
@@ -100,6 +118,8 @@ class CheckResult:
     def from_dict(cls, value: dict[str, Any]) -> CheckResult:
         """Parse one strict, machine-readable check result."""
 
+        if not isinstance(value, dict):
+            raise MergenConfigurationError("Conformance check must be an object.")
         expected = {
             "check_id",
             "invariant",
@@ -187,6 +207,8 @@ class ConformanceReport:
     def status(self) -> CheckStatus:
         """Return fail-closed aggregate status."""
 
+        if not self.results:
+            return CheckStatus.ERROR
         statuses = {result.status for result in self.results}
         if CheckStatus.ERROR in statuses:
             return CheckStatus.ERROR
@@ -257,6 +279,8 @@ class ConformanceReport:
     def from_dict(cls, value: dict[str, Any]) -> ConformanceReport:
         """Parse a rendered report and verify every derived field."""
 
+        if not isinstance(value, dict):
+            raise MergenConfigurationError("Conformance report must be an object.")
         expected = {
             "schema_version",
             "contract_version",
@@ -273,6 +297,12 @@ class ConformanceReport:
         }
         supplied_digest = value.get("report_digest")
         if supplied_digest is not None:
+            if not isinstance(supplied_digest, str) or not _DIGEST.fullmatch(
+                supplied_digest
+            ):
+                raise MergenConfigurationError(
+                    "Conformance report digest must be a SHA-256 hex digest."
+                )
             value = dict(value)
             del value["report_digest"]
         if set(value) != expected:
@@ -281,6 +311,10 @@ class ConformanceReport:
             raise MergenConfigurationError("Conformance report results must be an array.")
         if not isinstance(value["environment"], dict):
             raise MergenConfigurationError("Conformance report environment must be an object.")
+        if any(not isinstance(item, dict) for item in value["results"]):
+            raise MergenConfigurationError(
+                "Conformance report results must contain objects."
+            )
         try:
             profile = CertificationProfile(value["profile"])
             run_id = UUID(value["run_id"])
@@ -324,9 +358,17 @@ class ConformanceReport:
                 result[key] = item
             return result
 
+
+        def reject_constant(_value: str) -> NoReturn:
+            raise MergenConfigurationError("Conformance report contains a non-finite number.")
+
         try:
             decoded = payload.decode("utf-8") if isinstance(payload, bytes) else payload
-            value = json.loads(decoded, object_pairs_hook=reject_duplicates)
+            value = json.loads(
+                decoded,
+                object_pairs_hook=reject_duplicates,
+                parse_constant=reject_constant,
+            )
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise MergenConfigurationError(
                 "Conformance report is not valid UTF-8 JSON."

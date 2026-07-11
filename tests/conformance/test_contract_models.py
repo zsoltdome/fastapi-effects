@@ -170,3 +170,41 @@ def test_report_rejects_tampered_digest() -> None:
     payload["report_digest"] = "0" * 64
     with pytest.raises(MergenConfigurationError, match="digest"):
         ConformanceReport.from_dict(payload)
+
+
+def test_manifest_rejects_non_string_array_entries_cleanly() -> None:
+    value = complete_manifest().as_dict()
+    value["capabilities"] = [[Capability.AUTHORIZATION.value]]
+    with pytest.raises(MergenConfigurationError, match="contain strings"):
+        CapabilityManifest.from_dict(value)  # type: ignore[arg-type]
+
+
+def test_manifest_rejects_non_finite_json_constants() -> None:
+    payload = complete_manifest().as_dict()
+    payload["metadata"] = {"duration": float("nan")}
+    encoded = json.dumps(payload, allow_nan=True)
+    with pytest.raises(MergenConfigurationError, match="non-finite"):
+        CapabilityManifest.from_json(encoded)
+
+
+def test_report_rejects_non_object_result_entries() -> None:
+    original = report((result(),))
+    payload = original.as_dict()
+    payload["results"] = [1]
+    with pytest.raises(MergenConfigurationError, match="contain objects"):
+        ConformanceReport.from_dict(payload)  # type: ignore[arg-type]
+
+
+def test_empty_report_fails_closed() -> None:
+    empty = report(())
+    assert empty.status is CheckStatus.ERROR
+    assert not empty.certified
+
+
+def test_report_rejects_non_finite_json_constants() -> None:
+    original = report((result(),))
+    payload = original.as_dict()
+    payload["environment"] = {"duration": float("inf")}
+    encoded = json.dumps(payload, allow_nan=True)
+    with pytest.raises(MergenConfigurationError, match="non-finite"):
+        ConformanceReport.from_json(encoded)

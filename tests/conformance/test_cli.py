@@ -17,8 +17,12 @@ SOURCE = ROOT / "src"
 def run_cli(
     *arguments: str,
     environment: dict[str, str] | None = None,
+    unset_environment: tuple[str, ...] = (),
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
+    for name in tuple(env):
+        if name == "PYTEST_CURRENT_TEST" or name.startswith(("COV_CORE_", "COVERAGE_")):
+            env.pop(name, None)
     python_path = os.pathsep.join((str(SOURCE), str(ROOT)))
     env["PYTHONPATH"] = (
         python_path
@@ -27,6 +31,8 @@ def run_cli(
     )
     if environment:
         env.update(environment)
+    for name in unset_environment:
+        env.pop(name, None)
     return subprocess.run(
         [sys.executable, "-m", "fastapi_mergen", *arguments],
         cwd=ROOT,
@@ -144,15 +150,27 @@ def test_spec_is_machine_readable() -> None:
 
 
 def test_missing_secret_canary_environment_fails_configuration() -> None:
-    env = os.environ.copy()
-    env.pop("MERGEN_TEST_MISSING_CANARY", None)
     completed = run_cli(
         "conformance",
         "run",
         "--reference",
         "--secret-canary-env",
         "MERGEN_TEST_MISSING_CANARY",
-        environment=env,
+        unset_environment=("MERGEN_TEST_MISSING_CANARY",),
     )
     assert completed.returncode == 2
     assert "environment variable" in completed.stderr
+
+
+def test_adapter_factory_failure_is_bounded() -> None:
+    completed = run_cli(
+        "conformance",
+        "run",
+        "--adapter",
+        "tests.conformance.fixtures:failing_factory",
+        "--profile",
+        "core",
+    )
+    assert completed.returncode == 2
+    assert "could not be loaded" in completed.stderr
+    assert "factory-secret-detail" not in completed.stderr
