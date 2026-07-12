@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import platform
 import sys
 import time
@@ -43,10 +44,13 @@ class RunnerConfiguration:
         if self.check_timeout_seconds is not None and (
             not isinstance(self.check_timeout_seconds, int | float)
             or isinstance(self.check_timeout_seconds, bool)
+            or not math.isfinite(self.check_timeout_seconds)
             or self.check_timeout_seconds <= 0
             or self.check_timeout_seconds > 300
         ):
             raise MergenConfigurationError("Runner check timeout must be within 0 and 300 seconds.")
+        if not isinstance(self.fail_fast, bool):
+            raise MergenConfigurationError("Runner fail_fast must be a boolean.")
         if not isinstance(self.secret_canaries, tuple):
             raise MergenConfigurationError("Runner secret canaries must be a tuple.")
         if len(self.secret_canaries) > 32:
@@ -66,68 +70,83 @@ class ConformanceRunner:
         """Run selected checks; errors and unsupported facets fail certification."""
 
         if not isinstance(driver, BoundaryDriver):
-            raise MergenConfigurationError("Conformance driver does not implement lifecycle methods.")
-        manifest = driver.manifest
+            raise MergenConfigurationError(
+                "Conformance driver does not implement lifecycle methods."
+            )
+        try:
+            manifest = driver.manifest
+        except Exception as exc:  # noqa: BLE001 - never expose adapter exception text
+            await self._close_after_manifest_failure(driver)
+            raise MergenConfigurationError(
+                "Conformance driver manifest could not be read."
+            ) from exc
+
         selected = profile_invariants(self.configuration.profile)
         started_at = datetime.now(timezone.utc)
         results: list[CheckResult] = []
-        scenarios = tuple(scenario for scenario in SCENARIOS if scenario.invariant in selected)
+        scenarios = tuple(
+            scenario for scenario in SCENARIOS if scenario.invariant in selected
+        )
         declared = manifest.invariants
 
-        for invariant in sorted(selected, key=lambda item: item.value):
-            if invariant in declared:
-                continue
-            results.append(
-                CheckResult(
-                    check_id=f"profile.{invariant.value.lower()}.unsupported",
-                    invariant=invariant,
-                    status=CheckStatus.SKIP,
-                    severity=Severity.CRITICAL,
-                    summary="Implementation does not declare this required profile invariant.",
-                    duration_ms=0,
-                    evidence={
-                        "required_capabilities": sorted(
-                            capability.value for capability in required_capabilities(invariant)
-                        )
-                    },
-                    remediation="Declare and implement every invariant required by the selected profile.",
-                )
-            )
-            if self.configuration.fail_fast:
-                break
-
-        if not (self.configuration.fail_fast and results):
-            for scenario in scenarios:
-                if scenario.invariant not in declared:
+        try:
+            for invariant in sorted(selected, key=lambda item: item.value):
+                if invariant in declared:
                     continue
-                if scenario.capability is not None and scenario.capability not in manifest.capabilities:
-                    results.append(
-                        self._skip_for_capability(scenario, scenario.capability.value)
+                results.append(
+                    CheckResult(
+                        check_id=f"profile.{invariant.value.lower()}.unsupported",
+                        invariant=invariant,
+                        status=CheckStatus.SKIP,
+                        severity=Severity.CRITICAL,
+                        summary=(
+                            "Implementation does not declare this required profile "
+                            "invariant."
+                        ),
+                        duration_ms=0,
+                        evidence={
+                            "required_capabilities": sorted(
+                                capability.value
+                                for capability in required_capabilities(invariant)
+                            )
+                        },
+                        remediation=(
+                            "Declare and implement every invariant required by the "
+                            "selected profile."
+                        ),
                     )
-                    if self.configuration.fail_fast:
-                        break
-                    continue
-                result = await self._execute(driver, scenario)
-                results.append(result)
-                if self.configuration.fail_fast and result.status is not CheckStatus.PASS:
+                )
+                if self.configuration.fail_fast:
                     break
 
-        try:
-            await driver.close()
-        except Exception as exc:  # noqa: BLE001 - report bounded type, never message
-            results.append(
-                CheckResult(
-                    check_id="runner.cleanup",
-                    invariant=Invariant.CONTEXT_CLEANUP,
-                    status=CheckStatus.ERROR,
-                    severity=Severity.CRITICAL,
-                    summary="Driver cleanup raised an exception.",
-                    duration_ms=0,
-                    evidence={},
-                    remediation="Make driver cleanup idempotent, bounded, and exception-safe.",
-                    exception_type=f"{type(exc).__module__}.{type(exc).__qualname__}",
-                )
-            )
+            if not (self.configuration.fail_fast and results):
+                for scenario in scenarios:
+                    if scenario.invariant not in declared:
+                        continue
+                    if (
+                        scenario.capability is not None
+                        and scenario.capability not in manifest.capabilities
+                    ):
+                        results.append(
+                            self._skip_for_capability(
+                                scenario,
+                                scenario.capability.value,
+                            )
+                        )
+                        if self.configuration.fail_fast:
+                            break
+                        continue
+                    result = await self._execute(driver, scenario)
+                    results.append(result)
+                    if (
+                        self.configuration.fail_fast
+                        and result.status is not CheckStatus.PASS
+                    ):
+                        break
+        finally:
+            cleanup = await self._cleanup_result(driver)
+            if cleanup is not None:
+                results.append(cleanup)
 
         finished_at = datetime.now(timezone.utc)
         return ConformanceReport(
@@ -142,6 +161,33 @@ class ConformanceRunner:
                 "platform": sys.platform,
             },
         )
+
+    @staticmethod
+    async def _close_after_manifest_failure(driver: BoundaryDriver) -> None:
+        try:
+            await driver.close()
+        except Exception:  # noqa: BLE001 - preserve the manifest failure
+            pass
+
+    @staticmethod
+    async def _cleanup_result(driver: BoundaryDriver) -> CheckResult | None:
+        try:
+            await driver.close()
+        except Exception as exc:  # noqa: BLE001 - report bounded type, never message
+            return CheckResult(
+                check_id="runner.cleanup",
+                invariant=Invariant.CONTEXT_CLEANUP,
+                status=CheckStatus.ERROR,
+                severity=Severity.CRITICAL,
+                summary="Driver cleanup raised an exception.",
+                duration_ms=0,
+                evidence={},
+                remediation=(
+                    "Make driver cleanup idempotent, bounded, and exception-safe."
+                ),
+                exception_type=f"{type(exc).__module__}.{type(exc).__qualname__}",
+            )
+        return None
 
     async def _execute(self, driver: BoundaryDriver, scenario: Scenario) -> CheckResult:
         started = time.monotonic_ns()

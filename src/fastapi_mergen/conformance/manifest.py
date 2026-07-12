@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, NoReturn
 
 from fastapi_mergen.conformance.contract import (
     CONTRACT_VERSION,
@@ -119,6 +119,8 @@ class CapabilityManifest:
     def from_dict(cls, value: dict[str, Any]) -> CapabilityManifest:
         """Parse a strict manifest mapping."""
 
+        if not isinstance(value, dict):
+            raise MergenConfigurationError("Capability manifest must be an object.")
         expected = {
             "schema_version",
             "contract_version",
@@ -151,6 +153,14 @@ class CapabilityManifest:
         ):
             raise MergenConfigurationError(
                 "Capability manifest capabilities and invariants must be arrays."
+            )
+        if any(not isinstance(item, str) for item in value["capabilities"]):
+            raise MergenConfigurationError(
+                "Capability manifest capabilities must contain strings."
+            )
+        if any(not isinstance(item, str) for item in value["invariants"]):
+            raise MergenConfigurationError(
+                "Capability manifest invariants must contain strings."
             )
         if len(value["capabilities"]) != len(set(value["capabilities"])):
             raise MergenConfigurationError("Capability manifest repeats a capability.")
@@ -187,9 +197,17 @@ class CapabilityManifest:
                 result[key] = item
             return result
 
+
+        def reject_constant(_value: str) -> NoReturn:
+            raise MergenConfigurationError("Capability manifest contains a non-finite number.")
+
         try:
             decoded = payload.decode("utf-8") if isinstance(payload, bytes) else payload
-            value = json.loads(decoded, object_pairs_hook=reject_duplicates)
+            value = json.loads(
+                decoded,
+                object_pairs_hook=reject_duplicates,
+                parse_constant=reject_constant,
+            )
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise MergenConfigurationError("Capability manifest is not valid UTF-8 JSON.") from exc
         if not isinstance(value, dict):

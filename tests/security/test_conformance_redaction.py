@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from fastapi_mergen.conformance.safety import reject_sensitive_keys, safe_json, scan_for_secret_values
+from fastapi_mergen.conformance.safety import (
+    reject_sensitive_keys,
+    safe_json,
+    scan_for_secret_values,
+)
 from fastapi_mergen.errors import MergenConfigurationError
 import pytest
 

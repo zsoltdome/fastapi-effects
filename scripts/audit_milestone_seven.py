@@ -88,7 +88,10 @@ REQUIRED_PATHS = {
     "IMPLEMENTATION_REPORT_M7.md",
 }
 _ACTION_PIN = re.compile(r"uses:\s*[^\s@]+@[0-9a-f]{40}(?:\s*#.*)?$")
-_BRANCH = re.compile(r"^(main|(?:build|chore|ci|docs|feat|fix|refactor|test)/[a-z0-9][a-z0-9-]{1,63})$")
+_BRANCH = re.compile(
+    r"^(main|(?:build|chore|ci|docs|feat|fix|refactor|test)/"
+    r"[a-z0-9][a-z0-9-]{1,63})$"
+)
 
 
 @dataclass(slots=True)
@@ -218,7 +221,13 @@ def check_reporters() -> str:
         if stat.S_IMODE(destination.stat().st_mode) != 0o600:
             raise AssertionError("written report is not private by default")
     canary = "conformance-secret-canary-reference-key"
-    for rendered in (json_report, ET.tostring(junit, encoding="unicode"), json.dumps(sarif), markdown):
+    rendered_reports = (
+        json_report,
+        ET.tostring(junit, encoding="unicode"),
+        json.dumps(sarif),
+        markdown,
+    )
+    for rendered in rendered_reports:
         if canary in rendered:
             raise AssertionError("reporter exposed the reference signing canary")
     return "JSON, JUnit, SARIF, Markdown, digest, and private-write gates passed"
@@ -229,7 +238,10 @@ def literal_all(path: Path) -> set[str]:
     for node in tree.body:
         if not isinstance(node, ast.Assign):
             continue
-        if not any(isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets):
+        if not any(
+            isinstance(target, ast.Name) and target.id == "__all__"
+            for target in node.targets
+        ):
             continue
         if not isinstance(node.value, (ast.List, ast.Tuple)):
             raise AssertionError(f"{path} __all__ must be a literal sequence")

@@ -8,7 +8,6 @@ import os
 import sys
 from importlib.resources import files
 from pathlib import Path
-from typing import cast
 
 from fastapi_mergen.conformance.certification import verify_evidence
 from fastapi_mergen.conformance.contract import CertificationProfile, SPEC_RESOURCE
@@ -104,9 +103,7 @@ def execute(args: argparse.Namespace) -> int:
             if args.input:
                 manifest = CapabilityManifest.from_json(Path(args.input).read_bytes())
             else:
-                driver = asyncio.run(_driver(args))
-                manifest = driver.manifest
-                asyncio.run(driver.close())
+                manifest = asyncio.run(_manifest_from_driver(args))
             print(manifest.to_json())
             return 0
         except (OSError, MergenConfigurationError) as exc:
@@ -137,19 +134,49 @@ async def _driver(args: argparse.Namespace) -> BoundaryDriver:
     return await load_driver(args.adapter)
 
 
-async def _run(args: argparse.Namespace):
-    driver = await _driver(args)
+def _secret_canaries(args: argparse.Namespace) -> tuple[str, ...]:
     canaries: list[str] = []
     for name in args.secret_canary_env:
         if not name or name not in os.environ:
             raise MergenConfigurationError(
-                "Every --secret-canary-env name must identify a present environment variable."
+                "Every --secret-canary-env name must identify a present environment "
+                "variable."
             )
         canaries.append(os.environ[name])
+    return tuple(canaries)
+
+
+async def _run(args: argparse.Namespace) -> ConformanceReport:
+    canaries = _secret_canaries(args)
+    driver = await _driver(args)
     configuration = RunnerConfiguration(
         profile=CertificationProfile(args.profile),
         check_timeout_seconds=args.timeout,
         fail_fast=args.fail_fast,
-        secret_canaries=tuple(canaries),
+        secret_canaries=canaries,
     )
-    return await ConformanceRunner(configuration).run(cast(BoundaryDriver, driver))
+    return await ConformanceRunner(configuration).run(driver)
+
+
+async def _manifest_from_driver(args: argparse.Namespace) -> CapabilityManifest:
+    driver = await _driver(args)
+    manifest: CapabilityManifest | None = None
+    manifest_error: Exception | None = None
+    try:
+        manifest = driver.manifest
+    except Exception as exc:  # noqa: BLE001 - never expose application exception text
+        manifest_error = exc
+    try:
+        await driver.close()
+    except Exception as exc:  # noqa: BLE001 - bounded configuration error
+        if manifest_error is None:
+            raise MergenConfigurationError(
+                "Conformance driver cleanup failed."
+            ) from exc
+    if manifest_error is not None:
+        raise MergenConfigurationError(
+            "Conformance driver manifest could not be read."
+        ) from manifest_error
+    if manifest is None:
+        raise MergenConfigurationError("Conformance driver manifest is unavailable.")
+    return manifest
