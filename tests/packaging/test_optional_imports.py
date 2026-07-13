@@ -7,6 +7,8 @@ import pytest
 from fastapi_mergen import _optional
 from fastapi_mergen.errors import OptionalDependencyError
 
+pytestmark = pytest.mark.packaging
+
 
 def test_base_import_has_no_http_client_side_effect() -> None:
     import fastapi_mergen

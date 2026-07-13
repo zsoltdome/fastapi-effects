@@ -42,10 +42,18 @@ def run(
     subprocess.run(command, cwd=cwd, check=True, env=environment)
 
 
+def scripts_directory(environment: Path) -> Path:
+    return environment / ("Scripts" if os.name == "nt" else "bin")
+
+
 def python_in(environment: Path) -> Path:
-    scripts = "Scripts" if os.name == "nt" else "bin"
     executable = "python.exe" if os.name == "nt" else "python"
-    return environment / scripts / executable
+    return scripts_directory(environment) / executable
+
+
+def console_in(environment: Path) -> Path:
+    executable = "fastapi-mergen.exe" if os.name == "nt" else "fastapi-mergen"
+    return scripts_directory(environment) / executable
 
 
 def create_environment(path: Path, *, parent_dependencies: bool = False) -> Path:
@@ -118,6 +126,10 @@ def smoke_install(
             "prefix_path = Path(sys.prefix).resolve()",
             "assert package_path.is_relative_to(prefix_path), package_path",
             "assert package_path.with_name('py.typed').is_file()",
+            "spec_path = package_path.parent / 'conformance' / 'spec'",
+            "assert (spec_path / 'boundary-contract-v1.json').is_file()",
+            "assert (spec_path / 'manifest-v1.schema.json').is_file()",
+            "assert (spec_path / 'report-v1.schema.json').is_file()",
             "assert not package_path.parents[1].joinpath('mergen').exists()",
             "metadata = importlib.metadata.metadata('fastapi-mergen')",
             "assert metadata['Name'] == 'fastapi-mergen'",
@@ -146,6 +158,21 @@ def smoke_install(
             cwd=root,
             clean_python=True,
         )
+        run(
+            str(python),
+            "-m",
+            "fastapi_mergen",
+            "--version",
+            cwd=root,
+            clean_python=True,
+        )
+        run(
+            str(console_in(environment)),
+            "conformance",
+            "spec",
+            cwd=root,
+            clean_python=True,
+        )
         if not no_deps:
             run(
                 str(python),
@@ -160,8 +187,15 @@ def smoke_install(
 def inspect_wheel(wheel: Path) -> None:
     with zipfile.ZipFile(wheel) as archive:
         names = set(archive.namelist())
-    if "fastapi_mergen/py.typed" not in names:
-        raise AssertionError("wheel does not contain fastapi_mergen/py.typed")
+    required = {
+        "fastapi_mergen/py.typed",
+        "fastapi_mergen/conformance/spec/boundary-contract-v1.json",
+        "fastapi_mergen/conformance/spec/manifest-v1.schema.json",
+        "fastapi_mergen/conformance/spec/report-v1.schema.json",
+    }
+    missing = required - names
+    if missing:
+        raise AssertionError(f"wheel is missing package data: {sorted(missing)}")
     if any(name.startswith("mergen/") for name in names):
         raise AssertionError("wheel contains the occupied top-level mergen package")
     if any("/.git/" in name or name.startswith(".git/") for name in names):
@@ -171,8 +205,15 @@ def inspect_wheel(wheel: Path) -> None:
 def inspect_sdist(sdist: Path) -> None:
     with tarfile.open(sdist, "r:gz") as archive:
         names = set(archive.getnames())
-    if not any(name.endswith("/src/fastapi_mergen/py.typed") for name in names):
-        raise AssertionError("sdist does not contain fastapi_mergen/py.typed")
+    suffixes = (
+        "/src/fastapi_mergen/py.typed",
+        "/src/fastapi_mergen/conformance/spec/boundary-contract-v1.json",
+        "/src/fastapi_mergen/conformance/spec/manifest-v1.schema.json",
+        "/src/fastapi_mergen/conformance/spec/report-v1.schema.json",
+    )
+    missing = [suffix for suffix in suffixes if not any(name.endswith(suffix) for name in names)]
+    if missing:
+        raise AssertionError(f"sdist is missing package data: {missing}")
     if any("/.git/" in name or name.endswith("/.git") for name in names):
         raise AssertionError("sdist contains Git repository metadata")
 
