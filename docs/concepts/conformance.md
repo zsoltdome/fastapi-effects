@@ -17,6 +17,9 @@ The assurance layer answers concrete questions that ordinary unit coverage does 
 - Does principal context survive into the next tenant's job?
 - Does a duplicate command execute twice under concurrency?
 - Can a delegated credential be reused for another audience or route?
+- Does a webhook sign bytes other than the exact body sent, or accept a private IP?
+- Is broker enqueue incorrectly treated as terminal handler success?
+- Can a duplicate broker message execute the same handoff twice?
 - Do public evidence files expose a configured secret canary?
 
 ## Architecture
@@ -71,8 +74,8 @@ class BoundaryDriver(Protocol):
 
 Capability facets then expose transaction publication, tenant snapshots, delivery
 claims, authorization resolution, context lifecycle, transactional command identity,
-and delegation. An adapter should call the real implementation path rather than
-replicate expected answers in a mock.
+delegation, signed webhook delivery, and external-executor handoff. An adapter should
+call the real implementation path rather than replicate expected answers in a mock.
 
 ## Failure behavior
 

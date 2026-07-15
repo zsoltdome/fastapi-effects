@@ -12,11 +12,11 @@ authorization, delivery leases, command idempotency, and delegation.
 
 ### `Invariant`
 
-Stable identifiers `BC-01` through `BC-12`.
+Stable identifiers `BC-01` through `BC-14`.
 
 ### `CertificationProfile`
 
-`core`, `delivery`, `security`, or `complete`.
+`core`, `delivery`, `security`, `webhook`, `executor`, or `complete`.
 
 ### `CapabilityManifest`
 
@@ -120,7 +120,9 @@ Adapter authors implement `BoundaryDriver` and the protocols required by the man
 - `AuthorizationFacet`;
 - `ContextLifecycleFacet`;
 - `CommandIdempotencyFacet`;
-- `DelegationFacet`.
+- `DelegationFacet`;
+- `WebhookFacet`;
+- `ExternalExecutorFacet`.
 
 A manifest that declares an invariant without all prerequisite capabilities is
 rejected before execution.

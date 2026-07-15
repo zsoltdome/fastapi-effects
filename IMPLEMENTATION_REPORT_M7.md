@@ -13,16 +13,16 @@ MCP server.
 
 ## Implemented capabilities
 
-- Boundary Contract v1 descriptor with twelve stable invariants;
+- Boundary Contract v1 descriptor with fourteen stable invariants;
 - strict capability manifests with prerequisite validation and canonical SHA-256
   identity;
-- `core`, `delivery`, `security`, and `complete` certification profiles;
+- `core`, `delivery`, `security`, `webhook`, `executor`, and `complete` profiles;
 - runtime-checkable facet protocols for transaction, delivery, authority, context,
-  command idempotency, and delegation boundaries;
-- sixteen deterministic scenarios;
+  command idempotency, delegation, webhook, and executor boundaries;
+- nineteen deterministic scenarios;
 - bounded per-check timeouts, fail-fast option, cleanup checks, and fail-closed status;
 - deterministic in-memory reference driver;
-- fourteen injected faults proving that the suite detects broken implementations;
+- twenty injected faults proving that the suite detects broken implementations;
 - secret-key redaction and optional deployment-provided secret canaries;
 - JSON, JUnit, SARIF, and Markdown reporters;
 - strict archived-report parsing and independent manifest/report verification;

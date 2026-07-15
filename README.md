@@ -14,10 +14,10 @@ through a trusted application adapter.
 
 ## What this release provides
 
-- Boundary Contract v1 with twelve stable invariants;
-- strict capability manifests and four certification profiles;
+- Boundary Contract v1 with fourteen stable invariants;
+- strict capability manifests and six certification profiles;
 - deterministic asynchronous conformance scenarios;
-- an in-memory reference oracle with fourteen injectable defects;
+- an in-memory reference oracle with twenty injectable defects;
 - JSON, JUnit, SARIF, and Markdown reports;
 - independently verifiable manifest/report digests;
 - credential-safe bounded evidence and deployment secret canaries;
