@@ -39,6 +39,7 @@ CapabilityManifest.from_json(...)
 RunnerConfiguration(
     profile=CertificationProfile.CORE,
     check_timeout_seconds=None,
+    cleanup_timeout_seconds=5.0,
     fail_fast=False,
     secret_canaries=(),
 )

@@ -79,10 +79,11 @@ call the real implementation path rather than replicate expected answers in a mo
 
 ## Failure behavior
 
-Each scenario has a bounded timeout. Assertion failures become `fail`; unexpected
-exception types become `error` without copying the exception message. Unsupported
-profile invariants become `skip`, which also prevents certification. Driver cleanup is
-always attempted and cleanup failure produces a critical error.
+Each scenario and driver cleanup has an independent bounded timeout. Assertion
+failures become `fail`; unexpected exception types become `error` without copying the
+exception message. Unsupported profile invariants become `skip`, which also prevents
+certification. Driver cleanup is always attempted; timeout or failure produces a
+critical error.
 
 ## Secret canaries
 

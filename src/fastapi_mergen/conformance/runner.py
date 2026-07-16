@@ -35,6 +35,7 @@ class RunnerConfiguration:
 
     profile: CertificationProfile = CertificationProfile.CORE
     check_timeout_seconds: float | None = None
+    cleanup_timeout_seconds: float = 5.0
     fail_fast: bool = False
     secret_canaries: tuple[str, ...] = ()
 
@@ -49,6 +50,16 @@ class RunnerConfiguration:
             or self.check_timeout_seconds > 300
         ):
             raise MergenConfigurationError("Runner check timeout must be within 0 and 300 seconds.")
+        if (
+            not isinstance(self.cleanup_timeout_seconds, int | float)
+            or isinstance(self.cleanup_timeout_seconds, bool)
+            or not math.isfinite(self.cleanup_timeout_seconds)
+            or self.cleanup_timeout_seconds <= 0
+            or self.cleanup_timeout_seconds > 60
+        ):
+            raise MergenConfigurationError(
+                "Runner cleanup timeout must be within 0 and 60 seconds."
+            )
         if not isinstance(self.fail_fast, bool):
             raise MergenConfigurationError("Runner fail_fast must be a boolean.")
         if not isinstance(self.secret_canaries, tuple):
@@ -162,17 +173,35 @@ class ConformanceRunner:
             },
         )
 
-    @staticmethod
-    async def _close_after_manifest_failure(driver: BoundaryDriver) -> None:
+    async def _close_after_manifest_failure(self, driver: BoundaryDriver) -> None:
         try:
-            await driver.close()
+            await asyncio.wait_for(
+                driver.close(),
+                timeout=self.configuration.cleanup_timeout_seconds,
+            )
         except Exception:  # noqa: BLE001 - preserve the manifest failure
             pass
 
-    @staticmethod
-    async def _cleanup_result(driver: BoundaryDriver) -> CheckResult | None:
+    async def _cleanup_result(self, driver: BoundaryDriver) -> CheckResult | None:
         try:
-            await driver.close()
+            await asyncio.wait_for(
+                driver.close(),
+                timeout=self.configuration.cleanup_timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            return CheckResult(
+                check_id="runner.cleanup",
+                invariant=Invariant.CONTEXT_CLEANUP,
+                status=CheckStatus.ERROR,
+                severity=Severity.CRITICAL,
+                summary="Driver cleanup exceeded its bounded timeout.",
+                duration_ms=round(self.configuration.cleanup_timeout_seconds * 1000),
+                evidence={},
+                remediation=(
+                    "Make driver cleanup idempotent, bounded, and cancellation-safe."
+                ),
+                exception_type="builtins.TimeoutError",
+            )
         except Exception as exc:  # noqa: BLE001 - report bounded type, never message
             return CheckResult(
                 check_id="runner.cleanup",
