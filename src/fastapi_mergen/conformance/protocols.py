@@ -78,6 +78,38 @@ class CommandResult:
     generation: int
 
 
+
+
+@dataclass(frozen=True, slots=True)
+class WebhookAttemptView:
+    """Observable properties of one outbound webhook attempt."""
+
+    message_id: str
+    attempt_no: int
+    request_body_digest: str
+    signed_body_digest: str
+    signature_count: int
+    connected_ip: str
+    status_code: int
+    response_body_persisted: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutorHandoffView:
+    """Observable state of one external-executor handoff."""
+
+    handoff_id: UUID
+    delivery_id: UUID
+    attempt_id: UUID
+    task_id: str
+    status: str
+    terminal: bool
+    execution_count: int
+    tenant_id: UUID
+    subject_id: str
+    scopes: frozenset[str]
+
+
 @dataclass(frozen=True, slots=True)
 class DelegationView:
     """Verified next-hop delegated identity."""
@@ -236,3 +268,37 @@ class DelegationFacet(Protocol):
         path: str,
         required_scopes: frozenset[str],
     ) -> DelegationView: ...
+
+@runtime_checkable
+class WebhookFacet(Protocol):
+    """Deliver signed bytes through an attempt-time validated endpoint."""
+
+    async def deliver_webhook(
+        self,
+        *,
+        message_id: str,
+        body: bytes,
+        endpoint_url: str,
+        resolved_addresses: Sequence[str],
+        attempt_no: int,
+    ) -> WebhookAttemptView: ...
+
+
+@runtime_checkable
+class ExternalExecutorFacet(Protocol):
+    """Create and execute a durable, principal-preserving handoff."""
+
+    async def enqueue_handoff(
+        self,
+        *,
+        principal: Principal,
+        delivery_id: UUID,
+        attempt_id: UUID,
+    ) -> ExecutorHandoffView: ...
+
+    async def execute_handoff(
+        self,
+        *,
+        handoff_id: UUID,
+        worker_id: str,
+    ) -> ExecutorHandoffView: ...

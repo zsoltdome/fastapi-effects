@@ -21,7 +21,9 @@ from fastapi_mergen.conformance.protocols import (
     ContextLifecycleFacet,
     DelegationFacet,
     DeliveryLeaseFacet,
+    ExternalExecutorFacet,
     TransactionalEffectsFacet,
+    WebhookFacet,
 )
 from fastapi_mergen.core.policy import AuthorizationMode
 from fastapi_mergen.core.principal import Principal
@@ -518,6 +520,120 @@ async def delegation_rejection_matrix(driver: BoundaryDriver) -> ScenarioObserva
         {"rejected_probes": rejected},
     )
 
+async def webhook_signed_retry(driver: BoundaryDriver) -> ScenarioObservation:
+    facet: WebhookFacet = _require(driver, WebhookFacet, Capability.WEBHOOKS.value)
+    body = b'{"event":"invoice.created","version":1}'
+    digest = hashlib.sha256(body).hexdigest()
+    first = await facet.deliver_webhook(
+        message_id="msg_delivery_42",
+        body=body,
+        endpoint_url="https://customer.example/hooks",
+        resolved_addresses=("93.184.216.34",),
+        attempt_no=1,
+    )
+    second = await facet.deliver_webhook(
+        message_id="msg_delivery_42",
+        body=body,
+        endpoint_url="https://customer.example/hooks",
+        resolved_addresses=("93.184.216.34",),
+        attempt_no=2,
+    )
+    if first.message_id != second.message_id:
+        raise AssertionError("Webhook retry changed the stable message identity.")
+    if first.request_body_digest != digest or first.signed_body_digest != digest:
+        raise AssertionError("Webhook signature did not cover the exact sent bytes.")
+    if second.request_body_digest != digest or second.signed_body_digest != digest:
+        raise AssertionError("Webhook retry changed the signed body identity.")
+    if first.signature_count < 1 or second.signature_count < 1:
+        raise AssertionError("Webhook attempt did not include a signature.")
+    if first.response_body_persisted or second.response_body_persisted:
+        raise AssertionError("Webhook receiver body was persisted by default.")
+    return ScenarioObservation(
+        "Webhook retries signed the exact body under one stable message identity.",
+        {
+            "message_id": first.message_id,
+            "attempts": 2,
+            "signature_count": first.signature_count,
+            "response_body_persisted": False,
+        },
+    )
+
+
+async def webhook_ssrf_matrix(driver: BoundaryDriver) -> ScenarioObservation:
+    facet: WebhookFacet = _require(driver, WebhookFacet, Capability.WEBHOOKS.value)
+    blocked = (
+        "127.0.0.1",
+        "169.254.169.254",
+        "10.0.0.1",
+        "::1",
+        "::ffff:127.0.0.1",
+    )
+    rejected = 0
+    for index, address in enumerate(blocked, start=1):
+        try:
+            await facet.deliver_webhook(
+                message_id=f"msg_blocked_{index}",
+                body=b"{}",
+                endpoint_url="https://blocked.example/hooks",
+                resolved_addresses=(address,),
+                attempt_no=1,
+            )
+        except ConformanceAccessDenied:
+            rejected += 1
+    if rejected != len(blocked):
+        raise AssertionError("Webhook endpoint accepted a forbidden resolved address.")
+    return ScenarioObservation(
+        "Webhook delivery rejected private, metadata, loopback, and mapped addresses.",
+        {"rejected_addresses": rejected},
+    )
+
+
+async def executor_handoff_boundary(driver: BoundaryDriver) -> ScenarioObservation:
+    facet: ExternalExecutorFacet = _require(
+        driver,
+        ExternalExecutorFacet,
+        Capability.EXTERNAL_EXECUTOR.value,
+    )
+    origin = principal(scopes=frozenset({"invoices:read"}))
+    delivery_id = UUID("44444444-4444-4444-8444-444444444444")
+    attempt_id = UUID("55555555-5555-4555-8555-555555555555")
+    enqueued = await facet.enqueue_handoff(
+        principal=origin,
+        delivery_id=delivery_id,
+        attempt_id=attempt_id,
+    )
+    if enqueued.terminal or enqueued.status != "enqueued":
+        raise AssertionError("Broker acknowledgement was treated as terminal execution.")
+    if (
+        enqueued.tenant_id != origin.tenant_id
+        or enqueued.subject_id != origin.subject_id
+        or enqueued.scopes != origin.scopes
+    ):
+        raise AssertionError("Executor handoff lost or changed the originating principal.")
+    completed = await facet.execute_handoff(
+        handoff_id=enqueued.handoff_id,
+        worker_id="worker:one",
+    )
+    duplicate = await facet.execute_handoff(
+        handoff_id=enqueued.handoff_id,
+        worker_id="worker:duplicate",
+    )
+    if not completed.terminal or completed.status != "succeeded":
+        raise AssertionError("Worker completion did not finalize the durable handoff.")
+    if duplicate.execution_count != 1 or completed.execution_count != 1:
+        raise AssertionError("Duplicate broker delivery executed the handler more than once.")
+    if duplicate.task_id != enqueued.task_id or duplicate.handoff_id != enqueued.handoff_id:
+        raise AssertionError("Executor handoff identity changed across worker delivery.")
+    return ScenarioObservation(
+        "External enqueue remained non-terminal and duplicate execution was fenced.",
+        {
+            "handoff_id": enqueued.handoff_id,
+            "task_id": enqueued.task_id,
+            "execution_count": duplicate.execution_count,
+        },
+    )
+
+
 
 SCENARIOS: tuple[Scenario, ...] = (
     Scenario(
@@ -663,5 +779,32 @@ SCENARIOS: tuple[Scenario, ...] = (
         5.0,
         delegation_rejection_matrix,
         "Reject every audience or target mismatch without forwarding the origin credential.",
+    ),
+    Scenario(
+        "webhook.signed_retry",
+        Invariant.WEBHOOK_BOUNDARY,
+        Capability.WEBHOOKS,
+        "critical",
+        5.0,
+        webhook_signed_retry,
+        "Sign the exact sent bytes, retain message identity, and discard receiver bodies.",
+    ),
+    Scenario(
+        "webhook.ssrf_matrix",
+        Invariant.WEBHOOK_BOUNDARY,
+        Capability.WEBHOOKS,
+        "critical",
+        5.0,
+        webhook_ssrf_matrix,
+        "Resolve and reject every forbidden destination address at delivery time.",
+    ),
+    Scenario(
+        "executor.durable_handoff",
+        Invariant.EXECUTOR_HANDOFF,
+        Capability.EXTERNAL_EXECUTOR,
+        "critical",
+        5.0,
+        executor_handoff_boundary,
+        "Keep enqueue non-terminal and fence duplicate worker execution.",
     ),
 )

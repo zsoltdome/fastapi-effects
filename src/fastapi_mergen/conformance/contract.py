@@ -40,6 +40,8 @@ class Invariant(StrEnum):
     SECRET_MINIMIZATION = "BC-10"
     COMMAND_IDENTITY = "BC-11"
     DELEGATION_BINDING = "BC-12"
+    WEBHOOK_BOUNDARY = "BC-13"
+    EXECUTOR_HANDOFF = "BC-14"
 
 
 class CertificationProfile(StrEnum):
@@ -48,6 +50,8 @@ class CertificationProfile(StrEnum):
     CORE = "core"
     SECURITY = "security"
     DELIVERY = "delivery"
+    WEBHOOK = "webhook"
+    EXECUTOR = "executor"
     COMPLETE = "complete"
 
 
@@ -75,6 +79,8 @@ INVARIANT_CAPABILITIES = MappingProxyType(
         Invariant.SECRET_MINIMIZATION: frozenset(),
         Invariant.COMMAND_IDENTITY: frozenset({Capability.COMMAND_IDEMPOTENCY}),
         Invariant.DELEGATION_BINDING: frozenset({Capability.DELEGATION}),
+        Invariant.WEBHOOK_BOUNDARY: frozenset({Capability.WEBHOOKS}),
+        Invariant.EXECUTOR_HANDOFF: frozenset({Capability.EXTERNAL_EXECUTOR}),
     }
 )
 
@@ -107,6 +113,23 @@ PROFILE_INVARIANTS = MappingProxyType(
                 Invariant.INDEPENDENT_FANOUT,
                 Invariant.REPLAY_ACCOUNTABILITY,
                 Invariant.LEASE_FENCING,
+            }
+        ),
+        CertificationProfile.WEBHOOK: frozenset(
+            {
+                Invariant.STABLE_RETRY_IDENTITY,
+                Invariant.REPLAY_ACCOUNTABILITY,
+                Invariant.SECRET_MINIMIZATION,
+                Invariant.WEBHOOK_BOUNDARY,
+            }
+        ),
+        CertificationProfile.EXECUTOR: frozenset(
+            {
+                Invariant.TENANT_CONTINUITY,
+                Invariant.AUTHORITY_PROVENANCE,
+                Invariant.LEASE_FENCING,
+                Invariant.CONTEXT_CLEANUP,
+                Invariant.EXECUTOR_HANDOFF,
             }
         ),
         CertificationProfile.COMPLETE: frozenset(Invariant),

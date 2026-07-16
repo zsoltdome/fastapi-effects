@@ -10,6 +10,7 @@ import asyncio
 import base64
 import hashlib
 import hmac
+import ipaddress
 import json
 import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -17,6 +18,7 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
+from urllib.parse import urlsplit
 from uuid import UUID, NAMESPACE_URL, uuid5
 
 from fastapi_mergen.conformance.contract import Capability, Invariant
@@ -30,8 +32,10 @@ from fastapi_mergen.conformance.protocols import (
     ConformanceLeaseLost,
     DelegationView,
     DeliveryView,
+    ExecutorHandoffView,
     LeaseView,
     PublishedEvent,
+    WebhookAttemptView,
 )
 from fastapi_mergen.core.policy import AuthorizationMode
 from fastapi_mergen.core.principal import Principal
@@ -57,6 +61,12 @@ class Fault(StrEnum):
     DUPLICATE_COMMAND = "duplicate_command"
     FINGERPRINT_REUSE = "fingerprint_reuse"
     LOOSE_DELEGATION_TARGET = "loose_delegation_target"
+    WEBHOOK_UNSIGNED_BODY = "webhook_unsigned_body"
+    WEBHOOK_SSRF_ALLOWED = "webhook_ssrf_allowed"
+    WEBHOOK_RESPONSE_PERSISTED = "webhook_response_persisted"
+    EXECUTOR_ENQUEUE_TERMINAL = "executor_enqueue_terminal"
+    EXECUTOR_DUPLICATE_EXECUTION = "executor_duplicate_execution"
+    EXECUTOR_PRINCIPAL_LOST = "executor_principal_lost"
 
 
 @dataclass(slots=True)
@@ -78,6 +88,20 @@ class _DeliveryRecord:
     attempt_ids: list[UUID]
     active_lease_token: UUID | None = None
     replay_of: UUID | None = None
+
+
+@dataclass(slots=True)
+class _HandoffRecord:
+    handoff_id: UUID
+    delivery_id: UUID
+    attempt_id: UUID
+    task_id: str
+    status: str
+    terminal: bool
+    execution_count: int
+    tenant_id: UUID
+    subject_id: str
+    scopes: frozenset[str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +126,7 @@ class ReferenceBoundaryDriver:
         self._deliveries: dict[UUID, _DeliveryRecord] = {}
         self._commands: dict[tuple[UUID, str, str, str], _CommandRecord] = {}
         self._command_locks: dict[tuple[UUID, str, str, str], asyncio.Lock] = {}
+        self._handoffs: dict[UUID, _HandoffRecord] = {}
         self._delegation_secret = b"conformance-secret-canary-reference-key"
         self._closed = False
         self._manifest = CapabilityManifest(
@@ -128,6 +153,7 @@ class ReferenceBoundaryDriver:
         self._deliveries.clear()
         self._commands.clear()
         self._command_locks.clear()
+        self._handoffs.clear()
         self._principal = ContextVar("mergen_reference_principal", default=None)
         self._closed = False
 
@@ -389,6 +415,104 @@ class ReferenceBoundaryDriver:
                 generation=record.generation,
             )
 
+    async def deliver_webhook(
+        self,
+        *,
+        message_id: str,
+        body: bytes,
+        endpoint_url: str,
+        resolved_addresses: Sequence[str],
+        attempt_no: int,
+    ) -> WebhookAttemptView:
+        parsed = urlsplit(endpoint_url)
+        if (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.fragment
+            or attempt_no < 1
+            or not resolved_addresses
+        ):
+            raise ConformanceAccessDenied
+        addresses = tuple(ipaddress.ip_address(item) for item in resolved_addresses)
+        if (
+            Fault.WEBHOOK_SSRF_ALLOWED not in self._faults
+            and any(not address.is_global for address in addresses)
+        ):
+            raise ConformanceAccessDenied
+        body_digest = hashlib.sha256(body).hexdigest()
+        signed_digest = body_digest
+        if Fault.WEBHOOK_UNSIGNED_BODY in self._faults:
+            signed_digest = hashlib.sha256(body + b"changed").hexdigest()
+        hmac.new(
+            self._delegation_secret,
+            f"{message_id}.{attempt_no}.".encode("utf-8") + body,
+            hashlib.sha256,
+        ).digest()
+        return WebhookAttemptView(
+            message_id=message_id,
+            attempt_no=attempt_no,
+            request_body_digest=body_digest,
+            signed_body_digest=signed_digest,
+            signature_count=1,
+            connected_ip=str(addresses[0]),
+            status_code=200,
+            response_body_persisted=(
+                Fault.WEBHOOK_RESPONSE_PERSISTED in self._faults
+            ),
+        )
+
+    async def enqueue_handoff(
+        self,
+        *,
+        principal: Principal,
+        delivery_id: UUID,
+        attempt_id: UUID,
+    ) -> ExecutorHandoffView:
+        handoff_id = uuid5(
+            NAMESPACE_URL,
+            f"fastapi-mergen:handoff:{delivery_id}:{attempt_id}",
+        )
+        tenant_id = principal.tenant_id
+        subject_id = principal.subject_id
+        scopes = principal.scopes
+        if Fault.EXECUTOR_PRINCIPAL_LOST in self._faults:
+            tenant_id = UUID(int=0)
+            subject_id = "unknown"
+            scopes = frozenset()
+        terminal = Fault.EXECUTOR_ENQUEUE_TERMINAL in self._faults
+        record = _HandoffRecord(
+            handoff_id=handoff_id,
+            delivery_id=delivery_id,
+            attempt_id=attempt_id,
+            task_id=f"mergen-{delivery_id}-{attempt_id}",
+            status="succeeded" if terminal else "enqueued",
+            terminal=terminal,
+            execution_count=1 if terminal else 0,
+            tenant_id=tenant_id,
+            subject_id=subject_id,
+            scopes=scopes,
+        )
+        self._handoffs[handoff_id] = record
+        return self._handoff_view(record)
+
+    async def execute_handoff(
+        self,
+        *,
+        handoff_id: UUID,
+        worker_id: str,
+    ) -> ExecutorHandoffView:
+        del worker_id
+        record = self._handoffs[handoff_id]
+        if not record.terminal:
+            record.execution_count += 1
+            record.status = "succeeded"
+            record.terminal = True
+        elif Fault.EXECUTOR_DUPLICATE_EXECUTION in self._faults:
+            record.execution_count += 1
+        return self._handoff_view(record)
+
     async def mint_delegation(
         self,
         *,
@@ -464,6 +588,21 @@ class ReferenceBoundaryDriver:
             audience=claims["aud"],
             method=claims["method"],
             path=claims["path"],
+        )
+
+    @staticmethod
+    def _handoff_view(record: _HandoffRecord) -> ExecutorHandoffView:
+        return ExecutorHandoffView(
+            handoff_id=record.handoff_id,
+            delivery_id=record.delivery_id,
+            attempt_id=record.attempt_id,
+            task_id=record.task_id,
+            status=record.status,
+            terminal=record.terminal,
+            execution_count=record.execution_count,
+            tenant_id=record.tenant_id,
+            subject_id=record.subject_id,
+            scopes=record.scopes,
         )
 
     def _view(self, record: _DeliveryRecord) -> DeliveryView:

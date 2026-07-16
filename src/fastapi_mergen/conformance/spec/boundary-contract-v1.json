@@ -25,7 +25,9 @@
     "BC-09": "Context cleanup",
     "BC-10": "Secret minimization",
     "BC-11": "Transactional command identity",
-    "BC-12": "Delegation target binding"
+    "BC-12": "Delegation target binding",
+    "BC-13": "Webhook transport safety",
+    "BC-14": "External executor handoff"
   },
   "manifest_schema_version": 1,
   "profiles": {
@@ -41,7 +43,9 @@
       "BC-09",
       "BC-10",
       "BC-11",
-      "BC-12"
+      "BC-12",
+      "BC-13",
+      "BC-14"
     ],
     "core": [
       "BC-01",
@@ -58,6 +62,13 @@
       "BC-07",
       "BC-08"
     ],
+    "executor": [
+      "BC-02",
+      "BC-03",
+      "BC-08",
+      "BC-09",
+      "BC-14"
+    ],
     "security": [
       "BC-02",
       "BC-03",
@@ -65,6 +76,12 @@
       "BC-09",
       "BC-10",
       "BC-12"
+    ],
+    "webhook": [
+      "BC-04",
+      "BC-07",
+      "BC-10",
+      "BC-13"
     ]
   },
   "report_schema_version": 1,

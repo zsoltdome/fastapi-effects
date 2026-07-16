@@ -8,9 +8,9 @@ with explicit pre-1.0 contract and evidence-schema notes.
 ### Added
 
 - Boundary Contract v1 executable conformance package.
-- Strict capability manifests and `core`, `delivery`, `security`, and `complete`
-  profiles.
-- Sixteen deterministic scenarios and fourteen injected reference faults.
+- Strict capability manifests and `core`, `delivery`, `security`, `webhook`,
+  `executor`, and `complete` profiles.
+- Nineteen deterministic scenarios and twenty injected reference faults.
 - JSON, JUnit, SARIF, and Markdown evidence reporters.
 - Strict report parsing, report digests, and manifest-bound archived verification.
 - Deployment secret-canary checks and private atomic report output.
@@ -21,7 +21,7 @@ with explicit pre-1.0 contract and evidence-schema notes.
 
 - Package version advanced from the Milestone 1 foundation to the independent
   assurance release.
-- Boundary Contract documentation expanded from seven MDP invariants to twelve
+- Boundary Contract documentation expanded from seven MDP invariants to fourteen
   cross-milestone invariants.
 
 ### Security

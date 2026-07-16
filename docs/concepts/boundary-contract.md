@@ -153,6 +153,25 @@ next-hop credential.
 
 Executable checks: `delegation.exact_target`, `delegation.rejection_matrix`.
 
+### BC-13 — Webhook transport safety
+
+A webhook attempt **MUST** sign the exact bytes sent, preserve one stable message
+identity across automatic retries, validate every resolved destination address at
+attempt time, and discard receiver-controlled response bodies by default. Private,
+loopback, link-local, metadata, mapped, reserved, or otherwise non-global addresses
+**MUST** fail closed.
+
+Executable checks: `webhook.signed_retry`, `webhook.ssrf_matrix`.
+
+### BC-14 — External executor handoff
+
+Broker enqueue acknowledgement **MUST NOT** be treated as successful handler
+execution. The durable handoff **MUST** preserve tenant, subject, and attenuated
+authority, and duplicate broker delivery **MUST NOT** execute one handoff more than
+once. Worker completion is the only terminal success boundary.
+
+Executable check: `executor.durable_handoff`.
+
 ## 4. Guarantee vocabulary
 
 | Boundary | Contract guarantee |
@@ -180,6 +199,10 @@ Delivery is at least once. Ordering and cancellation are undefined and unsupport
 - **delivery** — retry identity, fan-out, replay, and lease fencing;
 - **security** — tenant continuity, authority, lease fencing, context cleanup,
   secret minimization, and delegation binding;
+- **webhook** — stable webhook identity, accountable replay, secret minimization,
+  exact-byte signing, and attempt-time SSRF controls;
+- **executor** — tenant and authority continuity, lease fencing, context cleanup,
+  non-terminal enqueue, and duplicate-execution fencing;
 - **complete** — every v1 invariant.
 
 A profile is certified only when every required invariant has at least one passing
