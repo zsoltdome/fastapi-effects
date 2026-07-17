@@ -20,6 +20,8 @@ from fastapi_mergen.conformance.protocols import BoundaryDriver
 from fastapi_mergen.errors import MergenConfigurationError
 from fastapi_mergen.testing.reference import Fault, ReferenceBoundaryDriver
 
+_DRIVER_CLOSE_TIMEOUT_SECONDS = 5.0
+
 
 def configure_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     """Attach the conformance command tree to the root CLI parser."""
@@ -167,7 +169,10 @@ async def _manifest_from_driver(args: argparse.Namespace) -> CapabilityManifest:
     except Exception as exc:  # noqa: BLE001 - never expose application exception text
         manifest_error = exc
     try:
-        await driver.close()
+        await asyncio.wait_for(
+            driver.close(),
+            timeout=_DRIVER_CLOSE_TIMEOUT_SECONDS,
+        )
     except Exception as exc:  # noqa: BLE001 - bounded configuration error
         if manifest_error is None:
             raise MergenConfigurationError(

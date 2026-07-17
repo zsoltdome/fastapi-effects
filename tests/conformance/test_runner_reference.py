@@ -104,3 +104,31 @@ def test_runner_rejects_non_finite_timeout() -> None:
 
     with pytest.raises(MergenConfigurationError, match="timeout"):
         RunnerConfiguration(check_timeout_seconds=float("nan"))
+
+
+async def test_cleanup_timeout_is_bounded_and_fails_certification() -> None:
+    import asyncio
+
+    from fastapi_mergen.conformance import CheckStatus
+
+    class HangingCleanupDriver(ReferenceBoundaryDriver):
+        async def close(self) -> None:
+            await asyncio.sleep(60)
+
+    report = await ConformanceRunner(
+        RunnerConfiguration(
+            profile=CertificationProfile.CORE,
+            cleanup_timeout_seconds=0.01,
+        )
+    ).run(HangingCleanupDriver())
+    cleanup = next(item for item in report.results if item.check_id == "runner.cleanup")
+    assert cleanup.status is CheckStatus.ERROR
+    assert cleanup.exception_type == "builtins.TimeoutError"
+    assert not report.certified
+
+
+def test_runner_rejects_non_finite_cleanup_timeout() -> None:
+    from fastapi_mergen.errors import MergenConfigurationError
+
+    with pytest.raises(MergenConfigurationError, match="cleanup timeout"):
+        RunnerConfiguration(cleanup_timeout_seconds=float("inf"))
