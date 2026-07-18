@@ -37,6 +37,7 @@ from fastapi_mergen.conformance import (  # noqa: E402
     decide,
     verify_evidence,
 )
+from fastapi_mergen.conformance.contract import PROFILE_INVARIANTS  # noqa: E402
 from fastapi_mergen.conformance.reporters import (  # noqa: E402
     ReportFormat,
     render_report,
@@ -149,15 +150,48 @@ def check_specifications() -> str:
     contract = json.loads((spec_root / "boundary-contract-v1.json").read_text())
     manifest_schema = json.loads((spec_root / "manifest-v1.schema.json").read_text())
     report_schema = json.loads((spec_root / "report-v1.schema.json").read_text())
+
+    runtime_capabilities = {item.value for item in Capability}
+    runtime_invariants = {item.value for item in Invariant}
+    runtime_profiles = {
+        profile.value: {item.value for item in PROFILE_INVARIANTS[profile]}
+        for profile in CertificationProfile
+    }
     if contract["contract_version"] != CONTRACT_VERSION:
         raise AssertionError("packaged contract version differs from runtime")
-    if set(contract["capabilities"]) != {item.value for item in Capability}:
+    if set(contract["capabilities"]) != runtime_capabilities:
         raise AssertionError("packaged capability set differs from runtime")
-    if set(contract["invariants"]) != {item.value for item in Invariant}:
+    if set(contract["invariants"]) != runtime_invariants:
         raise AssertionError("packaged invariant set differs from runtime")
+    contract_profiles = {
+        name: set(values) for name, values in contract["profiles"].items()
+    }
+    if contract_profiles != runtime_profiles:
+        raise AssertionError("packaged certification profiles differ from runtime")
+
     if manifest_schema.get("type") != "object" or report_schema.get("type") != "object":
         raise AssertionError("machine-readable schemas are not object schemas")
-    return "contract descriptor and evidence schemas match runtime enumerations"
+    if manifest_schema.get("additionalProperties") is not False:
+        raise AssertionError("manifest schema permits unknown top-level fields")
+    if report_schema.get("additionalProperties") is not False:
+        raise AssertionError("report schema permits unknown top-level fields")
+    manifest_properties = manifest_schema["properties"]
+    if set(manifest_properties["capabilities"]["items"]["enum"]) != runtime_capabilities:
+        raise AssertionError("manifest capability enumeration differs from runtime")
+    if set(manifest_properties["invariants"]["items"]["enum"]) != runtime_invariants:
+        raise AssertionError("manifest invariant enumeration differs from runtime")
+    report_properties = report_schema["properties"]
+    if set(report_properties["profile"]["enum"]) != set(runtime_profiles):
+        raise AssertionError("report profile enumeration differs from runtime")
+    check_schema = report_schema["$defs"]["check"]
+    if set(check_schema["properties"]["invariant"]["enum"]) != runtime_invariants:
+        raise AssertionError("report invariant enumeration differs from runtime")
+    if check_schema.get("additionalProperties") is not False:
+        raise AssertionError("report check schema permits unknown fields")
+    return (
+        "contract descriptor, profiles, manifest schema, and report schema match "
+        "runtime enumerations"
+    )
 
 
 async def reference_evidence() -> tuple[dict[str, ConformanceReport], dict[str, tuple[str, ...]]]:
