@@ -147,6 +147,15 @@ def test_spec_is_machine_readable() -> None:
     document = json.loads(completed.stdout)
     assert document["contract_version"] == "1.0"
     assert document["invariants"]["BC-01"] == "Atomic intent"
+    assert document["invariants"]["BC-14"] == "External executor handoff"
+    assert set(document["profiles"]) == {
+        "core",
+        "delivery",
+        "security",
+        "webhook",
+        "executor",
+        "complete",
+    }
 
 
 def test_missing_secret_canary_environment_fails_configuration() -> None:
