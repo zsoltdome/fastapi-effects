@@ -20,6 +20,7 @@ from fastapi_mergen.errors import MergenConfigurationError, SchemaRevisionMismat
 
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{0,127}$")
 _VERSION = re.compile(r"^[0-9A-Za-z][0-9A-Za-z.+_-]{0,63}$")
+_MAX_MANIFEST_BYTES = 256 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,7 +188,13 @@ class CapabilityManifest:
 
     @classmethod
     def from_json(cls, payload: str | bytes) -> CapabilityManifest:
-        """Parse strict JSON and reject duplicate object keys."""
+        """Parse strict, bounded JSON and reject duplicate object keys."""
+
+        if not isinstance(payload, str | bytes):
+            raise MergenConfigurationError("Capability manifest JSON must be text or bytes.")
+        encoded = payload.encode("utf-8") if isinstance(payload, str) else payload
+        if len(encoded) > _MAX_MANIFEST_BYTES:
+            raise MergenConfigurationError("Capability manifest JSON exceeds the size limit.")
 
         def reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
             result: dict[str, Any] = {}

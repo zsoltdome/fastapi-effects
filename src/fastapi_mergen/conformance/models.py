@@ -23,6 +23,8 @@ from fastapi_mergen.errors import MergenConfigurationError
 
 _CHECK_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,159}$")
 _DIGEST = re.compile(r"^[a-f0-9]{64}$")
+_MAX_REPORT_BYTES = 8 * 1024 * 1024
+_MAX_RESULTS = 2048
 
 
 class CheckStatus(StrEnum):
@@ -195,6 +197,8 @@ class ConformanceReport:
             not isinstance(result, CheckResult) for result in self.results
         ):
             raise MergenConfigurationError("Conformance results must be CheckResult values.")
+        if len(self.results) > _MAX_RESULTS:
+            raise MergenConfigurationError("Conformance report contains too many results.")
         check_ids = tuple(result.check_id for result in self.results)
         if len(check_ids) != len(set(check_ids)):
             raise MergenConfigurationError("Conformance report repeats a check_id.")
@@ -321,7 +325,7 @@ class ConformanceReport:
             started_at = datetime.fromisoformat(value["started_at"])
             finished_at = datetime.fromisoformat(value["finished_at"])
             results = tuple(CheckResult.from_dict(item) for item in value["results"])
-        except (TypeError, ValueError, KeyError) as exc:
+        except (AttributeError, TypeError, ValueError, KeyError) as exc:
             raise MergenConfigurationError("Conformance report value is invalid.") from exc
         report = cls(
             schema_version=value["schema_version"],
@@ -346,7 +350,13 @@ class ConformanceReport:
 
     @classmethod
     def from_json(cls, payload: str | bytes) -> ConformanceReport:
-        """Parse strict UTF-8 JSON and reject duplicate object keys."""
+        """Parse strict, bounded UTF-8 JSON and reject duplicate object keys."""
+
+        if not isinstance(payload, str | bytes):
+            raise MergenConfigurationError("Conformance report JSON must be text or bytes.")
+        encoded = payload.encode("utf-8") if isinstance(payload, str) else payload
+        if len(encoded) > _MAX_REPORT_BYTES:
+            raise MergenConfigurationError("Conformance report JSON exceeds the size limit.")
 
         def reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
             result: dict[str, Any] = {}

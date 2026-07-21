@@ -208,3 +208,31 @@ def test_report_rejects_non_finite_json_constants() -> None:
     encoded = json.dumps(payload, allow_nan=True)
     with pytest.raises(MergenConfigurationError, match="non-finite"):
         ConformanceReport.from_json(encoded)
+
+
+def test_manifest_rejects_oversized_json() -> None:
+    with pytest.raises(MergenConfigurationError, match="size limit"):
+        CapabilityManifest.from_json(" " * (256 * 1024 + 1))
+
+
+def test_report_rejects_oversized_json() -> None:
+    with pytest.raises(MergenConfigurationError, match="size limit"):
+        ConformanceReport.from_json(" " * (8 * 1024 * 1024 + 1))
+
+
+def test_report_rejects_excessive_result_count() -> None:
+    now = datetime(2026, 8, 26, tzinfo=timezone.utc)
+    with pytest.raises(MergenConfigurationError, match="too many results"):
+        ConformanceReport(
+            profile=CertificationProfile.CORE,
+            manifest_digest=complete_manifest().digest,
+            results=(result(),) * 2049,
+            started_at=now,
+            finished_at=now,
+        )
+
+
+@pytest.mark.parametrize("loader", [CapabilityManifest.from_json, ConformanceReport.from_json])
+def test_evidence_loader_rejects_non_text_payload(loader: object) -> None:
+    with pytest.raises(MergenConfigurationError, match="text or bytes"):
+        loader(123)  # type: ignore[operator]
