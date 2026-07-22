@@ -32,6 +32,11 @@ def main() -> int:
     run("mypy")
     run(sys.executable, "scripts/architecture_gate.py")
     run(sys.executable, "scripts/verify_milestone_one.py")
+    run(
+        sys.executable,
+        "scripts/audit_milestone_seven.py",
+        "--skip-git-governance",
+    )
     run("pytest", "-q", "-m", "not integration and not packaging")
     run(sys.executable, "scripts/build_and_test_artifacts.py")
     return 0
