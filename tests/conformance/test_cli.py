@@ -1,47 +1,65 @@
 from __future__ import annotations
 
+import io
 import json
 import os
-import subprocess
-import sys
+import threading
+from contextlib import redirect_stderr, redirect_stdout
+from dataclasses import dataclass
 from pathlib import Path
+from unittest.mock import patch
 
+from fastapi_mergen.cli.main import main
 from fastapi_mergen.conformance.manifest import CapabilityManifest
 from fastapi_mergen.conformance.models import ConformanceReport
 from fastapi_mergen.testing import ReferenceBoundaryDriver
 
-ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "src"
+
+@dataclass(frozen=True, slots=True)
+class CliResult:
+    returncode: int
+    stdout: str
+    stderr: str
 
 
 def run_cli(
     *arguments: str,
     environment: dict[str, str] | None = None,
     unset_environment: tuple[str, ...] = (),
-) -> subprocess.CompletedProcess[str]:
+) -> CliResult:
     env = os.environ.copy()
-    for name in tuple(env):
-        if name == "PYTEST_CURRENT_TEST" or name.startswith(("COV_CORE_", "COVERAGE_")):
-            env.pop(name, None)
-    python_path = os.pathsep.join((str(SOURCE), str(ROOT)))
-    env["PYTHONPATH"] = (
-        python_path
-        if not env.get("PYTHONPATH")
-        else os.pathsep.join((python_path, env["PYTHONPATH"]))
-    )
     if environment:
         env.update(environment)
     for name in unset_environment:
         env.pop(name, None)
-    return subprocess.run(
-        [sys.executable, "-m", "fastapi_mergen", *arguments],
-        cwd=ROOT,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=30,
-    )
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    result: list[int] = []
+    failure: list[BaseException] = []
+
+    def target() -> None:
+        try:
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                result.append(main(arguments))
+        except BaseException as exc:  # pragma: no cover - surfaced in parent thread
+            failure.append(exc)
+
+    with patch.dict(os.environ, env, clear=True):
+        thread = threading.Thread(
+            target=target,
+            name="mergen-cli-test",
+            daemon=True,
+        )
+        thread.start()
+        thread.join(timeout=30)
+    if thread.is_alive():
+        raise AssertionError("CLI test exceeded its bounded timeout.")
+    if failure:
+        raise failure[0]
+    if len(result) != 1:
+        raise AssertionError("CLI test did not return one process-style exit code.")
+    return CliResult(result[0], stdout.getvalue(), stderr.getvalue())
 
 
 def test_reference_run_emits_verifiable_json() -> None:
