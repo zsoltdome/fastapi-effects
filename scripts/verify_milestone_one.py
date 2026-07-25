@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "src" / "fastapi_mergen"
 AUTHOR_NAME = "mergen-institute"
 AUTHOR_EMAIL = "mergen-institute@users.noreply.github.com"
-ALLOWED_BRANCH_PREFIXES = {"chore", "docs", "feat", "fix", "refactor", "test"}
+ALLOWED_BRANCH_PREFIXES = {"build", "chore", "ci", "docs", "feat", "fix", "refactor", "test"}
 FORBIDDEN_PACKAGE_NAMES = {
     "idempotency",
     "mcp",
