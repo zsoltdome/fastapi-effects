@@ -11,6 +11,16 @@ the next planned product asset: the implementation-independent Boundary Contract
 Assurance Suite. It does not add another queue, workflow engine, storage backend, or
 MCP server.
 
+## Repository provenance
+
+The latest complete repository recoverable in the execution environment was the
+Milestone 1 archive, ending at Git commit `370dbe7`. Later milestone reports and
+examples were available, but their cumulative source repositories were not. This
+release therefore preserves the verified Milestone 1 history and adds an
+implementation-independent assurance layer. It does **not** recreate or claim the
+unavailable Milestone 2–6 runtime implementations. Production implementations are
+certified through trusted adapters that invoke their real deployment paths.
+
 ## Implemented capabilities
 
 - Boundary Contract v1 descriptor with fourteen stable invariants;
