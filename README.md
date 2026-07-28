@@ -25,9 +25,11 @@ through a trusted application adapter.
 - CLI, testing helpers, JSON schemas, CI workflow, and a cumulative milestone audit.
 
 This release does **not** turn the Milestone 1 API spike into a production event store.
-The conformance package is intentionally implementation independent: production
-runtime, PostgreSQL, queue, webhook, and delegation implementations are certified
-through adapters that call their real paths.
+The recoverable Git baseline is the verified Milestone 1 repository; later runtime
+source archives were unavailable in this environment. The conformance package is
+therefore intentionally implementation independent: production PostgreSQL, queue,
+webhook, idempotency, and delegation implementations are certified through adapters
+that call their real paths.
 
 ## Run the reference suite
 
