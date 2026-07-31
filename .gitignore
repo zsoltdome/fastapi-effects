@@ -28,3 +28,4 @@ Thumbs.db
 .env.*
 !.env.example
 .mergen-test-state/
+sup/
