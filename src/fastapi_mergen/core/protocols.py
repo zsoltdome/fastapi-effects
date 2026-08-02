@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from contextlib import AbstractAsyncContextManager
 from datetime import datetime
 from typing import Protocol
+from uuid import UUID
 
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .event import Event, EventRecord
 from .policy import AuthorizationMode
 from .principal import Principal
+from .routing import RouteSpecification
 
 
 class PrincipalProvider(Protocol):
@@ -44,6 +47,12 @@ class Clock(Protocol):
     def now(self) -> datetime: ...
 
 
+class UUIDGenerator(Protocol):
+    """Return opaque UUIDs without promising chronological ordering."""
+
+    def new_uuid(self) -> UUID: ...
+
+
 class RandomSource(Protocol):
     """Supply deterministic randomness to retry-policy calculations."""
 
@@ -57,7 +66,32 @@ class HandlerSessionProvider(Protocol):
 
 
 class EffectStore(Protocol):
-    """Future transactional store boundary without exposing persistence internals."""
+    """Transactional effect store without exposing ORM rows publicly."""
 
     @property
     def name(self) -> str: ...
+
+    async def publish(
+        self,
+        *,
+        session: AsyncSession,
+        principal: Principal,
+        event: Event[object],
+        routes: Sequence[RouteSpecification],
+        clock: Clock,
+        uuid_source: UUIDGenerator,
+        dedupe_namespace: str | None,
+        dedupe_key: str | None,
+    ) -> EventRecord: ...
+
+
+class EffectRouteProvider(Protocol):
+    """Resolve transaction-local immutable destinations for one event."""
+
+    async def routes_for(
+        self,
+        *,
+        session: AsyncSession,
+        principal: Principal,
+        event: Event[object],
+    ) -> Sequence[RouteSpecification]: ...

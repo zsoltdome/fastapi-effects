@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Protocol
 
 from fastapi_mergen.errors import MergenConfigurationError
 
@@ -27,19 +29,13 @@ class RetryPolicy:
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not _POLICY_NAME_PATTERN.fullmatch(self.name):
-            raise MergenConfigurationError(
-                "Retry policy name must be a lower-case stable key."
-            )
-        if not _is_positive_integer(self.version) or not _is_positive_integer(
-            self.max_attempts
-        ):
+            raise MergenConfigurationError("Retry policy name must be a lower-case stable key.")
+        if not _is_positive_integer(self.version) or not _is_positive_integer(self.max_attempts):
             raise MergenConfigurationError(
                 "Retry policy version and max_attempts must be positive integers."
             )
         if not _is_positive_integer(self.maximum_elapsed_seconds):
-            raise MergenConfigurationError(
-                "Retry maximum elapsed time must be a positive integer."
-            )
+            raise MergenConfigurationError("Retry maximum elapsed time must be a positive integer.")
 
         base_delay = _finite_number("base delay", self.base_delay_seconds)
         maximum_delay = _finite_number("maximum delay", self.maximum_delay_seconds)
@@ -56,11 +52,89 @@ class RetryPolicy:
                 "Retry maximum delay must not exceed maximum elapsed time."
             )
         if handler_timeout > self.maximum_elapsed_seconds:
-            raise MergenConfigurationError(
-                "Handler timeout must not exceed maximum elapsed time."
-            )
+            raise MergenConfigurationError("Handler timeout must not exceed maximum elapsed time.")
         if self.jitter != "full":
-            raise MergenConfigurationError("Milestone 1 permits only full-jitter retry policy.")
+            raise MergenConfigurationError("The runtime supports only full-jitter retry policy.")
+
+    def retry_delay(self, attempt_number: int, random_source: UniformRandom) -> timedelta:
+        """Calculate deterministic full-jitter backoff after one failed attempt."""
+        if not _is_positive_integer(attempt_number):
+            raise MergenConfigurationError("Retry attempt number must be positive.")
+        upper = min(
+            float(self.maximum_delay_seconds),
+            float(self.base_delay_seconds) * (2 ** max(0, attempt_number - 1)),
+        )
+        delay = random_source.uniform(0.0, upper)
+        if not math.isfinite(delay) or delay < 0 or delay > upper:
+            raise MergenConfigurationError("Random source returned an invalid retry delay.")
+        return timedelta(seconds=delay)
+
+    def permits_retry(
+        self,
+        *,
+        attempt_number: int,
+        first_attempt_at: datetime,
+        now: datetime,
+    ) -> bool:
+        if not _is_positive_integer(attempt_number):
+            raise MergenConfigurationError("Retry attempt number must be positive.")
+        for value in (first_attempt_at, now):
+            if value.tzinfo is None or value.utcoffset() is None:
+                raise MergenConfigurationError("Retry times must be timezone-aware.")
+        elapsed = (now - first_attempt_at).total_seconds()
+        return attempt_number < self.max_attempts and elapsed < self.maximum_elapsed_seconds
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "version": self.version,
+            "max_attempts": self.max_attempts,
+            "maximum_elapsed_seconds": self.maximum_elapsed_seconds,
+            "base_delay_seconds": float(self.base_delay_seconds),
+            "maximum_delay_seconds": float(self.maximum_delay_seconds),
+            "handler_timeout_seconds": float(self.handler_timeout_seconds),
+            "lease_duration_seconds": float(self.lease_duration_seconds),
+            "jitter": self.jitter,
+        }
+
+    @classmethod
+    def from_dict(cls, value: dict[str, object]) -> RetryPolicy:
+        try:
+            return cls(
+                name=_snapshot_str(value["name"]),
+                version=_snapshot_int(value["version"]),
+                max_attempts=_snapshot_int(value["max_attempts"]),
+                maximum_elapsed_seconds=_snapshot_int(value["maximum_elapsed_seconds"]),
+                base_delay_seconds=_snapshot_float(value["base_delay_seconds"]),
+                maximum_delay_seconds=_snapshot_float(value["maximum_delay_seconds"]),
+                handler_timeout_seconds=_snapshot_float(value["handler_timeout_seconds"]),
+                lease_duration_seconds=_snapshot_float(value["lease_duration_seconds"]),
+                jitter=_snapshot_str(value["jitter"]),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise MergenConfigurationError("Retry policy snapshot is invalid.") from exc
+
+
+class UniformRandom(Protocol):
+    def uniform(self, lower: float, upper: float) -> float: ...
+
+
+def _snapshot_str(value: object) -> str:
+    if not isinstance(value, str):
+        raise TypeError
+    return value
+
+
+def _snapshot_int(value: object) -> int:
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise TypeError
+    return value
+
+
+def _snapshot_float(value: object) -> float:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise TypeError
+    return float(value)
 
 
 def _is_positive_integer(value: object) -> bool:

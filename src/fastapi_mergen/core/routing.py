@@ -1,16 +1,19 @@
-"""Exact event route declarations for the Milestone 1 API spike."""
+"""Exact event routes and immutable execution-policy snapshots."""
 
 from __future__ import annotations
 
 import inspect
+import json
 import re
 from collections.abc import Awaitable, Callable, Iterable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 from fastapi_mergen.core.policy import AuthorizationMode
 from fastapi_mergen.core.retry import RetryPolicy
 from fastapi_mergen.errors import MergenConfigurationError
+from fastapi_mergen.sqlalchemy.canonical import canonical_json_bytes
 
 if TYPE_CHECKING:
     from fastapi_mergen.api import EffectContext
@@ -24,7 +27,7 @@ _SCOPE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
 @dataclass(frozen=True, slots=True)
 class RouteSpecification:
-    """Serializable route data that a future delivery will snapshot."""
+    """Serializable route data snapshotted into every original delivery."""
 
     event_type: str
     route_key: str
@@ -37,6 +40,70 @@ class RouteSpecification:
     service_capabilities: tuple[str, ...] | None
     maximum_snapshot_age_seconds: int | None
     retry_policy: RetryPolicy
+    destination_metadata: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        validate_route_declaration(
+            event_type=self.event_type,
+            route_key=self.route_key,
+            version=self.version,
+        )
+        _validate_key("Destination kind", self.destination_kind)
+        _validate_key("Destination key", self.destination_key)
+        normalized_scopes = _normalize_scopes(self.required_scopes)
+        object.__setattr__(self, "required_scopes", normalized_scopes)
+        if not isinstance(self.authorization, AuthorizationMode):
+            raise MergenConfigurationError("Route authorization mode is invalid.")
+        if self.service_policy is not None:
+            _validate_key("Service policy", self.service_policy)
+        if self.service_capabilities is not None:
+            object.__setattr__(
+                self,
+                "service_capabilities",
+                _normalize_scopes(self.service_capabilities),
+            )
+        if self.maximum_snapshot_age_seconds is not None and not _is_positive_integer(
+            self.maximum_snapshot_age_seconds
+        ):
+            raise MergenConfigurationError("Route snapshot maximum age must be positive.")
+        if not isinstance(self.retry_policy, RetryPolicy):
+            raise MergenConfigurationError("Route retry policy is invalid.")
+        try:
+            metadata = json.loads(
+                canonical_json_bytes(self.destination_metadata, maximum_bytes=16 * 1024)
+            )
+        except (TypeError, ValueError) as exc:
+            raise MergenConfigurationError("Destination metadata must be bounded JSON.") from exc
+        if not isinstance(metadata, dict):
+            raise MergenConfigurationError("Destination metadata must be a JSON object.")
+        object.__setattr__(self, "destination_metadata", _freeze_mapping(metadata))
+
+    def to_snapshot(self) -> dict[str, object]:
+        """Return the complete JSON-safe immutable execution specification."""
+        return {
+            "snapshot_version": 1,
+            "event_type": self.event_type,
+            "route_key": self.route_key,
+            "route_version": self.version,
+            "destination": {
+                "kind": self.destination_kind,
+                "key": self.destination_key,
+                **_thaw_mapping(self.destination_metadata),
+            },
+            "authority": {
+                "mode": self.authorization.value,
+                "required_scopes": list(self.required_scopes),
+                "service_policy": self.service_policy,
+                "service_capabilities": (
+                    None if self.service_capabilities is None else list(self.service_capabilities)
+                ),
+                "maximum_snapshot_age_seconds": self.maximum_snapshot_age_seconds,
+            },
+            "retry": self.retry_policy.to_dict(),
+        }
+
+    def snapshot_bytes(self) -> bytes:
+        return canonical_json_bytes(self.to_snapshot(), maximum_bytes=32 * 1024)
 
 
 class RouteRegistry:
@@ -149,6 +216,15 @@ class RouteRegistry:
             )
         )
 
+    def resolve_handler(self, *, key: str, version: int) -> Handler:
+        """Resolve only the frozen immutable handler identity."""
+        if not self._frozen:
+            raise MergenConfigurationError("Route registry must be frozen before execution.")
+        handler = self._handlers.get((key, version))
+        if handler is None:
+            raise MergenConfigurationError("Delivery references an unknown handler identity.")
+        return handler
+
     def _require_mutable(self) -> None:
         if self._frozen:
             raise MergenConfigurationError("Route registry is frozen; registration is closed.")
@@ -172,14 +248,14 @@ class HandlerRouteBuilder(Generic[PayloadT]):
 
     def to_handler(
         self,
-        handler: Callable[["EffectContext[PayloadT]"], Awaitable[None]],
+        handler: Callable[[EffectContext[PayloadT]], Awaitable[None]],
         *,
         required_scopes: Iterable[str] = (),
         authorization: AuthorizationMode | str = AuthorizationMode.REVALIDATE,
         service_policy: str | None = None,
         maximum_snapshot_age_seconds: int | None = None,
         retry_policy: RetryPolicy | None = None,
-    ) -> Callable[["EffectContext[PayloadT]"], Awaitable[None]]:
+    ) -> Callable[[EffectContext[PayloadT]], Awaitable[None]]:
         mode = AuthorizationMode.parse(authorization)
         scopes = _normalize_scopes(required_scopes)
         if mode is AuthorizationMode.SNAPSHOT:
@@ -266,9 +342,32 @@ def _normalize_scopes(scopes: Iterable[str]) -> tuple[str, ...]:
 def _is_async_callable(value: object) -> bool:
     if inspect.iscoroutinefunction(value):
         return True
-    call = getattr(value, "__call__", None)
-    return call is not None and inspect.iscoroutinefunction(call)
+    return callable(value) and inspect.iscoroutinefunction(type(value).__call__)
 
 
 def _is_positive_integer(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _freeze_mapping(value: dict[str, Any]) -> Mapping[str, Any]:
+    return MappingProxyType({key: _freeze_json(item) for key, item in value.items()})
+
+
+def _freeze_json(value: Any) -> Any:
+    if isinstance(value, dict):
+        return _freeze_mapping(value)
+    if isinstance(value, list):
+        return tuple(_freeze_json(item) for item in value)
+    return value
+
+
+def _thaw_mapping(value: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: _thaw_json(item) for key, item in value.items()}
+
+
+def _thaw_json(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return _thaw_mapping(value)
+    if isinstance(value, tuple):
+        return [_thaw_json(item) for item in value]
+    return value

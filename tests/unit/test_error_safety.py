@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import re
 from typing import Any, cast
 from uuid import uuid4
 
 import pytest
 
+import fastapi_mergen
 from fastapi_mergen import (
+    AuthenticationRequired,
+    CommandConflict,
     DedupeConflict,
     LeaseLost,
     MergenConfigurationError,
@@ -42,3 +46,19 @@ def test_public_error_fields_reject_unsafe_runtime_values() -> None:
         LeaseLost(delivery_id=cast(Any, "not-a-uuid"))
     with pytest.raises(MergenConfigurationError, match="non-negative"):
         SchemaRevisionMismatch(component="route-snapshot", expected=1, actual=-1)
+
+
+def test_public_errors_expose_stable_machine_codes() -> None:
+    assert AuthenticationRequired.error_code == "mergen.authentication_required"
+    assert CommandConflict.error_code == "mergen.command_conflict"
+    assert RetryableDeliveryError.error_code == "mergen.delivery_retryable"
+    assert SchemaRevisionMismatch.error_code == "mergen.schema_revision_mismatch"
+    values = (getattr(fastapi_mergen, name) for name in fastapi_mergen.__all__)
+    error_types = [
+        value
+        for value in values
+        if isinstance(value, type) and issubclass(value, fastapi_mergen.MergenError)
+    ]
+    codes = [error_type.error_code for error_type in error_types]
+    assert len(codes) == len(set(codes))
+    assert all(re.fullmatch(r"mergen\.[a-z_]+", code) for code in codes)
