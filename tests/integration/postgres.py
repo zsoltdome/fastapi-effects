@@ -75,7 +75,7 @@ async def _connect(dsn: str) -> Any:
     try:
         import asyncpg
     except ImportError as exc:  # pragma: no cover - actionable environment failure
-        raise RuntimeError('Install test dependencies with `uv sync --group test`.') from exc
+        raise RuntimeError("Install test dependencies with `uv sync --group test`.") from exc
     return await asyncpg.connect(dsn)
 
 
