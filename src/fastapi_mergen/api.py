@@ -1,4 +1,4 @@
-"""Intentionally narrow public API for the Milestone 1 design spike."""
+"""Narrow public API for the transactional effect runtime."""
 
 import inspect
 import re
@@ -12,16 +12,19 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi_mergen.core.event import Event
+from fastapi_mergen.core.identity import UUIDSource
 from fastapi_mergen.core.policy import AuthorizationMode
 from fastapi_mergen.core.principal import Principal
 from fastapi_mergen.core.protocols import (
     AuthorizationResolver,
     Clock,
+    EffectRouteProvider,
     EffectStore,
     HandlerSessionProvider,
     PrincipalProvider,
     RandomSource,
     ServicePolicyRegistry,
+    UUIDGenerator,
 )
 from fastapi_mergen.core.retry import RetryPolicy
 from fastapi_mergen.core.routing import (
@@ -30,7 +33,8 @@ from fastapi_mergen.core.routing import (
     RouteSpecification,
     validate_route_declaration,
 )
-from fastapi_mergen.errors import MergenConfigurationError, MilestoneNotImplementedError
+from fastapi_mergen.core.runtime import SystemClock
+from fastapi_mergen.errors import MergenConfigurationError
 from fastapi_mergen.sqlalchemy.uow import MergenUnitOfWork
 
 PayloadT = TypeVar("PayloadT", covariant=True)
@@ -76,8 +80,8 @@ class EffectContext(Generic[PayloadT]):
     def application_session(self) -> AbstractAsyncContextManager[AsyncSession]:
         """Open a fresh tenant-bound app session, never the relay control session."""
         if self._application_session_provider is None:
-            raise MilestoneNotImplementedError(
-                "Handler application sessions are implemented in Milestone 2."
+            raise MergenConfigurationError(
+                "No tenant-bound handler application-session provider is configured."
             )
         return self._application_session_provider(self.principal)
 
@@ -94,12 +98,12 @@ class Mergen:
         service_policy_registry: ServicePolicyRegistry | None = None,
         clock: Clock | None = None,
         random_source: RandomSource | None = None,
+        uuid_source: UUIDGenerator | None = None,
         handler_session_provider: HandlerSessionProvider | None = None,
+        route_providers: Iterable[EffectRouteProvider] = (),
     ) -> None:
         if not _is_async_callable(principal_provider):
-            raise MergenConfigurationError(
-                "principal_provider must be an asynchronous callable."
-            )
+            raise MergenConfigurationError("principal_provider must be an asynchronous callable.")
         if authorization_resolver is not None:
             resolve = getattr(authorization_resolver, "resolve", None)
             if resolve is None or not inspect.iscoroutinefunction(resolve):
@@ -122,9 +126,11 @@ class Mergen:
         self._store = store
         self._authorization_resolver = authorization_resolver
         self._service_policy_registry = service_policy_registry
-        self._clock = clock
+        self._clock = clock or SystemClock()
         self._random_source = random_source
+        self._uuid_source = uuid_source or UUIDSource()
         self._handler_session_provider = handler_session_provider
+        self._route_providers = tuple(route_providers)
         self._registry = RouteRegistry()
 
     @property
@@ -197,6 +203,22 @@ class Mergen:
         """Return deterministic exact matches for API-spike evaluation."""
         return self._registry.matching(event_type)
 
+    def handler_executor(self) -> Any:
+        """Build the in-process sink after route and authority configuration freezes."""
+        self.freeze()
+        if self._handler_session_provider is None:
+            raise MergenConfigurationError(
+                "Handler execution requires a tenant-bound application-session provider."
+            )
+        from fastapi_mergen.handlers.executor import HandlerExecutor
+
+        return HandlerExecutor(
+            registry=self._registry,
+            clock=self._clock,
+            application_sessions=self._handler_session_provider,
+            authorization_resolver=self._authorization_resolver,
+        )
+
     def principal_dependency(self) -> PrincipalDependency:
         """Build the trusted request-edge dependency without creating a DB session."""
 
@@ -221,13 +243,23 @@ class Mergen:
         FastAPI resolves dependencies in declaration order, so authentication and
         tenant membership fail before the session dependency is entered.
         """
+        self.freeze()
         resolve_principal = self.principal_dependency()
+        routes = self._registry.specifications()
 
         async def dependency(
             principal: Annotated[Principal, Depends(resolve_principal)],
             session: Annotated[AsyncSession, Depends(session_dependency)],
         ) -> MergenUnitOfWork:
-            return MergenUnitOfWork(session=session, principal=principal)
+            return MergenUnitOfWork(
+                session=session,
+                principal=principal,
+                store=self._store,
+                routes=routes,
+                route_providers=self._route_providers,
+                clock=self._clock,
+                uuid_source=self._uuid_source,
+            )
 
         return dependency
 
@@ -251,12 +283,11 @@ class Mergen:
 
     def _prepare_authorization_snapshots(self) -> None:
         specifications = self._registry.specifications()
-        if any(
-            spec.authorization is AuthorizationMode.REVALIDATE for spec in specifications
-        ) and self._authorization_resolver is None:
-            raise MergenConfigurationError(
-                "Revalidate routes require an authorization resolver."
-            )
+        if (
+            any(spec.authorization is AuthorizationMode.REVALIDATE for spec in specifications)
+            and self._authorization_resolver is None
+        ):
+            raise MergenConfigurationError("Revalidate routes require an authorization resolver.")
 
         service_routes = tuple(
             spec
@@ -294,8 +325,7 @@ class Mergen:
 def _is_async_callable(value: object) -> bool:
     if inspect.iscoroutinefunction(value):
         return True
-    call = getattr(value, "__call__", None)
-    return call is not None and inspect.iscoroutinefunction(call)
+    return callable(value) and inspect.iscoroutinefunction(type(value).__call__)
 
 
 def _is_positive_integer(value: object) -> bool:

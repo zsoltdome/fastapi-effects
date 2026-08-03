@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi import Depends, FastAPI, HTTPException, Request, status
-from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi_mergen import (
@@ -17,7 +17,6 @@ from fastapi_mergen import (
     Mergen,
     MergenConfigurationError,
     MergenUnitOfWork,
-    MilestoneNotImplementedError,
     Principal,
     RetryPolicy,
 )
@@ -150,9 +149,7 @@ def test_only_latest_route_version_is_active_for_new_emission() -> None:
     ).to_handler(version_two)
 
     matches = mergen.matching_routes("invoice.created")
-    assert [(route.route_key, route.version) for route in matches] == [
-        ("invoice.render_pdf", 2)
-    ]
+    assert [(route.route_key, route.version) for route in matches] == [("invoice.render_pdf", 2)]
     assert [(route.route_key, route.version) for route in mergen.routes] == [
         ("invoice.render_pdf", 1),
         ("invoice.render_pdf", 2),
@@ -249,9 +246,7 @@ def test_service_policy_is_resolved_and_snapshotted_at_freeze() -> None:
         (None, "service policy registry"),
         (StaticServicePolicyRegistry({}), "not registered"),
         (
-            StaticServicePolicyRegistry(
-                {"invoice-renderer": frozenset({"invoices:render"})}
-            ),
+            StaticServicePolicyRegistry({"invoice-renderer": frozenset({"invoices:render"})}),
             "lacks a required route capability",
         ),
     ],
@@ -300,11 +295,11 @@ def test_service_policy_snapshot_update_is_atomic() -> None:
 
 
 def test_value_objects_validate_shape() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     principal = Principal(
         tenant_id=TENANT_ID,
         subject_id="user:1",
-        scopes=frozenset({"invoices:read", "invoices:read"}),
+        scopes=frozenset({"invoices:read"}),
         issued_at=now,
         authentication_time=now - timedelta(seconds=1),
         expires_at=now + timedelta(hours=1),
@@ -341,15 +336,12 @@ def test_value_objects_validate_shape() -> None:
 
 
 @pytest.mark.asyncio
-async def test_uow_spike_validates_then_fails_before_session_operation() -> None:
-    session = cast(AsyncSession, object())
+async def test_uow_validates_before_active_transaction_operation() -> None:
+    session = AsyncSession()
     uow = MergenUnitOfWork(
         session=session,
         principal=Principal(tenant_id=TENANT_ID, subject_id="user:1"),
     )
-    with pytest.raises(MilestoneNotImplementedError, match="Milestone 2"):
-        async with uow:
-            raise AssertionError("unreachable")
     event = Event(type="invoice.created", version=1, data={})
     with pytest.raises(MergenConfigurationError, match="provided together"):
         await uow.emit(event, dedupe_namespace="invoice-create")
@@ -359,12 +351,13 @@ async def test_uow_spike_validates_then_fails_before_session_operation() -> None
             dedupe_namespace="invoice-create",
             dedupe_key="unsafe\nkey",
         )
-    with pytest.raises(MilestoneNotImplementedError, match="Milestone 2"):
+    with pytest.raises(MergenConfigurationError, match="active Mergen"):
         await uow.emit(
             event,
             dedupe_namespace="invoice-create",
             dedupe_key="request-1",
         )
+    await session.close()
 
 
 @pytest.mark.asyncio
@@ -376,14 +369,16 @@ async def test_fastapi_uow_dependency_resolves_principal_without_sql() -> None:
     resolve_principal = mergen.principal_dependency()
     dependency = mergen.uow_dependency(session_dependency)
     request = Request({"type": "http", "headers": [], "method": "GET", "path": "/"})
-    session = cast(AsyncSession, object())
+    session = AsyncSession()
     principal = await resolve_principal(request)
     uow = await dependency(principal=principal, session=session)
     assert uow.session is session
     assert uow.principal.tenant_id == TENANT_ID
+    await session.close()
 
 
-def test_fastapi_resolves_principal_before_session_dependency() -> None:
+@pytest.mark.asyncio
+async def test_fastapi_resolves_principal_before_session_dependency() -> None:
     events: list[str] = []
 
     class RejectingProvider:
@@ -408,8 +403,11 @@ def test_fastapi_resolves_principal_before_session_dependency() -> None:
         events.append("handler")
         return {"status": "ok"}
 
-    with TestClient(app) as client:
-        response = client.get("/probe")
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.get("/probe")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert events == ["principal"]
 
@@ -444,10 +442,10 @@ def test_documented_submodule_imports_are_available() -> None:
     assert PostgresStore().name == "postgresql"
 
 
-def test_postgres_store_fails_closed() -> None:
+def test_postgres_store_uses_authoritative_schema() -> None:
     from fastapi_mergen.postgres import PostgresStore
 
     with pytest.raises(MergenConfigurationError, match="schema name"):
         PostgresStore(schema="unsafe-schema")
-    with pytest.raises(MilestoneNotImplementedError, match="Milestone 2"):
-        PostgresStore().require_implementation()
+    assert PostgresStore().schema == "fastapi_mergen"
+    assert not hasattr(PostgresStore(), "require_implementation")
