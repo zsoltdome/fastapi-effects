@@ -6,7 +6,7 @@ import asyncio
 import hashlib
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -67,7 +67,7 @@ def principal(
 ) -> Principal:
     """Return a deterministic, valid test principal."""
 
-    issued = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
+    issued = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
     return Principal(
         tenant_id=tenant_id,
         subject_id=subject_id,
@@ -218,7 +218,8 @@ async def stable_retry_identity(driver: BoundaryDriver) -> ScenarioObservation:
         causation_id=None,
         commit=True,
     )
-    assert published is not None
+    if published is None:
+        raise RuntimeError("Conformance driver discarded committed publication.")
     first = await leases.claim(delivery_id=published.delivery_ids[0], worker_id="worker:one")
     await leases.finalize(lease=first, outcome="retryable_failure")
     second = await leases.claim(delivery_id=published.delivery_ids[0], worker_id="worker:two")
@@ -248,7 +249,8 @@ async def independent_fanout(driver: BoundaryDriver) -> ScenarioObservation:
         causation_id=None,
         commit=True,
     )
-    assert published is not None
+    if published is None:
+        raise RuntimeError("Conformance driver discarded committed publication.")
     first = await leases.claim(delivery_id=published.delivery_ids[0], worker_id="worker:a")
     second = await leases.claim(delivery_id=published.delivery_ids[1], worker_id="worker:b")
     failed = await leases.finalize(lease=first, outcome="terminal_failure")
@@ -300,7 +302,8 @@ async def replay_accountability(driver: BoundaryDriver) -> ScenarioObservation:
         causation_id=None,
         commit=True,
     )
-    assert published is not None
+    if published is None:
+        raise RuntimeError("Conformance driver discarded committed publication.")
     claim = await leases.claim(delivery_id=published.delivery_ids[0], worker_id="worker:one")
     original = await leases.finalize(lease=claim, outcome="terminal_failure")
     replay = await leases.replay(
@@ -335,7 +338,8 @@ async def lease_fencing(driver: BoundaryDriver) -> ScenarioObservation:
         causation_id=None,
         commit=True,
     )
-    assert published is not None
+    if published is None:
+        raise RuntimeError("Conformance driver discarded committed publication.")
     stale = await leases.claim(delivery_id=published.delivery_ids[0], worker_id="worker:stale")
     await leases.finalize(lease=stale, outcome="retryable_failure")
     current = await leases.claim(delivery_id=published.delivery_ids[0], worker_id="worker:current")
@@ -344,7 +348,7 @@ async def lease_fencing(driver: BoundaryDriver) -> ScenarioObservation:
     except ConformanceLeaseLost:
         view = await leases.delivery(delivery_id=published.delivery_ids[0])
         if view.status != "leased":
-            raise AssertionError("Stale finalization modified current lease state.")
+            raise AssertionError("Stale finalization modified current lease state.") from None
         await leases.finalize(lease=current, outcome="succeeded")
         return ScenarioObservation("Stale lease token was rejected without mutation.", {})
     raise AssertionError("Stale worker finalized work after a newer claim.")
@@ -407,17 +411,25 @@ async def command_concurrency(driver: BoundaryDriver) -> ScenarioObservation:
         await asyncio.sleep(0)
         return hashlib.sha256(b"invoice-created").hexdigest()
 
-    kwargs = {
-        "principal": principal(),
-        "route_id": "invoice.create",
-        "method": "POST",
-        "idempotency_key": "command-42",
-        "request_fingerprint": hashlib.sha256(b"same-request").hexdigest(),
-        "operation": operation,
-    }
+    command_principal = principal()
+    fingerprint = hashlib.sha256(b"same-request").hexdigest()
     first, second = await asyncio.gather(
-        facet.execute_command(**kwargs),
-        facet.execute_command(**kwargs),
+        facet.execute_command(
+            principal=command_principal,
+            route_id="invoice.create",
+            method="POST",
+            idempotency_key="command-42",
+            request_fingerprint=fingerprint,
+            operation=operation,
+        ),
+        facet.execute_command(
+            principal=command_principal,
+            route_id="invoice.create",
+            method="POST",
+            idempotency_key="command-42",
+            request_fingerprint=fingerprint,
+            operation=operation,
+        ),
     )
     if executions != 1:
         raise AssertionError("Concurrent duplicate command executed more than once.")
@@ -519,6 +531,7 @@ async def delegation_rejection_matrix(driver: BoundaryDriver) -> ScenarioObserva
         "Audience, method, and path mismatch were rejected fail-closed.",
         {"rejected_probes": rejected},
     )
+
 
 async def webhook_signed_retry(driver: BoundaryDriver) -> ScenarioObservation:
     facet: WebhookFacet = _require(driver, WebhookFacet, Capability.WEBHOOKS.value)
@@ -632,7 +645,6 @@ async def executor_handoff_boundary(driver: BoundaryDriver) -> ScenarioObservati
             "execution_count": duplicate.execution_count,
         },
     )
-
 
 
 SCENARIOS: tuple[Scenario, ...] = (

@@ -172,6 +172,8 @@ def test_spec_is_machine_readable() -> None:
         "security",
         "webhook",
         "executor",
+        "command",
+        "delegation",
         "complete",
     }
 

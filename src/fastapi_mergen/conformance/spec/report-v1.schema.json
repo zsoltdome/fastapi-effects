@@ -137,6 +137,8 @@
         "delivery",
         "webhook",
         "executor",
+        "command",
+        "delegation",
         "complete"
       ]
     },

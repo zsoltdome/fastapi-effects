@@ -78,8 +78,6 @@ class CommandResult:
     generation: int
 
 
-
-
 @dataclass(frozen=True, slots=True)
 class WebhookAttemptView:
     """Observable properties of one outbound webhook attempt."""
@@ -268,6 +266,7 @@ class DelegationFacet(Protocol):
         path: str,
         required_scopes: frozenset[str],
     ) -> DelegationView: ...
+
 
 @runtime_checkable
 class WebhookFacet(Protocol):

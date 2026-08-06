@@ -49,9 +49,7 @@ async def test_configured_secret_canary_fails_closed() -> None:
         )
     ).run(CanaryDriver())
     result = next(
-        item
-        for item in report.results
-        if item.invariant is Invariant.SECRET_MINIMIZATION
+        item for item in report.results if item.invariant is Invariant.SECRET_MINIMIZATION
     )
     assert result.status.value == "fail"
     assert "deploy-secret-value" not in repr(report.as_dict())
@@ -90,9 +88,9 @@ async def test_cleanup_failure_prevents_certification() -> None:
         async def close(self) -> None:
             raise RuntimeError("secret cleanup detail")
 
-    report = await ConformanceRunner(
-        RunnerConfiguration(profile=CertificationProfile.CORE)
-    ).run(CleanupFailureDriver())
+    report = await ConformanceRunner(RunnerConfiguration(profile=CertificationProfile.CORE)).run(
+        CleanupFailureDriver()
+    )
     cleanup = next(item for item in report.results if item.check_id == "runner.cleanup")
     assert cleanup.status is CheckStatus.ERROR
     assert not report.certified

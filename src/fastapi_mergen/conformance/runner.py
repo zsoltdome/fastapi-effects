@@ -7,8 +7,9 @@ import math
 import platform
 import sys
 import time
+from contextlib import suppress
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi_mergen.conformance.contract import (
@@ -24,7 +25,7 @@ from fastapi_mergen.conformance.models import (
     Severity,
 )
 from fastapi_mergen.conformance.protocols import BoundaryDriver
-from fastapi_mergen.conformance.safety import scan_for_secret_values
+from fastapi_mergen.conformance.safety import JsonValue, scan_for_secret_values
 from fastapi_mergen.conformance.scenarios import SCENARIOS, Scenario
 from fastapi_mergen.errors import MergenConfigurationError
 
@@ -80,30 +81,28 @@ class ConformanceRunner:
     async def run(self, driver: BoundaryDriver) -> ConformanceReport:
         """Run selected checks; errors and unsupported facets fail certification."""
 
-        if not isinstance(driver, BoundaryDriver):
-            raise MergenConfigurationError(
-                "Conformance driver does not implement lifecycle methods."
-            )
         try:
             manifest = driver.manifest
-        except Exception as exc:  # noqa: BLE001 - never expose adapter exception text
+        except Exception as exc:
             await self._close_after_manifest_failure(driver)
             raise MergenConfigurationError(
                 "Conformance driver manifest could not be read."
             ) from exc
 
         selected = profile_invariants(self.configuration.profile)
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
         results: list[CheckResult] = []
-        scenarios = tuple(
-            scenario for scenario in SCENARIOS if scenario.invariant in selected
-        )
+        scenarios = tuple(scenario for scenario in SCENARIOS if scenario.invariant in selected)
         declared = manifest.invariants
 
         try:
             for invariant in sorted(selected, key=lambda item: item.value):
                 if invariant in declared:
                     continue
+                missing_capabilities: list[JsonValue] = []
+                missing_capabilities.extend(
+                    sorted(capability.value for capability in required_capabilities(invariant))
+                )
                 results.append(
                     CheckResult(
                         check_id=f"profile.{invariant.value.lower()}.unsupported",
@@ -111,16 +110,10 @@ class ConformanceRunner:
                         status=CheckStatus.SKIP,
                         severity=Severity.CRITICAL,
                         summary=(
-                            "Implementation does not declare this required profile "
-                            "invariant."
+                            "Implementation does not declare this required profile invariant."
                         ),
                         duration_ms=0,
-                        evidence={
-                            "required_capabilities": sorted(
-                                capability.value
-                                for capability in required_capabilities(invariant)
-                            )
-                        },
+                        evidence={"required_capabilities": missing_capabilities},
                         remediation=(
                             "Declare and implement every invariant required by the "
                             "selected profile."
@@ -149,17 +142,14 @@ class ConformanceRunner:
                         continue
                     result = await self._execute(driver, scenario)
                     results.append(result)
-                    if (
-                        self.configuration.fail_fast
-                        and result.status is not CheckStatus.PASS
-                    ):
+                    if self.configuration.fail_fast and result.status is not CheckStatus.PASS:
                         break
         finally:
             cleanup = await self._cleanup_result(driver)
             if cleanup is not None:
                 results.append(cleanup)
 
-        finished_at = datetime.now(timezone.utc)
+        finished_at = datetime.now(UTC)
         return ConformanceReport(
             profile=self.configuration.profile,
             manifest_digest=manifest.digest,
@@ -174,13 +164,11 @@ class ConformanceRunner:
         )
 
     async def _close_after_manifest_failure(self, driver: BoundaryDriver) -> None:
-        try:
+        with suppress(Exception):
             await asyncio.wait_for(
                 driver.close(),
                 timeout=self.configuration.cleanup_timeout_seconds,
             )
-        except Exception:  # noqa: BLE001 - preserve the manifest failure
-            pass
 
     async def _cleanup_result(self, driver: BoundaryDriver) -> CheckResult | None:
         try:
@@ -188,7 +176,7 @@ class ConformanceRunner:
                 driver.close(),
                 timeout=self.configuration.cleanup_timeout_seconds,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return CheckResult(
                 check_id="runner.cleanup",
                 invariant=Invariant.CONTEXT_CLEANUP,
@@ -197,12 +185,10 @@ class ConformanceRunner:
                 summary="Driver cleanup exceeded its bounded timeout.",
                 duration_ms=round(self.configuration.cleanup_timeout_seconds * 1000),
                 evidence={},
-                remediation=(
-                    "Make driver cleanup idempotent, bounded, and cancellation-safe."
-                ),
+                remediation=("Make driver cleanup idempotent, bounded, and cancellation-safe."),
                 exception_type="builtins.TimeoutError",
             )
-        except Exception as exc:  # noqa: BLE001 - report bounded type, never message
+        except Exception as exc:
             return CheckResult(
                 check_id="runner.cleanup",
                 invariant=Invariant.CONTEXT_CLEANUP,
@@ -211,9 +197,7 @@ class ConformanceRunner:
                 summary="Driver cleanup raised an exception.",
                 duration_ms=0,
                 evidence={},
-                remediation=(
-                    "Make driver cleanup idempotent, bounded, and exception-safe."
-                ),
+                remediation=("Make driver cleanup idempotent, bounded, and exception-safe."),
                 exception_type=f"{type(exc).__module__}.{type(exc).__qualname__}",
             )
         return None
@@ -236,7 +220,7 @@ class ConformanceRunner:
                     "Conformance evidence exposed a configured secret canary.",
                     evidence={"leaked_canary_count": len(leaked)},
                 )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return self._result(
                 scenario,
                 CheckStatus.ERROR,
@@ -251,7 +235,7 @@ class ConformanceRunner:
                 started,
                 "Boundary invariant was not preserved.",
             )
-        except Exception as exc:  # noqa: BLE001 - exception messages may contain secrets
+        except Exception as exc:
             return self._result(
                 scenario,
                 CheckStatus.ERROR,

@@ -52,6 +52,8 @@ class CertificationProfile(StrEnum):
     DELIVERY = "delivery"
     WEBHOOK = "webhook"
     EXECUTOR = "executor"
+    COMMAND = "command"
+    DELEGATION = "delegation"
     COMPLETE = "complete"
 
 
@@ -130,6 +132,18 @@ PROFILE_INVARIANTS = MappingProxyType(
                 Invariant.LEASE_FENCING,
                 Invariant.CONTEXT_CLEANUP,
                 Invariant.EXECUTOR_HANDOFF,
+            }
+        ),
+        CertificationProfile.COMMAND: frozenset(
+            {
+                Invariant.SECRET_MINIMIZATION,
+                Invariant.COMMAND_IDENTITY,
+            }
+        ),
+        CertificationProfile.DELEGATION: frozenset(
+            {
+                Invariant.SECRET_MINIMIZATION,
+                Invariant.DELEGATION_BINDING,
             }
         ),
         CertificationProfile.COMPLETE: frozenset(Invariant),

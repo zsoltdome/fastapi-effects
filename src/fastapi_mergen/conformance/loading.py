@@ -33,7 +33,7 @@ async def load_driver(specification: str) -> BoundaryDriver:
             value = value()
         if inspect.isawaitable(value):
             value = await value
-    except Exception as exc:  # noqa: BLE001 - never expose application exception text
+    except Exception as exc:
         raise MergenConfigurationError("Conformance driver could not be loaded.") from exc
     if not isinstance(value, BoundaryDriver):
         raise MergenConfigurationError("Loaded object is not a BoundaryDriver.")

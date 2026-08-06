@@ -19,16 +19,15 @@ from fastapi_mergen.testing import ReferenceBoundaryDriver
 
 
 async def make_report() -> ConformanceReport:
-    return await ConformanceRunner(
-        RunnerConfiguration(profile=CertificationProfile.COMPLETE)
-    ).run(ReferenceBoundaryDriver())
+    return await ConformanceRunner(RunnerConfiguration(profile=CertificationProfile.COMPLETE)).run(
+        ReferenceBoundaryDriver()
+    )
 
 
 async def test_all_report_formats_are_parseable_and_secret_safe() -> None:
     report = await make_report()
     rendered = {
-        format: render_report(report, format)
-        for format in ReportFormat
+        output_format: render_report(report, output_format) for output_format in ReportFormat
     }
     json_payload = json.loads(rendered[ReportFormat.JSON])
     assert json_payload["report_digest"] == report.digest

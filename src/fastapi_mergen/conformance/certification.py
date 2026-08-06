@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fastapi_mergen.conformance.contract import CertificationProfile, profile_invariants
-from fastapi_mergen.conformance.models import CheckStatus, ConformanceReport
 from fastapi_mergen.conformance.manifest import CapabilityManifest
+from fastapi_mergen.conformance.models import CheckStatus, ConformanceReport
 from fastapi_mergen.errors import MergenConfigurationError
 
 
@@ -26,11 +26,7 @@ def decide(report: ConformanceReport) -> CertificationDecision:
     """Require at least one passing check for every profile invariant."""
 
     required = profile_invariants(report.profile)
-    passed = {
-        result.invariant
-        for result in report.results
-        if result.status is CheckStatus.PASS
-    }
+    passed = {result.invariant for result in report.results if result.status is CheckStatus.PASS}
     missing = tuple(sorted(item.value for item in required - passed))
     failed = tuple(
         result.check_id for result in report.results if result.status is CheckStatus.FAIL

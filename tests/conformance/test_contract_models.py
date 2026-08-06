@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
@@ -48,7 +48,7 @@ def result(
 
 
 def report(results: tuple[CheckResult, ...]) -> ConformanceReport:
-    now = datetime(2026, 8, 26, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 26, tzinfo=UTC)
     return ConformanceReport(
         profile=CertificationProfile.CORE,
         manifest_digest=complete_manifest().digest,
@@ -144,7 +144,7 @@ def test_report_round_trip_verifies_digest_and_derived_fields() -> None:
 
 
 @pytest.mark.parametrize(
-    "field,value,message",
+    ("field", "value", "message"),
     [("status", "fail", "status"), ("certified", True, "certification")],
 )
 def test_report_rejects_tampered_derived_field(
@@ -221,7 +221,7 @@ def test_report_rejects_oversized_json() -> None:
 
 
 def test_report_rejects_excessive_result_count() -> None:
-    now = datetime(2026, 8, 26, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 26, tzinfo=UTC)
     with pytest.raises(MergenConfigurationError, match="too many results"):
         ConformanceReport(
             profile=CertificationProfile.CORE,

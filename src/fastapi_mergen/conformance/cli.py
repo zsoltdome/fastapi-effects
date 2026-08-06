@@ -10,13 +10,13 @@ from importlib.resources import files
 from pathlib import Path
 
 from fastapi_mergen.conformance.certification import verify_evidence
-from fastapi_mergen.conformance.contract import CertificationProfile, SPEC_RESOURCE
+from fastapi_mergen.conformance.contract import SPEC_RESOURCE, CertificationProfile
 from fastapi_mergen.conformance.loading import load_driver
 from fastapi_mergen.conformance.manifest import CapabilityManifest
 from fastapi_mergen.conformance.models import ConformanceReport
+from fastapi_mergen.conformance.protocols import BoundaryDriver
 from fastapi_mergen.conformance.reporters import ReportFormat, render_report, write_report
 from fastapi_mergen.conformance.runner import ConformanceRunner, RunnerConfiguration
-from fastapi_mergen.conformance.protocols import BoundaryDriver
 from fastapi_mergen.errors import MergenConfigurationError
 from fastapi_mergen.testing.reference import Fault, ReferenceBoundaryDriver
 
@@ -141,8 +141,7 @@ def _secret_canaries(args: argparse.Namespace) -> tuple[str, ...]:
     for name in args.secret_canary_env:
         if not name or name not in os.environ:
             raise MergenConfigurationError(
-                "Every --secret-canary-env name must identify a present environment "
-                "variable."
+                "Every --secret-canary-env name must identify a present environment variable."
             )
         canaries.append(os.environ[name])
     return tuple(canaries)
@@ -166,18 +165,16 @@ async def _manifest_from_driver(args: argparse.Namespace) -> CapabilityManifest:
     manifest_error: Exception | None = None
     try:
         manifest = driver.manifest
-    except Exception as exc:  # noqa: BLE001 - never expose application exception text
+    except Exception as exc:
         manifest_error = exc
     try:
         await asyncio.wait_for(
             driver.close(),
             timeout=_DRIVER_CLOSE_TIMEOUT_SECONDS,
         )
-    except Exception as exc:  # noqa: BLE001 - bounded configuration error
+    except Exception as exc:
         if manifest_error is None:
-            raise MergenConfigurationError(
-                "Conformance driver cleanup failed."
-            ) from exc
+            raise MergenConfigurationError("Conformance driver cleanup failed.") from exc
     if manifest_error is not None:
         raise MergenConfigurationError(
             "Conformance driver manifest could not be read."

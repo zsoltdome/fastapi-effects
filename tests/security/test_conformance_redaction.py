@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import pytest
+
 from fastapi_mergen.conformance.safety import (
     reject_sensitive_keys,
     safe_json,
     scan_for_secret_values,
 )
 from fastapi_mergen.errors import MergenConfigurationError
-import pytest
 
 
 def test_nested_sensitive_fields_are_redacted() -> None:

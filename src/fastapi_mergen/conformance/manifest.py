@@ -77,14 +77,19 @@ class CapabilityManifest:
     def as_dict(self) -> dict[str, JsonValue]:
         """Return the canonical manifest representation."""
 
+        capabilities: list[JsonValue] = []
+        capabilities.extend(sorted(item.value for item in self.capabilities))
+        invariants: list[JsonValue] = []
+        invariants.extend(sorted(item.value for item in self.invariants))
+
         return {
             "schema_version": self.schema_version,
             "contract_version": self.contract_version,
             "adapter_name": self.adapter_name,
             "adapter_version": self.adapter_version,
             "implementation": self.implementation,
-            "capabilities": sorted(item.value for item in self.capabilities),
-            "invariants": sorted(item.value for item in self.invariants),
+            "capabilities": capabilities,
+            "invariants": invariants,
             "metadata": self.metadata,
         }
 
@@ -134,9 +139,8 @@ class CapabilityManifest:
         }
         if set(value) != expected:
             raise MergenConfigurationError("Capability manifest fields are incomplete or unknown.")
-        if (
-            not isinstance(value["schema_version"], int)
-            or isinstance(value["schema_version"], bool)
+        if not isinstance(value["schema_version"], int) or isinstance(
+            value["schema_version"], bool
         ):
             raise MergenConfigurationError("Capability manifest schema_version is invalid.")
         for field_name in (
@@ -146,23 +150,15 @@ class CapabilityManifest:
             "implementation",
         ):
             if not isinstance(value[field_name], str):
-                raise MergenConfigurationError(
-                    f"Capability manifest {field_name} is invalid."
-                )
-        if not isinstance(value["capabilities"], list) or not isinstance(
-            value["invariants"], list
-        ):
+                raise MergenConfigurationError(f"Capability manifest {field_name} is invalid.")
+        if not isinstance(value["capabilities"], list) or not isinstance(value["invariants"], list):
             raise MergenConfigurationError(
                 "Capability manifest capabilities and invariants must be arrays."
             )
         if any(not isinstance(item, str) for item in value["capabilities"]):
-            raise MergenConfigurationError(
-                "Capability manifest capabilities must contain strings."
-            )
+            raise MergenConfigurationError("Capability manifest capabilities must contain strings.")
         if any(not isinstance(item, str) for item in value["invariants"]):
-            raise MergenConfigurationError(
-                "Capability manifest invariants must contain strings."
-            )
+            raise MergenConfigurationError("Capability manifest invariants must contain strings.")
         if len(value["capabilities"]) != len(set(value["capabilities"])):
             raise MergenConfigurationError("Capability manifest repeats a capability.")
         if len(value["invariants"]) != len(set(value["invariants"])):
@@ -203,7 +199,6 @@ class CapabilityManifest:
                     raise MergenConfigurationError("Capability manifest contains duplicate keys.")
                 result[key] = item
             return result
-
 
         def reject_constant(_value: str) -> NoReturn:
             raise MergenConfigurationError("Capability manifest contains a non-finite number.")

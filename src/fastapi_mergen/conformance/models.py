@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, NoReturn
 from uuid import UUID, uuid4
@@ -182,9 +182,7 @@ class ConformanceReport:
             raise MergenConfigurationError("Conformance report schema version is invalid.")
         if self.contract_version != CONTRACT_VERSION:
             raise MergenConfigurationError("Conformance report contract version is invalid.")
-        if not isinstance(self.manifest_digest, str) or not _DIGEST.fullmatch(
-            self.manifest_digest
-        ):
+        if not isinstance(self.manifest_digest, str) or not _DIGEST.fullmatch(self.manifest_digest):
             raise MergenConfigurationError("Manifest digest must be a SHA-256 hex digest.")
         if not isinstance(self.run_id, UUID):
             raise MergenConfigurationError("Conformance run_id must be a UUID.")
@@ -227,13 +225,11 @@ class ConformanceReport:
         """Return whether every selected invariant has passing, complete evidence."""
 
         required = profile_invariants(self.profile)
-        passed = {
-            result.invariant
-            for result in self.results
-            if result.status is CheckStatus.PASS
-        }
-        return required.issubset(passed) and bool(self.results) and all(
-            result.status is CheckStatus.PASS for result in self.results
+        passed = {result.invariant for result in self.results if result.status is CheckStatus.PASS}
+        return (
+            required.issubset(passed)
+            and bool(self.results)
+            and all(result.status is CheckStatus.PASS for result in self.results)
         )
 
     def counts(self) -> dict[str, int]:
@@ -247,19 +243,22 @@ class ConformanceReport:
     def as_dict(self) -> dict[str, JsonValue]:
         """Return the versioned report representation."""
 
+        counts: dict[str, JsonValue] = dict(self.counts())
+        results: list[JsonValue] = [result.as_dict() for result in self.results]
+
         return {
             "schema_version": self.schema_version,
             "contract_version": self.contract_version,
             "run_id": str(self.run_id),
             "profile": self.profile.value,
             "manifest_digest": self.manifest_digest,
-            "started_at": self.started_at.astimezone(timezone.utc).isoformat(),
-            "finished_at": self.finished_at.astimezone(timezone.utc).isoformat(),
+            "started_at": self.started_at.astimezone(UTC).isoformat(),
+            "finished_at": self.finished_at.astimezone(UTC).isoformat(),
             "status": self.status.value,
             "certified": self.certified,
-            "counts": self.counts(),
+            "counts": counts,
             "environment": self.environment,
-            "results": [result.as_dict() for result in self.results],
+            "results": results,
         }
 
     def canonical_bytes(self) -> bytes:
@@ -301,9 +300,7 @@ class ConformanceReport:
         }
         supplied_digest = value.get("report_digest")
         if supplied_digest is not None:
-            if not isinstance(supplied_digest, str) or not _DIGEST.fullmatch(
-                supplied_digest
-            ):
+            if not isinstance(supplied_digest, str) or not _DIGEST.fullmatch(supplied_digest):
                 raise MergenConfigurationError(
                     "Conformance report digest must be a SHA-256 hex digest."
                 )
@@ -316,9 +313,7 @@ class ConformanceReport:
         if not isinstance(value["environment"], dict):
             raise MergenConfigurationError("Conformance report environment must be an object.")
         if any(not isinstance(item, dict) for item in value["results"]):
-            raise MergenConfigurationError(
-                "Conformance report results must contain objects."
-            )
+            raise MergenConfigurationError("Conformance report results must contain objects.")
         try:
             profile = CertificationProfile(value["profile"])
             run_id = UUID(value["run_id"])
@@ -368,7 +363,6 @@ class ConformanceReport:
                 result[key] = item
             return result
 
-
         def reject_constant(_value: str) -> NoReturn:
             raise MergenConfigurationError("Conformance report contains a non-finite number.")
 
@@ -380,9 +374,7 @@ class ConformanceReport:
                 parse_constant=reject_constant,
             )
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise MergenConfigurationError(
-                "Conformance report is not valid UTF-8 JSON."
-            ) from exc
+            raise MergenConfigurationError("Conformance report is not valid UTF-8 JSON.") from exc
         if not isinstance(value, dict):
             raise MergenConfigurationError("Conformance report root must be an object.")
         return cls.from_dict(value)

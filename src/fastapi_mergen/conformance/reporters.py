@@ -37,10 +37,10 @@ def report_digest(report: ConformanceReport) -> str:
     return report.digest
 
 
-def render_report(report: ConformanceReport, format: ReportFormat | str) -> str:
+def render_report(report: ConformanceReport, output_format: ReportFormat | str) -> str:
     """Render a report without including exception messages or raw credentials."""
 
-    selected = ReportFormat(format)
+    selected = ReportFormat(output_format)
     if selected is ReportFormat.JSON:
         value = report.as_dict()
         value["report_digest"] = report_digest(report)
@@ -70,9 +70,7 @@ def write_report(path: str | Path, content: str) -> Path:
     try:
         parent = target.parent.resolve(strict=True)
     except FileNotFoundError as exc:
-        raise MergenConfigurationError(
-            "Conformance output parent does not exist."
-        ) from exc
+        raise MergenConfigurationError("Conformance output parent does not exist.") from exc
     if not parent.is_dir():
         raise MergenConfigurationError("Conformance output parent is not a directory.")
 
@@ -82,13 +80,9 @@ def write_report(path: str | Path, content: str) -> Path:
         if stat.S_ISLNK(mode):
             raise MergenConfigurationError("Conformance output path must not be a symlink.")
         if not stat.S_ISREG(mode):
-            raise MergenConfigurationError(
-                "Conformance output path must be a regular file."
-            )
+            raise MergenConfigurationError("Conformance output path must be a regular file.")
 
-    fd, temporary = tempfile.mkstemp(
-        prefix=f".{target.name}.", suffix=".tmp", dir=parent
-    )
+    fd, temporary = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=parent)
     temporary_path = Path(temporary)
     try:
         os.fchmod(fd, 0o600)
@@ -211,6 +205,8 @@ def _sarif(report: ConformanceReport) -> str:
                 },
             }
         )
+    json_rules: list[JsonValue] = list(rules)
+    json_results: list[JsonValue] = list(results)
     document: dict[str, JsonValue] = {
         "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
         "version": "2.1.0",
@@ -219,10 +215,8 @@ def _sarif(report: ConformanceReport) -> str:
                 "tool": {
                     "driver": {
                         "name": "FastAPI-Mergen Boundary Conformance",
-                        "informationUri": (
-                            "https://github.com/mergen-institute/fastapi-mergen"
-                        ),
-                        "rules": rules,
+                        "informationUri": ("https://github.com/mergen-institute/fastapi-mergen"),
+                        "rules": json_rules,
                         "version": report.contract_version,
                     }
                 },
@@ -233,7 +227,7 @@ def _sarif(report: ConformanceReport) -> str:
                     "report_digest": report_digest(report),
                     "certified": report.certified,
                 },
-                "results": results,
+                "results": json_results,
             }
         ],
     }

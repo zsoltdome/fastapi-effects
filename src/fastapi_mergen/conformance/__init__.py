@@ -5,16 +5,16 @@ queue, webhook, or MCP implementation.  Implementations expose one or more
 facet protocols and the runner executes deterministic boundary scenarios.
 """
 
+from fastapi_mergen.conformance.certification import (
+    CertificationDecision,
+    decide,
+    verify_evidence,
+)
 from fastapi_mergen.conformance.contract import (
     CONTRACT_VERSION,
     Capability,
     CertificationProfile,
     Invariant,
-)
-from fastapi_mergen.conformance.certification import (
-    CertificationDecision,
-    decide,
-    verify_evidence,
 )
 from fastapi_mergen.conformance.manifest import CapabilityManifest
 from fastapi_mergen.conformance.models import (
@@ -32,10 +32,10 @@ __all__ = [
     "CapabilityManifest",
     "CertificationDecision",
     "CertificationProfile",
-    "ConformanceRunner",
     "CheckResult",
     "CheckStatus",
     "ConformanceReport",
+    "ConformanceRunner",
     "Invariant",
     "ReportFormat",
     "RunnerConfiguration",

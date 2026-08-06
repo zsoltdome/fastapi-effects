@@ -9,7 +9,6 @@ from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
 from uuid import UUID
 
 from fastapi_mergen.errors import MergenConfigurationError
@@ -91,8 +90,8 @@ def safe_json(value: object, *, depth: int = 0) -> JsonValue:
         entries = list(value.items())[:_MAX_ITEMS]
         for raw_key, item in entries:
             key = clean_text(str(raw_key), maximum=_MAX_KEY)
-            result[key] = "<redacted>" if is_sensitive_key(key) else safe_json(
-                item, depth=depth + 1
+            result[key] = (
+                "<redacted>" if is_sensitive_key(key) else safe_json(item, depth=depth + 1)
             )
         if len(value) > _MAX_ITEMS:
             result["<truncated>"] = len(value) - _MAX_ITEMS

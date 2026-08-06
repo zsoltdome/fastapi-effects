@@ -16,10 +16,10 @@ import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from urllib.parse import urlsplit
-from uuid import UUID, NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from fastapi_mergen.conformance.contract import Capability, Invariant
 from fastapi_mergen.conformance.manifest import CapabilityManifest
@@ -200,9 +200,7 @@ class ReferenceBoundaryDriver:
                 correlation_id=(
                     UUID(int=0) if Fault.LINEAGE_DROPPED in self._faults else correlation_id
                 ),
-                causation_id=(
-                    None if Fault.LINEAGE_DROPPED in self._faults else causation_id
-                ),
+                causation_id=(None if Fault.LINEAGE_DROPPED in self._faults else causation_id),
             )
             for delivery_id, destination in zip(delivery_ids, destinations, strict=True):
                 self._deliveries[delivery_id] = _DeliveryRecord(
@@ -219,9 +217,7 @@ class ReferenceBoundaryDriver:
             tenant_id=principal.tenant_id,
             delivery_ids=delivery_ids,
             correlation_id=(
-                UUID(int=0)
-                if Fault.LINEAGE_DROPPED in self._faults
-                else correlation_id
+                UUID(int=0) if Fault.LINEAGE_DROPPED in self._faults else correlation_id
             ),
             causation_id=(None if Fault.LINEAGE_DROPPED in self._faults else causation_id),
         )
@@ -268,8 +264,7 @@ class ReferenceBoundaryDriver:
     async def finalize(self, *, lease: LeaseView, outcome: str) -> DeliveryView:
         record = self._deliveries[lease.delivery_id]
         if (
-            record.status != "leased"
-            or record.active_lease_token != lease.lease_token
+            record.status != "leased" or record.active_lease_token != lease.lease_token
         ) and Fault.STALE_LEASE_ACCEPTED not in self._faults:
             raise ConformanceLeaseLost
         if outcome == "succeeded":
@@ -436,9 +431,8 @@ class ReferenceBoundaryDriver:
         ):
             raise ConformanceAccessDenied
         addresses = tuple(ipaddress.ip_address(item) for item in resolved_addresses)
-        if (
-            Fault.WEBHOOK_SSRF_ALLOWED not in self._faults
-            and any(not address.is_global for address in addresses)
+        if Fault.WEBHOOK_SSRF_ALLOWED not in self._faults and any(
+            not address.is_global for address in addresses
         ):
             raise ConformanceAccessDenied
         body_digest = hashlib.sha256(body).hexdigest()
@@ -447,7 +441,7 @@ class ReferenceBoundaryDriver:
             signed_digest = hashlib.sha256(body + b"changed").hexdigest()
         hmac.new(
             self._delegation_secret,
-            f"{message_id}.{attempt_no}.".encode("utf-8") + body,
+            f"{message_id}.{attempt_no}.".encode() + body,
             hashlib.sha256,
         ).digest()
         return WebhookAttemptView(
@@ -458,9 +452,7 @@ class ReferenceBoundaryDriver:
             signature_count=1,
             connected_ip=str(addresses[0]),
             status_code=200,
-            response_body_persisted=(
-                Fault.WEBHOOK_RESPONSE_PERSISTED in self._faults
-            ),
+            response_body_persisted=(Fault.WEBHOOK_RESPONSE_PERSISTED in self._faults),
         )
 
     async def enqueue_handoff(
@@ -528,7 +520,7 @@ class ReferenceBoundaryDriver:
         if ttl <= timedelta(0) or ttl > timedelta(minutes=5):
             raise ValueError("ttl outside reference policy")
         target_path = self._canonical_path(path)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         claims = {
             "v": 1,
             "jti": self._uuid("delegation").hex,
@@ -566,7 +558,7 @@ class ReferenceBoundaryDriver:
             claims = json.loads(payload)
         except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise ConformanceAccessDenied from exc
-        now = int(datetime.now(timezone.utc).timestamp())
+        now = int(datetime.now(UTC).timestamp())
         if claims.get("v") != 1 or not claims.get("iat") <= now <= claims.get("exp"):
             raise ConformanceAccessDenied
         exact_target = (
