@@ -1,9 +1,6 @@
-"""Optional webhook integration boundary reserved for Milestone 3."""
+"""Tenant-safe webhook persistence and optional delivery integration.
 
-from fastapi_mergen._optional import require_modules
-
-require_modules(
-    feature="Webhook support",
-    extra="webhooks",
-    modules=("cryptography", "httpx", "standardwebhooks"),
-)
+Persistence models deliberately use base dependencies.  Modules that perform
+encryption or network delivery validate the ``webhooks`` extra at their own
+import boundary.
+"""
