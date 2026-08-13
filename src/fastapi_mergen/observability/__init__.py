@@ -1,9 +1,14 @@
-"""Optional OpenTelemetry integration boundary."""
+"""Dependency-free secret-minimizing runtime observability."""
 
-from fastapi_mergen._optional import require_modules
+from fastapi_mergen.observability.events import RuntimeEvent, RuntimeEventKind, TraceLineage
+from fastapi_mergen.observability.logging import StructuredLogEventSink
+from fastapi_mergen.observability.protocols import EventSink, NoOpEventSink
 
-require_modules(
-    feature="OpenTelemetry support",
-    extra="otel",
-    modules=("opentelemetry", "opentelemetry.sdk"),
-)
+__all__ = [
+    "EventSink",
+    "NoOpEventSink",
+    "RuntimeEvent",
+    "RuntimeEventKind",
+    "StructuredLogEventSink",
+    "TraceLineage",
+]

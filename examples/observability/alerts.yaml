@@ -1,0 +1,26 @@
+groups:
+  - name: fastapi-mergen
+    rules:
+      - alert: MergenBacklogOld
+        expr: max(fastapi_mergen_backlog_oldest_age_seconds) > 300
+        for: 10m
+        labels: {severity: page}
+      - alert: MergenDeadRate
+        expr: sum(rate(fastapi_mergen_runtime_events_total{mergen_event_kind="dead"}[10m])) > 0.1
+        for: 10m
+        labels: {severity: page}
+      - alert: MergenLeaseExpiry
+        expr: sum(rate(fastapi_mergen_runtime_events_total{mergen_event_kind="reconciled"}[10m])) > 0.1
+        for: 10m
+        labels: {severity: ticket}
+      - alert: MergenWebhookPaused
+        expr: increase(fastapi_mergen_runtime_events_total{mergen_event_kind="webhook_paused"}[15m]) > 0
+        labels: {severity: page}
+      - alert: MergenCommandConflicts
+        expr: sum(rate(fastapi_mergen_runtime_events_total{mergen_event_kind="command_conflict"}[10m])) > 1
+        for: 10m
+        labels: {severity: ticket}
+      - alert: MergenDelegationDenied
+        expr: sum(rate(fastapi_mergen_runtime_events_total{mergen_event_kind="delegation_denied"}[10m])) > 1
+        for: 5m
+        labels: {severity: page}
