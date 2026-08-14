@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "before-command-commit", "mode": "postgres", "node": "tests/integration/test_command_concurrency.py::test_missing_completion_rolls_back_claim"},
+    {"id": "effect-publish-before-command-commit", "mode": "postgres", "node": "tests/integration/test_command_concurrency.py::test_effect_publication_failure_rolls_back_command_and_business_write"},
+    {"id": "remote-webhook-success-before-finalize", "mode": "postgres", "node": "tests/chaos/test_webhook_crash_matrix.py::test_receiver_success_then_relay_crash_retries_stable_identity"},
+    {"id": "taskiq-duplicate-after-accept", "mode": "postgres", "node": "tests/integration/test_taskiq_worker_claim.py::test_real_taskiq_broker_duplicate_is_fenced_and_context_is_reset"},
+    {"id": "taskiq-worker-expires-before-finalize", "mode": "postgres", "node": "tests/integration/test_taskiq_worker_claim.py::test_expired_execution_rejects_stale_finalization"},
+    {"id": "delegation-key-provider-outage", "mode": "injected", "node": "tests/chaos/test_failure_contract.py::test_key_provider_outage_denies_verification_and_stops_issuance"},
+    {"id": "delegation-revoked-key", "mode": "injected", "node": "tests/security/test_delegation_keys.py::test_rotation_overlap_and_immediate_revocation_are_audited"},
+    {"id": "database-connection-loss-transaction-boundary", "mode": "postgres", "node": "tests/chaos/test_postgres_connection_loss.py::test_connection_loss_rolls_back_uncommitted_work_and_preserves_committed_intent"},
+    {
+      "id": "database-restart",
+      "mode": "external",
+      "node": null,
+      "rehearsal": {
+        "script": "scripts/rehearse_postgres_restart.py",
+        "evidence": [
+          "docs/evidence/postgres-restart-16.json",
+          "docs/evidence/postgres-restart-18.json"
+        ]
+      }
+    },
+    {"id": "database-failover-ambiguous-commit", "mode": "external", "node": null}
+  ]
+}

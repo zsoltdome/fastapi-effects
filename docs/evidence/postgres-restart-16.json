@@ -1,0 +1,16 @@
+{
+  "backend_replaced": true,
+  "captured_on": "2026-08-30",
+  "delivery_identity_preserved": true,
+  "doctor_healthy": true,
+  "event_identity_preserved": true,
+  "expected_major": 16,
+  "fastapi_mergen": "0.11.0a1",
+  "platform": "linux-x86_64",
+  "postgresql_after": "16.15",
+  "postgresql_before": "16.15",
+  "restart_observed": true,
+  "result": "pass",
+  "schema_compatible": true,
+  "schema_version": 1
+}

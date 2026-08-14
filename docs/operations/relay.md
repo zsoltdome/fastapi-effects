@@ -1,6 +1,6 @@
 # Relay state and operation
 
-**Status:** normative design; implementation begins in Milestone 2.
+**Status:** implemented core runtime behavior in `0.7.0a1`.
 
 ## State machine
 
@@ -20,9 +20,10 @@ Terminal rows never return to pending. Manual replay creates a new linked delive
 
 At PostgreSQL `READ COMMITTED`, a worker:
 
-1. selects a bounded tenant and due deliveries with `FOR UPDATE SKIP LOCKED`;
-2. assigns `status='leased'`, worker ID, fresh random lease token, and database-time
-   lease expiry;
+1. ranks due deliveries per tenant, then locks a bounded set with
+   `FOR UPDATE SKIP LOCKED`;
+2. assigns `state='leased'`, a fresh random lease token, and an expiry from the
+   injected runtime clock;
 3. increments attempts started and sets first-attempt time when absent;
 4. inserts one append-only attempt row with the same token and attempt number;
 5. commits immediately;
@@ -36,10 +37,10 @@ accept a sink callback, making I/O inside the lock transaction structurally diff
 
 The MDP promises bounded unfairness, not ordering:
 
-1. select a bounded tenant set ordered by oldest due delivery;
-2. rotate the starting tenant between loops;
-3. claim at most `per_tenant_claim_limit` rows per tenant;
-4. stop at the worker batch limit;
+1. rank due rows within each tenant by due time and creation time;
+2. retain at most `per_tenant` rows from each rank partition;
+3. order the bounded candidates by due age;
+4. stop at `batch_size`; and
 5. use `SKIP LOCKED` only to coordinate competing workers.
 
 No FIFO, global, causal, or per-key ordering SLA is implied.
@@ -75,14 +76,14 @@ state and produces a `LeaseLost` result and metric.
 
 ## Lease expiry and reconciliation
 
-A new claim may reclaim an expired lease with a new token and attempt number. The
-prior unfinished attempt becomes `abandoned` exactly once through a bounded
-reconciliation transaction. A stale process cannot renew or finalize the replacement
-worker's lease.
+The bounded reconciliation pass changes an expired lease to `retry_wait` (or `dead`
+when its budget is exhausted) and marks its open attempt `abandoned`. A later claim
+uses a new token and attempt identity. A stale process cannot finalize either the
+reconciled row or its replacement lease.
 
 ## Polling
 
-Periodic polling is the correctness path through Milestone 3. A later
+Periodic polling is the correctness path through v1. A later
 `LISTEN/NOTIFY` integration may reduce latency only as a wake-up hint; polling remains
 enabled and recovers missed notifications.
 
