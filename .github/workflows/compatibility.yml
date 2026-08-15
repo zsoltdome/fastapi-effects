@@ -1,0 +1,126 @@
+name: Compatibility
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compatibility-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: compat-python-${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+          enable-cache: true
+      - run: uv sync --group dev --all-extras
+      - run: uv run pytest -q -m "not integration and not packaging"
+      - run: uv run python scripts/build_and_test_artifacts.py --offline-system-packages
+
+  postgres:
+    name: compat-pg${{ matrix.postgres }}-py${{ matrix.python_id }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - postgres: "16"
+            python: "3.11"
+            python_id: "311"
+          - postgres: "18"
+            python: "3.14"
+            python_id: "314"
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      MERGEN_TEST_ADMIN_DSN: postgresql://postgres:postgres@127.0.0.1:55432/postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+          enable-cache: true
+      - run: uv sync --group test --all-extras
+      - run: uv run pytest -q -m integration
+
+  dependencies:
+    name: ${{ matrix.evidence-id }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - evidence-id: compat-min-base
+            requirement: .
+            resolution: lowest-direct
+            imports: fastapi_mergen
+          - evidence-id: compat-min-webhooks
+            requirement: .[webhooks]
+            resolution: lowest-direct
+            imports: fastapi_mergen.webhooks.signing,cryptography,httpx,standardwebhooks
+          - evidence-id: compat-min-otel
+            requirement: .[otel]
+            resolution: lowest-direct
+            imports: fastapi_mergen.observability.otel,opentelemetry
+          - evidence-id: compat-min-taskiq
+            requirement: .[taskiq]
+            resolution: lowest-direct
+            imports: fastapi_mergen.executors.taskiq.adapter,taskiq
+          - evidence-id: compat-min-fastmcp
+            requirement: .[fastmcp]
+            resolution: lowest-direct
+            imports: fastapi_mergen.integrations.fastmcp,fastmcp
+          - evidence-id: compat-latest-all
+            requirement: .[webhooks,otel,taskiq,fastmcp]
+            resolution: highest
+            imports: fastapi_mergen,cryptography,httpx,opentelemetry,taskiq,fastmcp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+          enable-cache: true
+      - name: Create isolated dependency environment
+        run: uv venv --python 3.11 .compat-venv
+      - name: Resolve exact dependency surface
+        run: >-
+          uv pip install --python .compat-venv/bin/python
+          --resolution "${{ matrix.resolution }}"
+          -e "${{ matrix.requirement }}"
+      - name: Import exact dependency surface
+        env:
+          MERGEN_IMPORTS: ${{ matrix.imports }}
+        run: .compat-venv/bin/python -c "import importlib, os; [importlib.import_module(name) for name in os.environ['MERGEN_IMPORTS'].split(',')]"

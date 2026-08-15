@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "workflow": ".github/workflows/compatibility.yml",
+  "evidence_ids": [
+    "compat-python-3.11",
+    "compat-python-3.12",
+    "compat-python-3.13",
+    "compat-python-3.14",
+    "compat-pg16-py311",
+    "compat-pg18-py314",
+    "compat-min-base",
+    "compat-min-webhooks",
+    "compat-min-otel",
+    "compat-min-taskiq",
+    "compat-min-fastmcp",
+    "compat-latest-all"
+  ]
+}
