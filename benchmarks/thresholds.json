@@ -1,0 +1,4 @@
+{
+  "minimum_claims_per_second": 10,
+  "maximum_command_contention_p95_ms": 5000
+}

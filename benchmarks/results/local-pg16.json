@@ -1,0 +1,42 @@
+{
+  "correctness": {
+    "all_tenants_claimed": true,
+    "all_webhooks_accepted_once": true,
+    "no_starvation_within_batch_policy": true,
+    "one_command_execution": true
+  },
+  "dataset": {
+    "concurrent_command_callers": 16,
+    "events_per_tenant": 3,
+    "payload_bytes": 14,
+    "tenants": 3,
+    "total_deliveries": 9
+  },
+  "environment": {
+    "captured_at": "2026-08-30T13:47:24.216082+00:00",
+    "cpu_count": 14,
+    "fastapi_mergen": "0.11.0a1",
+    "machine": "x86_64",
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.39",
+    "postgresql": "16.15",
+    "python": "3.13.15"
+  },
+  "measurements": {
+    "backlog_oldest_age_seconds": 0.039971,
+    "claim_max_consecutive_tenant": 2,
+    "claim_tenants_observed": 3,
+    "claim_throughput_per_second": 94.97426666885212,
+    "command_contention_p95_ms": 285.19280400360003,
+    "command_index_bytes_after": 81920,
+    "command_index_bytes_before": 81920,
+    "command_replays": 15,
+    "emission_multi_tenant_p95_ms": 5.810522008687258,
+    "emission_single_tenant_p50_ms": 5.810522008687258,
+    "retention_pruned_rows": 1,
+    "retention_seconds": 0.004068656009621918,
+    "retry_scheduled_delay_seconds": 0.005,
+    "webhook_transport_per_second": 3495.706081749087
+  },
+  "performance_alerts": [],
+  "schema_version": 1
+}
