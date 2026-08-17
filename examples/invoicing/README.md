@@ -1,17 +1,19 @@
-# Invoicing reference application
+# Invoicing runtime vertical slice
 
-This is a Milestone 1 architecture fixture, not a deployable service. It proves that:
+This example exercises the cumulative M8 runtime:
 
-- FastAPI and OpenAPI boot without a live database;
-- principal resolution and session acquisition are separate dependencies;
-- the explicit UoW shape type-checks;
-- typed DTOs—not ORM graph serialization—form events;
-- one exact `invoice.created` route targets an explicitly keyed handler;
-- entering the UoW fails before SQL until Milestone 2 implements RLS and atomic
-  persistence.
+- FastAPI authenticates and binds a tenant before opening the application session;
+- the outer Mergen UoW commits the invoice, event, and frozen delivery together;
+- a polling relay claims the delivery without holding locks during handler work;
+- the handler restores attenuated authority and opens a fresh tenant-bound application
+  session; and
+- the render record and terminal delivery state demonstrate end-to-end completion.
 
-Run the boot tests with:
+Boot-only tests need no database:
 
 ```bash
 pytest examples/invoicing/tests -q
 ```
+
+The live vertical slice is `tests/integration/test_invoicing_postgres_boot.py` and uses
+`MERGEN_TEST_ADMIN_DSN` like the rest of the PostgreSQL integration suite.

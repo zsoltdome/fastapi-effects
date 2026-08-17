@@ -1,1 +1,1 @@
-"""Milestone 1 invoicing reference application."""
+"""Transactional invoicing runtime example."""

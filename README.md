@@ -1,21 +1,43 @@
 # FastAPI-Mergen
 
-> **Status:** pre-alpha assurance release `0.6.0a1`.
+> **Status:** production-hardening alpha `0.11.0a1`; v1 external gates are open.
 
 FastAPI-Mergen defines and tests the transaction boundary for **tenant-safe effects**
 in async FastAPI and PostgreSQL systems.
 
 > **One commit. Every effect keeps its tenant and authority provenance.**
 
-Milestone 7 delivers the executable **Mergen Boundary Contract Conformance and
-Assurance Suite**. It certifies observable transaction, isolation, authority, retry,
-replay, lease, context, idempotency, delegation, and evidence-minimization behavior
-through a trusted application adapter.
+The cumulative runtime now records effect intent in the application transaction,
+fans it out into immutable delivery specifications, and executes leased work through
+fresh tenant-bound application sessions. The preserved Boundary Contract suite tests
+the production PostgreSQL path as well as its deterministic reference oracle.
 
-## What this release provides
+## Capability status
+
+The recoverable baseline at commit `6b8d3626445bd577cc6c5af80f3b84e30e2c7712`
+contains the Milestone 1 API foundation and the Milestone 7 assurance suite. The
+Milestone 2–6 runtime sources were unavailable; runtime work after that commit is a
+new, reviewable implementation and is not reconstructed history.
+
+| Capability | Status in `0.11.0a1` |
+|---|---|
+| Boundary Contract and conformance profiles | Implemented |
+| Deterministic in-memory conformance driver | Reference-only |
+| Real PostgreSQL transactional runtime | Implemented |
+| Explicit SQLAlchemy UoW, dedupe, and immutable fan-out | Implemented |
+| Leases, reconciliation, polling relay, and in-process handlers | Implemented |
+| PostgreSQL roles, forced RLS, schema checks, and doctor | Implemented |
+| Target-bound delegation and FastMCP 3.4 bridge | Implemented alpha |
+| Encrypted, signed, SSRF-safe webhook delivery | Implemented beta |
+| Durable Taskiq external executor | Implemented alpha |
+| Transactional inbound command idempotency | Implemented alpha |
+| API/schema compatibility, recovery, telemetry, and release evidence | Implemented locally |
+| Two external deployments, independent review, RC observation | Required; not complete |
+
+## What this alpha provides
 
 - Boundary Contract v1 with fourteen stable invariants;
-- strict capability manifests and six certification profiles;
+- strict capability manifests and eight certification profiles;
 - deterministic asynchronous conformance scenarios;
 - an in-memory reference oracle with twenty injectable defects;
 - JSON, JUnit, SARIF, and Markdown reports;
@@ -23,13 +45,29 @@ through a trusted application adapter.
 - credential-safe bounded evidence and deployment secret canaries;
 - private, atomic report-file output;
 - CLI, testing helpers, JSON schemas, CI workflow, and a cumulative milestone audit.
+- atomic event and original-delivery persistence in a caller-owned async SQLAlchemy
+  transaction;
+- tenant-scoped dedupe with immutable payload conflict detection;
+- PostgreSQL 16/18 RLS, role, migration, and pooled-context diagnostics;
+- fenced delivery leases, deterministic retry, reconciliation, replay, and polling;
+- snapshot, revalidated, and service-policy handler authority; and
+- a real PostgreSQL adapter certifying the `core`, `delivery`, and `security` profiles.
+- versioned exact-event webhook subscriptions and AES-GCM encrypted signing keys;
+- Standard Webhooks-compatible deterministic bodies and rotation-overlap signatures;
+- attempt-time DNS policy, explicit-IP TLS/HTTP, bounded response parsing, pause,
+  replay, retention, and a real adapter certifying the `webhook` profile.
+- durable per-attempt Taskiq handoffs, stable task IDs, duplicate worker fencing,
+  principal restoration, expiry recovery, and a real `executor` profile adapter.
+- transaction-owned command generations, exact request fingerprinting, bounded
+  response replay, restricted retention, and a real `command` profile adapter.
+- audience/method/path-bound delegation, scope/depth attenuation, key
+  rotation/revocation, token-free audit, and a real `delegation` profile adapter.
 
-This release does **not** turn the Milestone 1 API spike into a production event store.
-The recoverable Git baseline is the verified Milestone 1 repository; later runtime
-source archives were unavailable in this environment. The conformance package is
-therefore intentionally implementation independent: production PostgreSQL, queue,
-webhook, idempotency, and delegation implementations are certified through adapters
-that call their real paths.
+This is an alpha integration release: polling remains the correctness path and
+Taskiq is an optional transport for durable handler handoffs. Command idempotency
+protects local database work and durable effect intent, not direct remote calls.
+FastMCP tool visibility is not authorization; downstream routes verify delegation.
+Webhook promotion to stable still requires recorded design-partner staging feedback.
 
 ## Run the reference suite
 
@@ -84,18 +122,18 @@ FastAPI-Mergen does not promise generic exactly-once distributed execution.
 
 Start with:
 
-1. [Boundary Contract v1](docs/concepts/boundary-contract.md);
-2. [Conformance architecture](docs/concepts/conformance.md);
-3. [Certification operations](docs/operations/certification.md);
-4. [Conformance API reference](docs/reference/conformance-api.md);
-5. [Security policy](SECURITY.md).
+1. [PostgreSQL quickstart](docs/tutorials/quickstart.md);
+2. [Boundary Contract v1](docs/concepts/boundary-contract.md);
+3. [Public API and compatibility](docs/reference/public-api.md);
+4. [Production operations](docs/operations/migrations.md);
+5. [Certification operations](docs/operations/certification.md);
+6. [Security policy](SECURITY.md).
 
 ## Development
 
 ```bash
 uv sync --all-extras --all-groups
-uv run pytest -q tests/conformance tests/security tests/unit
-uv run python scripts/audit_milestone_seven.py --skip-git-governance
+uv run python scripts/check.py
 ```
 
 ## Licence

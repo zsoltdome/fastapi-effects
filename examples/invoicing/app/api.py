@@ -17,7 +17,7 @@ get_uow = mergen.uow_dependency(get_async_session)
 
 @router.get("/health", tags=["operations"])
 async def health() -> dict[str, str]:
-    return {"status": "ok", "milestone": "1"}
+    return {"status": "ok", "milestone": "8"}
 
 
 @router.post(
@@ -30,11 +30,7 @@ async def create_invoice(
     data: InvoiceIn,
     uow: MergenUnitOfWork = Depends(get_uow),
 ) -> InvoiceOut:
-    """Show the intended atomic application-row plus effect-intent transaction.
-
-    In version 0.0.1, entering the UoW raises before SQL. Milestone 2 implements the
-    transaction, tenant binding, event, and original delivery rows.
-    """
+    """Commit the invoice and its immutable effect intent in one transaction."""
     async with uow:
         invoice = Invoice(
             tenant_id=uow.principal.tenant_id,
