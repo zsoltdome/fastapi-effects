@@ -4,7 +4,7 @@
 
 | Role | Runtime | Owns objects | Tenant visibility | Required privileges |
 |---|---:|---:|---|---|
-| `mergen_migration_owner` | No | Yes | Administrative | Schema/table/function/policy DDL |
+| `mergen_migration` | No | Yes | Administrative | Schema/table/policy DDL |
 | `mergen_app` | Yes | No | One transaction-bound tenant | Application and tenant-scoped Mergen operations |
 | `mergen_relay` | Yes | No | All tenants on Mergen control tables only | Claim/read/finalize deliveries and attempts; no application tables; no delete history |
 
@@ -14,53 +14,39 @@ processes.
 
 ## Transaction-local tenant context
 
-The planned UoW executes this before application SQL:
+The UoW executes these settings before application SQL:
 
 ```sql
 SELECT pg_catalog.set_config(
-    'fastapi_mergen.tenant_id',
+    'mergen.tenant_id',
     :tenant_id,
     true
 );
+SELECT pg_catalog.set_config('mergen.subject_id', :subject_id, true);
 ```
 
-`true` makes the setting local to the current transaction. The fail-closed helper is
-schema-qualified and returns `NULL` when no value exists:
-
-```sql
-CREATE FUNCTION fastapi_mergen.current_tenant_id()
-RETURNS uuid
-LANGUAGE sql
-STABLE
-PARALLEL SAFE
-AS $$
-    SELECT NULLIF(
-        pg_catalog.current_setting('fastapi_mergen.tenant_id', true),
-        ''
-    )::uuid
-$$;
-```
-
-A malformed value raises rather than selecting an arbitrary tenant.
+`true` makes each setting local to the current transaction. Policies use
+`NULLIF(current_setting('mergen.tenant_id', true), '')::uuid`; missing context returns
+`NULL` and denies all tenant rows, while malformed context fails closed.
 
 ## Policy shape
 
 Every Mergen tenant table has RLS enabled and forced:
 
 ```sql
-ALTER TABLE fastapi_mergen.event ENABLE ROW LEVEL SECURITY;
-ALTER TABLE fastapi_mergen.event FORCE ROW LEVEL SECURITY;
+ALTER TABLE fastapi_mergen.events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fastapi_mergen.events FORCE ROW LEVEL SECURITY;
 ```
 
 The request/handler role requires both read visibility and write validation:
 
 ```sql
-CREATE POLICY event_app_policy
-ON fastapi_mergen.event
+CREATE POLICY events_application_tenant
+ON fastapi_mergen.events
 FOR ALL
 TO mergen_app
-USING (tenant_id = fastapi_mergen.current_tenant_id())
-WITH CHECK (tenant_id = fastapi_mergen.current_tenant_id());
+USING (tenant_id = NULLIF(current_setting('mergen.tenant_id', true), '')::uuid)
+WITH CHECK (tenant_id = NULLIF(current_setting('mergen.tenant_id', true), '')::uuid);
 ```
 
 The relay receives separate, explicit policies only on Mergen-owned tables. It does
@@ -68,7 +54,7 @@ not receive a general application-schema grant.
 
 ## Ownership and search path
 
-- Objects are owned by `mergen_migration_owner`.
+- Objects are owned by `mergen_migration` (or the explicitly configured migration role).
 - SQL and migrations are schema-qualified.
 - Security-definer functions, if admitted later, use a fixed safe `search_path` and
   have narrowly granted execution.
@@ -76,9 +62,9 @@ not receive a general application-schema grant.
   precedes trusted schemas on the search path.
 - The public schema must not be an implicit extension point for privileged SQL.
 
-## `fastapi-mergen doctor` planned probes
+## `fastapi-mergen doctor` probes
 
-Milestone 2 diagnostics must run as actual configured roles and verify:
+Diagnostics run as the engine's actual configured role and verify:
 
 1. superuser, ownership, membership, and `BYPASSRLS` status;
 2. expected schema/table/function owners;
@@ -89,11 +75,10 @@ Milestone 2 diagnostics must run as actual configured roles and verify:
 7. setting reset after commit and rollback;
 8. pool reuse without a prior tenant;
 9. relay denial on configured application tables;
-10. unsafe writable search-path objects;
-11. package/schema revision compatibility.
+10. package/schema revision compatibility.
 
-Critical failure produces a non-zero exit. Human and JSON output must redact passwords,
-credential-bearing DSNs, payloads, and secrets.
+Critical failure produces a non-zero exit. Output is bounded and never includes the
+configured DSN, passwords, payloads, or secrets.
 
 ## Security limitation
 

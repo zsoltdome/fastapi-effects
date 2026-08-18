@@ -1,7 +1,6 @@
-# Public API spike
+# Runtime public API
 
-Milestone 1 provides importable, typed shapes to evaluate ergonomics. Security-critical
-operations fail closed until Milestone 2.
+The Milestone 1 spike has become the narrow typed surface for the M8 core runtime.
 
 ## Root exports
 
@@ -32,9 +31,8 @@ from fastapi_mergen.postgres import PostgresStore
 from fastapi_mergen.sqlalchemy import MergenUnitOfWork
 ```
 
-`PostgresStore` is a fail-closed Milestone 1 declaration. Calling its persistence guard
-raises `MilestoneNotImplementedError`; it does not imply that schema, RLS, or event
-persistence already exists.
+`PostgresStore` persists events and their immutable original delivery set through the
+active `MergenUnitOfWork`. Repository and ORM types remain internal.
 
 ## Route declaration
 
@@ -62,6 +60,7 @@ DSLs are outside the MDP.
 ```python
 get_uow = mergen.uow_dependency(get_async_session)
 
+
 @app.post("/invoices")
 async def create_invoice(
     data: InvoiceIn,
@@ -71,13 +70,13 @@ async def create_invoice(
         ...
 ```
 
-In `0.0.1`, entering this context raises `MilestoneNotImplementedError` before starting
-SQL. The shape is evaluated without pretending that transaction/RLS behavior exists.
+The context rejects active or nested transactions, binds tenant and subject settings,
+and commits or rolls back the application row and effect intent together.
 
 ## Replaceable protocols
 
 The host can provide principal, authorization, clock, random, handler-session, and
-future effect-store implementations through explicit protocols. User code need not
+effect-store implementations through explicit protocols. User code need not
 subclass internal implementation classes.
 
 ## Rejected surface alternatives

@@ -1,7 +1,6 @@
 # Unit-of-work lifecycle
 
-These diagrams freeze Milestone 2 behavior. In Milestone 1, entering the UoW raises
-`MilestoneNotImplementedError` before SQL.
+These diagrams describe the implemented explicit outer-transaction lifecycle.
 
 ## Success
 

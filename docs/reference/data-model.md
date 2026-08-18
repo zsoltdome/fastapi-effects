@@ -1,14 +1,13 @@
 # Event, delivery, and attempt model
 
-This is the normative logical model; SQLAlchemy mappings and migrations begin in
-Milestone 2.
+This is the normative logical model implemented by schema revision `core=1`.
 
 ## Event
 
 An event owns:
 
 - UUID identity and tenant ID;
-- principal schema/version, subject, actor/client, origin scopes, approved metadata,
+- principal subject, actor/client, origin scopes, approved opaque credential reference,
   and authentication timestamps;
 - event type, positive schema version, typed JSON payload, canonical SHA-256 hash;
 - optional tenant-scoped dedupe namespace/key;
@@ -17,7 +16,7 @@ An event owns:
 
 Constraints:
 
-- unique `(id, tenant_id)` supports tenant-safe composite references;
+- unique `(tenant_id, event_id)` supports tenant-safe composite references;
 - partial unique `(tenant_id, dedupe_namespace, dedupe_key)` when a key exists;
 - namespace/key are both null or both present;
 - payload and scope counts are bounded;
@@ -35,11 +34,10 @@ A delivery owns:
 - route key/version and snapshot schema version;
 - sink kind, stable destination key, immutable destination snapshot;
 - immutable authorization and retry policy snapshot;
-- status, attempts started, max attempts, next-attempt time, deadline;
-- current lease worker/token/expiry only while leased;
-- first attempt, terminal time, bounded last error;
+- state, attempts started, and next-attempt time;
+- current lease token/expiry only while leased;
 - replay reason and authorizing subject;
-- state version and timestamps.
+- creation and update timestamps.
 
 The unique original-route key prevents duplicate original delivery materialization.
 Lease and terminal check constraints reject impossible combinations.
@@ -49,23 +47,21 @@ Lease and terminal check constraints reject impossible combinations.
 An attempt owns:
 
 - UUID identity and tenant-safe delivery reference;
-- positive attempt number, lease token, worker ID;
+- positive attempt number and lease token;
 - start/finish and outcome;
-- bounded transport metadata such as status, duration, byte counts, request ID, and
-  retry-after time;
-- bounded error class/code/summary.
+- a bounded failure code and safe summary for failed attempts.
 
-`(delivery_id, attempt_no)` is unique. The payload, policy body, credentials, secrets,
-and webhook response body are not attempt columns.
+`(tenant_id, delivery_id, attempt_number)` is unique. Payloads, policy bodies,
+credentials, secrets, and receiver response bodies are not attempt columns.
 
 ## Tenant-safe references
 
 Every relation includes tenant ID:
 
 ```text
-(event_id, tenant_id)    → event(id, tenant_id)
-(delivery_id, tenant_id) → delivery(id, tenant_id)
-(replay_of, tenant_id)   → delivery(id, tenant_id)
+(tenant_id, event_id)    → events(tenant_id, event_id)
+(tenant_id, delivery_id) → deliveries(tenant_id, delivery_id)
+(tenant_id, replay_of)   → deliveries(tenant_id, delivery_id)
 ```
 
 This prevents a direct-SQL or ORM bug from linking history across tenants even when a
