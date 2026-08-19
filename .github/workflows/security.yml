@@ -30,4 +30,25 @@ jobs:
       - name: Audit dependencies
         run: uv run pip-audit
       - name: Scan source
-        run: uv run bandit -q -r src
+        run: uv run bandit -q -c bandit.yaml -r src
+      - name: Scan tracked files and dependency licenses
+        run: uv run python scripts/security_scan.py
+      - name: Generate CycloneDX SBOM
+        run: uv run python scripts/generate_sbom.py --output build/sbom.cdx.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+        with:
+          name: security-sbom-${{ github.sha }}
+          path: build/sbom.cdx.json
+          if-no-files-found: error
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate

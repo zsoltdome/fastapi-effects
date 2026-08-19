@@ -2,9 +2,10 @@
 
 ## Supported status
 
-FastAPI-Mergen `0.6.0a1` is a pre-alpha assurance release. Its supported claims cover
-the conformance models, runner, evidence formats, CLI, and reference fault matrix.
-It does not itself make the Milestone 1 persistence API spike production ready.
+FastAPI-Mergen `0.11.0a1` is a production-hardening alpha. Core, webhook, Taskiq,
+command-idempotency, and delegation claims are covered by real implementations and
+conformance, but v1 promotion remains blocked on external design-partner and independent
+review evidence. Supported Python/database versions are listed in `docs/compatibility.md`.
 
 ## Reporting
 
@@ -41,3 +42,11 @@ production DSNs in a report.
   are never durable event or delivery fields.
 
 The complete model and residual risks are in `docs/concepts/threat-model.md`.
+
+## Supply chain
+
+CI runs Bandit, pip-audit, an offline high-confidence secret scan, forbidden-license
+checks, and pull-request dependency review. Release builds generate a CycloneDX SBOM,
+SHA-256 checksums, and GitHub/Sigstore build provenance. Actions are pinned by full commit
+digest. Exceptions require an issue, owner, expiry, mitigation, and entry in the review
+register; there are currently no accepted critical/high exceptions.
