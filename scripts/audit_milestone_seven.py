@@ -4,10 +4,9 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import ast
+import asyncio
 import json
-import os
 import re
 import stat
 import subprocess
@@ -15,9 +14,10 @@ import sys
 import tempfile
 import tomllib
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -28,7 +28,6 @@ from fastapi_mergen._version import __version__  # noqa: E402
 from fastapi_mergen.conformance import (  # noqa: E402
     CONTRACT_VERSION,
     Capability,
-    CapabilityManifest,
     CertificationProfile,
     ConformanceReport,
     ConformanceRunner,
@@ -45,7 +44,7 @@ from fastapi_mergen.conformance.reporters import (  # noqa: E402
 )
 from fastapi_mergen.testing import Fault, ReferenceBoundaryDriver  # noqa: E402
 
-EXPECTED_VERSION = "0.6.0a1"
+MINIMUM_RELEASE = (0, 6, 0)
 AUTHOR_NAME = "mergen-institute"
 AUTHOR_EMAIL = "mergen-institute@users.noreply.github.com"
 ALLOWED_BRANCH_PREFIXES = {
@@ -137,8 +136,9 @@ def check_metadata() -> str:
         raise AssertionError("distribution name changed")
     if metadata.get("authors") != [{"name": AUTHOR_NAME}]:
         raise AssertionError("project author must be mergen-institute only")
-    if __version__ != EXPECTED_VERSION:
-        raise AssertionError(f"version is {__version__}, expected {EXPECTED_VERSION}")
+    match = re.match(r"^\d+\.\d+\.\d+", __version__)
+    if match is None or tuple(int(item) for item in match.group().split(".")) < MINIMUM_RELEASE:
+        raise AssertionError(f"version is {__version__}, expected M7 or later")
     package_data = project["tool"]["setuptools"]["package-data"]["fastapi_mergen"]
     if "conformance/spec/*.json" not in package_data:
         raise AssertionError("conformance specifications are not packaged")
@@ -163,9 +163,7 @@ def check_specifications() -> str:
         raise AssertionError("packaged capability set differs from runtime")
     if set(contract["invariants"]) != runtime_invariants:
         raise AssertionError("packaged invariant set differs from runtime")
-    contract_profiles = {
-        name: set(values) for name, values in contract["profiles"].items()
-    }
+    contract_profiles = {name: set(values) for name, values in contract["profiles"].items()}
     if contract_profiles != runtime_profiles:
         raise AssertionError("packaged certification profiles differ from runtime")
 
@@ -212,9 +210,7 @@ async def reference_evidence() -> tuple[dict[str, ConformanceReport], dict[str, 
         report = await ConformanceRunner(
             RunnerConfiguration(profile=CertificationProfile.COMPLETE)
         ).run(ReferenceBoundaryDriver(faults=(fault,)))
-        failing = tuple(
-            item.check_id for item in report.results if item.status.value != "pass"
-        )
+        failing = tuple(item.check_id for item in report.results if item.status.value != "pass")
         if report.certified or not failing:
             raise AssertionError(f"fault was not detected: {fault.value}")
         detected[fault.value] = failing
@@ -273,8 +269,7 @@ def literal_all(path: Path) -> set[str]:
         if not isinstance(node, ast.Assign):
             continue
         if not any(
-            isinstance(target, ast.Name) and target.id == "__all__"
-            for target in node.targets
+            isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
         ):
             continue
         if not isinstance(node.value, (ast.List, ast.Tuple)):
@@ -363,7 +358,7 @@ def execute_gate(gate: Gate, callback: Callable[[], str]) -> None:
     try:
         gate.detail = callback()
         gate.status = "PASS"
-    except Exception as exc:  # noqa: BLE001 - audit captures bounded type and detail
+    except Exception as exc:
         gate.status = "FAIL"
         gate.detail = f"{type(exc).__name__}: {exc}"
 

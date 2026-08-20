@@ -17,15 +17,6 @@ PACKAGE = ROOT / "src" / "fastapi_mergen"
 AUTHOR_NAME = "mergen-institute"
 AUTHOR_EMAIL = "mergen-institute@users.noreply.github.com"
 ALLOWED_BRANCH_PREFIXES = {"build", "chore", "ci", "docs", "feat", "fix", "refactor", "test"}
-FORBIDDEN_PACKAGE_NAMES = {
-    "idempotency",
-    "mcp",
-    "queue",
-    "queues",
-    "tasks",
-    "workflow",
-    "workflows",
-}
 REQUIRED_PATHS = {
     "pyproject.toml",
     "README.md",
@@ -85,9 +76,12 @@ REQUIRED_PATHS = {
     "tests/packaging/test_optional_imports.py",
 }
 REQUIRED_ROOT_EXPORTS = {
+    "AuthenticationRequired",
     "AuthorizationDenied",
     "AuthorizationExpired",
     "AuthorizationMode",
+    "CommandConflict",
+    "CommandInProgress",
     "DedupeConflict",
     "EffectContext",
     "Event",
@@ -97,6 +91,8 @@ REQUIRED_ROOT_EXPORTS = {
     "MergenError",
     "MergenUnitOfWork",
     "MilestoneNotImplementedError",
+    "OptimisticConflict",
+    "OptionalDependencyError",
     "PermanentDeliveryError",
     "Principal",
     "RetryPolicy",
@@ -145,10 +141,16 @@ def check_metadata() -> None:
     if scripts.get("fastapi-mergen") != "fastapi_mergen.cli.main:main":
         fail("console entry point must be fastapi-mergen")
     extras = project.get("optional-dependencies", {})
-    if set(extras) != {"otel", "webhooks"}:
-        fail("only webhooks and otel optional extras are permitted in Milestone 1")
+    if not {"otel", "webhooks"}.issubset(extras):
+        fail("the preserved Milestone 1 optional extras are missing")
     base_dependencies = "\n".join(project.get("dependencies", [])).lower()
-    for optional in ("cryptography", "httpx", "opentelemetry", "standardwebhooks"):
+    for optional in (
+        "cryptography",
+        "fastmcp",
+        "httpx",
+        "opentelemetry",
+        "standardwebhooks",
+    ):
         if optional in base_dependencies:
             fail(f"optional dependency leaked into base dependencies: {optional}")
     package_data = data["tool"]["setuptools"]["package-data"]
@@ -162,16 +164,17 @@ def literal_all(path: Path) -> set[str]:
         if not isinstance(node, ast.Assign):
             continue
         has_all = any(
-            isinstance(target, ast.Name) and target.id == "__all__"
-            for target in node.targets
+            isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
         )
         if not has_all:
             continue
-        if not isinstance(node.value, (ast.List, ast.Tuple)):
+        literal_value = node.value
+        if not isinstance(literal_value, (ast.List, ast.Tuple)):
             fail(f"{path.relative_to(ROOT)} __all__ must be a literal sequence")
+            return set()
         exports = {
             element.value
-            for element in node.value.elts
+            for element in literal_value.elts
             if isinstance(element, ast.Constant) and isinstance(element.value, str)
         }
         return exports
@@ -184,21 +187,11 @@ def check_public_surface() -> None:
         fail("root package exports differ from the frozen public API")
     if (ROOT / "src" / "mergen").exists():
         fail("occupied top-level mergen import package exists")
-    package_directories = {
-        path.name for path in PACKAGE.iterdir() if path.is_dir() and not path.name.startswith("__")
-    }
-    forbidden = sorted(package_directories & FORBIDDEN_PACKAGE_NAMES)
-    if forbidden:
-        fail(f"out-of-scope package directories exist: {forbidden}")
 
 
 def require_phrases(path: str, phrases: tuple[str, ...]) -> None:
     text = re.sub(r"\s+", " ", read(path).lower())
-    missing = [
-        phrase
-        for phrase in phrases
-        if re.sub(r"\s+", " ", phrase.lower()) not in text
-    ]
+    missing = [phrase for phrase in phrases if re.sub(r"\s+", " ", phrase.lower()) not in text]
     if missing:
         fail(f"{path} is missing required contract language: {missing}")
 
@@ -292,7 +285,7 @@ def check_contract_documents() -> None:
         (
             "from fastapi_mergen.postgres import PostgresStore",
             "from fastapi_mergen.sqlalchemy import MergenUnitOfWork",
-            "fail-closed Milestone 1 declaration",
+            "Milestone 1 spike has become the narrow typed surface",
         ),
     )
     require_phrases(
@@ -325,8 +318,8 @@ def check_ci_and_postgres_harness() -> None:
             'python: ["3.11", "3.12", "3.13", "3.14"]',
             'postgres: "16"',
             'postgres: "18"',
-            'uv sync --group dev',
-            'uv sync --group test',
+            "uv sync --group dev",
+            "uv sync --group test",
         ),
     )
     require_phrases(
@@ -379,7 +372,7 @@ def check_git_governance(*, require_clean: bool) -> None:
             fail(f"unsupported branch prefix: {branch}")
         word_count = len([part for part in re.split(r"[-_/]+", slug) if part])
         if not 3 <= word_count <= 7:
-            fail(f"branch name must contain 3–7 short words: {branch}")
+            fail(f"branch name must contain 3-7 short words: {branch}")
 
     records = run_git(
         "log",
@@ -396,7 +389,7 @@ def check_git_governance(*, require_clean: bool) -> None:
             fail(f"unexpected author or committer email found: {subject}")
         words = subject.split()
         if not 3 <= len(words) <= 7:
-            fail(f"commit subject must contain 3–7 words: {subject!r}")
+            fail(f"commit subject must contain 3-7 words: {subject!r}")
 
 
 def main() -> int:

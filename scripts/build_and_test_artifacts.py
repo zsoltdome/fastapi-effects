@@ -21,6 +21,8 @@ OPTIONAL_MODULES = (
     "cryptography",
     "httpx",
     "standardwebhooks",
+    "taskiq",
+    "fastmcp",
     "opentelemetry",
     "opentelemetry.sdk",
 )
@@ -39,6 +41,12 @@ def run(
         environment.pop("PYTHONPATH", None)
         environment["PIP_NO_INPUT"] = "1"
         environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    if command and Path(command[0]).name == "uv":
+        environment = os.environ.copy() if environment is None else environment
+        environment.setdefault(
+            "UV_CACHE_DIR",
+            str(Path(tempfile.gettempdir()) / "mergen-uv-cache"),
+        )
     subprocess.run(command, cwd=cwd, check=True, env=environment)
 
 
@@ -139,6 +147,20 @@ def smoke_install(
             code.append("import fastapi_mergen.webhooks")
         elif extra == "otel":
             code.append("import fastapi_mergen.observability")
+        elif extra == "taskiq":
+            code.extend(
+                (
+                    "import taskiq",
+                    "import fastapi_mergen.executors.taskiq.adapter",
+                )
+            )
+        elif extra == "fastmcp":
+            code.extend(
+                (
+                    "import fastmcp",
+                    "import fastapi_mergen.integrations.fastmcp",
+                )
+            )
         elif not no_deps:
             code.extend(
                 (
@@ -220,6 +242,9 @@ def inspect_sdist(sdist: Path) -> None:
 
 def build_with_available_backend(*, offline: bool) -> None:
     if offline:
+        if shutil.which("uv"):
+            run("uv", "build", "--offline", "--no-sources")
+            return
         run(
             sys.executable,
             "-m",
@@ -291,6 +316,8 @@ def main() -> int:
     if not offline:
         smoke_install(wheel, "webhooks", system_site_packages=False, no_deps=False)
         smoke_install(wheel, "otel", system_site_packages=False, no_deps=False)
+        smoke_install(wheel, "taskiq", system_site_packages=False, no_deps=False)
+        smoke_install(wheel, "fastmcp", system_site_packages=False, no_deps=False)
         smoke_install(sdist, None, system_site_packages=False, no_deps=False)
     print("Clean artifact smoke tests passed")
     return 0

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail when the Milestone 1 repository violates frozen scope or API rules."""
+"""Fail when the repository violates frozen architecture and API rules."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "src" / "fastapi_mergen"
-FORBIDDEN_PACKAGES = {"idempotency", "mcp", "queue", "tasks", "workflow", "workflows"}
+FORBIDDEN_PACKAGES = {"mcp", "queue", "tasks", "workflow", "workflows"}
 REQUIRED_ADRS = {
     "0001-trust-model.md",
     "0002-explicit-uow-transaction.md",

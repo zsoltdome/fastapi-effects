@@ -25,10 +25,12 @@ def require(command: str) -> None:
 
 
 def main() -> int:
-    for command in ("ruff", "mypy", "pytest"):
+    for command in ("uv", "ruff", "mypy", "pytest", "twine"):
         require(command)
-    run("ruff", "format", "--check", ".")
-    run("ruff", "check", ".")
+    run("uv", "lock", "--check")
+    quality_roots = ("src", "tests", "examples", "scripts")
+    run("ruff", "format", "--check", *quality_roots)
+    run("ruff", "check", *quality_roots)
     run("mypy")
     run(sys.executable, "scripts/architecture_gate.py")
     run(sys.executable, "scripts/verify_milestone_one.py")
@@ -37,8 +39,13 @@ def main() -> int:
         "scripts/audit_milestone_seven.py",
         "--skip-git-governance",
     )
+    run(sys.executable, "scripts/audit_milestone_eight.py")
     run("pytest", "-q", "-m", "not integration and not packaging")
     run(sys.executable, "scripts/build_and_test_artifacts.py")
+    distributions = tuple(sorted((ROOT / "dist").glob("*")))
+    if not distributions:
+        raise SystemExit("Artifact build did not create wheel or sdist files.")
+    run("twine", "check", *(str(path) for path in distributions))
     return 0
 
 

@@ -4,7 +4,6 @@ import importlib.metadata
 from pathlib import Path
 
 import pytest
-
 from packaging.specifiers import SpecifierSet
 
 import fastapi_mergen

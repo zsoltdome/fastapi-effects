@@ -17,13 +17,10 @@ def test_base_import_has_no_http_client_side_effect() -> None:
 
 
 def test_missing_webhook_dependency_is_actionable() -> None:
-    if all(
-        importlib.util.find_spec(module) is not None
-        for module in ("cryptography", "httpx", "standardwebhooks")
-    ):
+    if all(importlib.util.find_spec(module) is not None for module in ("cryptography",)):
         pytest.skip("webhook extra is installed")
     with pytest.raises(OptionalDependencyError, match=r"fastapi-mergen\[webhooks\]"):
-        __import__("fastapi_mergen.webhooks")
+        __import__("fastapi_mergen.webhooks.secrets")
 
 
 def test_missing_nested_optional_module_is_actionable(
