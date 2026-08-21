@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "candidate_version": null,
+  "partners": [],
+  "independent_security_review": {
+    "status": "pending",
+    "evidence_digest": null,
+    "unresolved_critical_or_high": null
+  },
+  "rc_observation": {
+    "status": "not_started",
+    "started_at": null,
+    "completed_at": null,
+    "reset_by_contract_change": false,
+    "release_blockers": []
+  },
+  "approval": {
+    "decision": "no-go",
+    "decided_at": null,
+    "approvers": []
+  }
+}

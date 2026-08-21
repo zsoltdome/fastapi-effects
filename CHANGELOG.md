@@ -3,6 +3,56 @@
 All notable changes are documented here. The project follows Semantic Versioning,
 with explicit pre-1.0 contract and evidence-schema notes.
 
+## Unreleased
+
+### Added
+
+- Real async SQLAlchemy outer unit of work with transaction-local tenant and subject
+  context.
+- PostgreSQL event, delivery, attempt, and schema-revision mappings with forced RLS.
+- Atomic immutable fan-out, tenant-scoped dedupe, payload-conflict detection, fenced
+  leases, full-jitter retry, reconciliation, replay, and polling relay.
+- Fresh tenant-bound in-process handler execution with snapshot, revalidation, and
+  service-policy authority.
+- Live `doctor` role/RLS/schema/context diagnostics and Alembic migration round trips.
+- Production PostgreSQL conformance adapter for `core`, `delivery`, and `security`.
+- Target-bound short-lived delegation signing and verification primitives required by
+  the preserved security profile.
+- Immutable webhook subscription versions, forced-RLS secret storage, and AES-GCM
+  envelope encryption with one-time secret creation and bounded rotation overlap.
+- Standard Webhooks-compatible deterministic envelopes and multi-key signatures.
+- Hostile URL/DNS policy, explicit-IP TLS transport, bounded HTTP/1.1 parsing,
+  Retry-After classification, operational replay/retention, and auditable auto-pause.
+- PostgreSQL-backed webhook conformance driver, ambiguous-crash coverage, and a
+  deduplicating receiver example.
+- Durable Taskiq handoff rows, stable per-attempt task IDs, nonterminal broker
+  acknowledgement, duplicate execution fencing, principal/session restoration,
+  execution-token finalization, expiry recovery, and real executor conformance.
+- Transaction-owned command generations, advisory-lock serialization, strict request
+  fingerprints, immutable bounded response replay, forced RLS, restricted pruning,
+  FastAPI helpers, and real command conformance.
+- Short-lived audience/method/path-bound delegation, non-expanding scope/depth,
+  bounded rotation/revocation, token-free audit, downstream FastAPI enforcement,
+  a FastMCP 3.4 bridge, and real delegation conformance.
+- Frozen v1 public-surface inventory, stable exception codes, schema component registry,
+  explicit startup compatibility checks, data-preserving migration matrix, and guarded
+  destructive downgrades.
+- Tenant-bound, security-definer webhook retention with bounded dependency-ordered
+  batches, post-commit telemetry, and schema revision `0005_webhook_retention`.
+
+### Changed
+
+- Version advanced to the delegation/FastMCP alpha `0.11.0a1`.
+- The invoicing example now completes request → atomic publication → relay →
+  tenant-bound handler end to end.
+
+### Documentation
+
+- Recorded commit `6b8d3626445bd577cc6c5af80f3b84e30e2c7712` as the truthful
+  assurance baseline for the new cumulative runtime implementation.
+- Clarified that the Milestone 2–6 runtime source was unavailable and is being newly
+  implemented rather than historically reconstructed.
+
 ## 0.6.0a1 - 2026-08-26
 
 ### Added
@@ -29,6 +79,9 @@ with explicit pre-1.0 contract and evidence-schema notes.
 - Public evidence omits exception messages and recursively redacts sensitive fields.
 - Manifest metadata rejects sensitive field names.
 - Report output refuses symbolic links and defaults to mode `0600`.
+
+`0.6.0a1` is an implementation-independent assurance release, not a production
+transactional-effect runtime.
 
 ## 0.0.1 - 2026-08-24
 

@@ -1,0 +1,52 @@
+name: Release evidence
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+          enable-cache: true
+      - run: uv sync --group security --all-extras
+      - name: Verify candidate gate
+        run: uv run python scripts/audit_release_candidate.py
+      - name: Build and smoke artifacts
+        run: uv run python scripts/build_and_test_artifacts.py
+      - name: Generate SBOM, checksums, schemas, and certification
+        run: |
+          mkdir -p build/release
+          uv run python scripts/generate_sbom.py --output build/release/sbom.cdx.json
+          sha256sum dist/* > build/release/SHA256SUMS
+          cp src/fastapi_mergen/conformance/spec/*.json build/release/
+          uv run fastapi-mergen conformance run --reference --profile complete --format json --output build/release/certification.json
+      - name: Attest distributions and SBOM
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: |
+            dist/*
+            build/release/sbom.cdx.json
+            build/release/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+        with:
+          name: release-evidence-${{ github.ref_name }}
+          path: |
+            dist/*
+            build/release/*
+          if-no-files-found: error
