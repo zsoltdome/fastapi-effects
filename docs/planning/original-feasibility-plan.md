@@ -124,24 +124,25 @@ from mergen import Mergen, Principal, requires, emit
 
 mergen = Mergen(
     resolve=SubdomainResolver() | HeaderResolver("X-Org") | JWTClaimResolver("org_id"),
-    principal_from=my_auth_adapter,      # bring your own auth
-    isolation="rls",                     # or "filter" / "schema"
+    principal_from=my_auth_adapter,  # bring your own auth
+    isolation="rls",  # or "filter" / "schema"
 )
 app.add_middleware(mergen.middleware)
+
 
 @app.post("/invoices", operation_id="create_invoice", tags=["mcp"])
 @requires("invoices:write")
 async def create_invoice(data: InvoiceIn, db: AsyncSession = Depends(mergen.session)):
-    inv = Invoice(**data.model_dump())        # tenant_id applied automatically
+    inv = Invoice(**data.model_dump())  # tenant_id applied automatically
     db.add(inv)
     await emit("invoice.created", inv, sinks=["task", "webhook"])
-    return inv                                # one commit — row, job and webhook, or none
+    return inv  # one commit — row, job and webhook, or none
 ```
 
 ```python
 @mergen.task(retries=5, backoff="exponential")
 async def render_pdf(invoice_id: UUID, storage: Storage = Depends(get_storage)):
-    p = Principal.current()                   # tenant restored, not passed by hand
+    p = Principal.current()  # tenant restored, not passed by hand
     ...
 ```
 

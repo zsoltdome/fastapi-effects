@@ -74,3 +74,10 @@ certified.
 Live PostgreSQL, queue broker, network, or FastMCP tests remain the responsibility of
 the corresponding adapter and deployment CI. An unavailable environment-dependent
 check must be represented as not run or unsupported, never as a pass.
+# Baseline clarification
+
+Commit `6b8d3626445bd577cc6c5af80f3b84e30e2c7712` is the retained Milestone 1 plus
+Milestone 7 assurance baseline. Milestone 2–6 runtime source was unavailable in the
+recoverable repository. Subsequent runtime work is a transparent new implementation;
+this report does not claim that the missing history or production runtime was
+recovered.

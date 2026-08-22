@@ -418,6 +418,7 @@ from fastapi_mergen.sqlalchemy import MergenUnitOfWork
 
 get_uow = mergen.uow_dependency(get_async_session)
 
+
 @app.post("/invoices")
 async def create_invoice(
     data: InvoiceIn,
@@ -456,6 +457,7 @@ Guarantee:
 
 ```python
 from fastapi_mergen import EffectContext
+
 
 @mergen.handler("invoice.render_pdf", version=1)
 async def render_invoice_pdf(

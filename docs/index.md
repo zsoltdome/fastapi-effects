@@ -5,29 +5,34 @@ FastAPI-Mergen defines a transaction boundary and executable assurance contract 
 
 > **One commit. Every effect keeps its tenant and authority provenance.**
 
-Version `0.6.0a1` is the Milestone 7 assurance release. The production runtime remains
-adapter-defined; this repository supplies the specification oracle, protocols,
-scenarios, evidence formats, and certification rules.
+Version `0.11.0a1` is the production-hardening alpha. The repository now includes the
+real PostgreSQL runtime, webhooks, Taskiq handoffs, command idempotency, target-bound
+delegation/FastMCP, and their executable conformance profiles. v1 promotion remains
+blocked on external partner, independent review, and RC observation evidence.
 
 ## Read in this order
 
-1. [Boundary Contract v1](concepts/boundary-contract.md) — normative invariants.
-2. [Conformance and assurance](concepts/conformance.md) — executable model and limits.
-3. [Guarantees](concepts/guarantees.md) — atomicity, retry, replay, and consumer
+1. [PostgreSQL quickstart](tutorials/quickstart.md) — real atomic delivery.
+2. [Boundary Contract v1](concepts/boundary-contract.md) — normative invariants.
+3. [Conformance and assurance](concepts/conformance.md) — executable model and limits.
+4. [Guarantees](concepts/guarantees.md) — atomicity, retry, replay, and consumer
    deduplication terminology.
-4. [Threat model](concepts/threat-model.md) — trust assumptions and residual risk.
-5. [Authorization](concepts/authorization.md) — snapshot, revalidation, and named
+5. [Threat model](concepts/threat-model.md) — trust assumptions and residual risk.
+6. [Authorization](concepts/authorization.md) — snapshot, revalidation, and named
    service authority.
-6. [Certification operations](operations/certification.md) — running and retaining
+7. [Production operations](operations/migrations.md) — migration through incident recovery.
+8. [Certification operations](operations/certification.md) — running and retaining
    evidence.
-7. [Conformance API](reference/conformance-api.md) — public assurance types and
+9. [Public API](reference/public-api.md) — frozen symbols and deprecation policy.
+10. [Conformance API](reference/conformance-api.md) — public assurance types and
    protocols.
-8. [Architecture decisions](adr/README.md) — frozen choices and rejected alternatives.
+11. [Architecture decisions](adr/README.md) — frozen choices and rejected alternatives.
 
 ## Assurance status
 
 - **Normative:** Boundary Contract v1 and certification semantics.
 - **Executable:** reference driver, profiles, scenarios, reporters, CLI, and audit.
-- **Adapter-defined:** production PostgreSQL, executor, webhook, idempotency, or
-  delegation implementation under test.
+- **Implemented:** PostgreSQL, handlers, webhook, Taskiq, command, and delegation paths.
+- **Externally blocked:** production partner validation, independent review, RC
+  observation, and trusted publication.
 - **Not claimed:** formal verification or universal exactly-once effects.

@@ -16,7 +16,8 @@ queue, a hosted control plane, or a replacement MCP implementation.
 ## Implemented capabilities
 
 - versioned Boundary Contract descriptor and strict schemas;
-- fourteen normative invariants and six certification profiles;
+- fourteen normative invariants and eight certification profiles after the additive
+  command and delegation profiles introduced by Milestones 11–12;
 - strict implementation manifests with canonical digests;
 - deterministic async scenario runner with bounded execution and cleanup;
 - reference Boundary Driver and twenty deliberate invariant faults;
