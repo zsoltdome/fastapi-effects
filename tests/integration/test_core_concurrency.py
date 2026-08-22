@@ -19,7 +19,8 @@ from fastapi_mergen import (
 )
 from fastapi_mergen.core.context import current_principal
 from fastapi_mergen.core.routing import RouteSpecification
-from fastapi_mergen.postgres.leasing import LeaseRepository
+from fastapi_mergen.postgres.leasing import ClaimedDelivery, LeaseRepository
+from fastapi_mergen.postgres.relay import PollingRelay, RelayConfig
 from fastapi_mergen.postgres.roles import RuntimeRoles
 from fastapi_mergen.postgres.schema import install_core_schema
 from fastapi_mergen.postgres.store import PostgresStore
@@ -233,6 +234,55 @@ async def test_claim_fairness_and_expired_lease_fencing(
         assert abandoned == 2
     finally:
         await relay.dispose()
+        await application.dispose()
+        await migration.dispose()
+
+
+@pytest.mark.asyncio
+async def test_relay_never_leases_more_than_immediate_execution_capacity(
+    test_database: ProvisionedDatabase,
+) -> None:
+    migration = create_async_engine(test_database.migration_sqlalchemy_dsn)
+    application = create_async_engine(test_database.app_sqlalchemy_dsn)
+    relay_engine = create_async_engine(test_database.relay_sqlalchemy_dsn)
+    roles = RuntimeRoles(
+        migration=test_database.migration_role,
+        application=test_database.app_role,
+        relay=test_database.relay_role,
+    )
+
+    class SuccessfulSink:
+        async def execute(self, claim: ClaimedDelivery) -> None:
+            del claim
+
+    try:
+        await install_core_schema(migration, roles=roles)
+        app_sessions = async_sessionmaker(application, expire_on_commit=False)
+        relay_sessions = async_sessionmaker(relay_engine, expire_on_commit=False)
+        principal = Principal(tenant_id=uuid4(), subject_id="user:relay-bound")
+        for index in range(6):
+            await _emit(app_sessions, principal, dedupe_key=f"relay-{index}")
+
+        relay = PollingRelay(
+            sessions=relay_sessions,
+            sink=SuccessfulSink(),
+            config=RelayConfig(batch_size=6, per_tenant=6, concurrency=2),
+        )
+        assert await relay.run_once() == 2
+
+        async with relay_sessions() as session:
+            states = dict(
+                (
+                    await session.execute(
+                        select(DeliveryRow.state, func.count())
+                        .group_by(DeliveryRow.state)
+                        .order_by(DeliveryRow.state)
+                    )
+                ).all()
+            )
+        assert states == {"pending": 4, "succeeded": 2}
+    finally:
+        await relay_engine.dispose()
         await application.dispose()
         await migration.dispose()
 

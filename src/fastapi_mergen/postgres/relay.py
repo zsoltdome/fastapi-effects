@@ -88,23 +88,22 @@ class PollingRelay:
             claims = await self.leases.claim(
                 session,
                 now=self.clock.now(),
-                batch_size=self.config.batch_size,
+                # A lease starts when claim() commits, not when a semaphore later
+                # admits the sink.  Never lease more work than this relay can begin
+                # immediately or queued claims can expire before their first I/O.
+                batch_size=min(self.config.batch_size, self.config.concurrency),
                 per_tenant=self.config.per_tenant,
             )
-        semaphore = asyncio.Semaphore(self.config.concurrency)
         async with asyncio.TaskGroup() as group:
             for claim in claims:
-                group.create_task(self._execute_one(claim, semaphore))
+                group.create_task(self.execute_claim(claim))
         return len(claims)
 
-    async def _execute_one(
-        self,
-        claim: ClaimedDelivery,
-        semaphore: asyncio.Semaphore,
-    ) -> None:
+    async def execute_claim(self, claim: ClaimedDelivery) -> None:
+        """Execute and finalize one already-committed lease through relay policy."""
+
         try:
-            async with semaphore:
-                disposition = await self.sink.execute(claim)
+            disposition = await self.sink.execute(claim)
         except asyncio.CancelledError:
             raise
         except PermanentDeliveryError as exc:
