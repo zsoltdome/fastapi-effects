@@ -6,6 +6,7 @@ import hashlib
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any
+from urllib.parse import urljoin
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -110,34 +111,55 @@ class WebhookDeliverySink:
             body=body,
             secrets=(item.material for item in signing_secrets),
         )
-        endpoint, addresses = await resolve_endpoint(
-            endpoint_url,
-            resolver=self.resolver,
-            production=self.production,
-            allowed_ports=self.allowed_ports,
-        )
-        last_error: RetryableDeliveryError | None = None
-        transport_result = None
-        for address in addresses:
-            try:
-                transport_result = await self.transport.send(
-                    endpoint=endpoint,
-                    connected_ip=address,
-                    body=body,
-                    headers=signed.values,
-                )
-                break
-            except RetryableDeliveryError as exc:
-                last_error = exc
-        if transport_result is None:
-            if last_error is not None:
-                raise last_error
-            raise RetryableDeliveryError(
-                code="webhook.transport_failed",
-                summary="Webhook endpoint had no connectable approved address.",
+        current_url = endpoint_url
+        redirect_count = 0
+        while True:
+            endpoint, addresses = await resolve_endpoint(
+                current_url,
+                resolver=self.resolver,
+                production=self.production,
+                allowed_ports=self.allowed_ports,
             )
+            last_error: RetryableDeliveryError | None = None
+            transport_result = None
+            for address in addresses:
+                try:
+                    transport_result = await self.transport.send(
+                        endpoint=endpoint,
+                        connected_ip=address,
+                        body=body,
+                        headers=signed.values,
+                    )
+                    break
+                except RetryableDeliveryError as exc:
+                    last_error = exc
+            if transport_result is None:
+                if last_error is not None:
+                    raise last_error
+                raise RetryableDeliveryError(
+                    code="webhook.transport_failed",
+                    summary="Webhook endpoint had no connectable approved address.",
+                )
+            response = transport_result.response
+            if not 300 <= response.status_code < 400:
+                break
+            maximum_redirects = self.transport.limits.maximum_redirects
+            if maximum_redirects == 0:
+                break
+            if redirect_count >= maximum_redirects:
+                raise PermanentDeliveryError(
+                    code="webhook.redirect_limit",
+                    summary="Webhook response exceeded its configured redirect limit.",
+                )
+            location = response.headers.get("location")
+            if location is None or not location.strip():
+                raise PermanentDeliveryError(
+                    code="webhook.redirect_location",
+                    summary="Webhook redirect did not provide a usable Location header.",
+                )
+            current_url = urljoin(endpoint.url, location.strip())
+            redirect_count += 1
         policy = RetryPolicy.from_dict(dict(claim.route_snapshot["retry"]))
-        response = transport_result.response
         classification = classify_response(
             response.status_code,
             response.headers,

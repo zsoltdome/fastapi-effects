@@ -31,6 +31,17 @@ class AddressResolver(Protocol):
     async def resolve(self, hostname: str, port: int) -> tuple[str, ...]: ...
 
 
+class ConnectionOpener(Protocol):
+    async def __call__(
+        self,
+        *,
+        host: str,
+        port: int,
+        ssl: ssl.SSLContext | None,
+        server_hostname: str | None,
+    ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]: ...
+
+
 class SystemAddressResolver:
     async def resolve(self, hostname: str, port: int) -> tuple[str, ...]:
         loop = asyncio.get_running_loop()
@@ -56,6 +67,7 @@ class TransportLimits:
     write_timeout_seconds: float = 10.0
     total_timeout_seconds: float = 30.0
     maximum_request_bytes: int = 512 * 1024
+    maximum_redirects: int = 0
     response: ResponseLimits = field(default_factory=ResponseLimits)
 
     def __post_init__(self) -> None:
@@ -65,6 +77,12 @@ class TransportLimits:
             raise ValueError("Webhook write timeout is invalid.")
         if not isinstance(self.maximum_request_bytes, int) or self.maximum_request_bytes < 1:
             raise ValueError("Webhook maximum request size must be positive.")
+        if (
+            not isinstance(self.maximum_redirects, int)
+            or isinstance(self.maximum_redirects, bool)
+            or not 0 <= self.maximum_redirects <= 5
+        ):
+            raise ValueError("Webhook redirect limit must be in [0, 5].")
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,10 +100,17 @@ class ExplicitIPTransport:
         limits: TransportLimits | None = None,
         ssl_context: ssl.SSLContext | None = None,
         production: bool = True,
+        connection_opener: ConnectionOpener | None = None,
     ) -> None:
         self._limits = limits or TransportLimits()
         self._production = production
         self._ssl_context = ssl_context or _secure_ssl_context()
+        self._connection_opener = connection_opener or asyncio.open_connection
+
+    @property
+    def limits(self) -> TransportLimits:
+        """Return the immutable transport policy used for this client."""
+        return self._limits
 
     async def send(
         self,
@@ -109,7 +134,7 @@ class ExplicitIPTransport:
             async with asyncio.timeout(self._limits.total_timeout_seconds):
                 use_tls = endpoint.scheme == "https"
                 reader, connected_writer = await asyncio.wait_for(
-                    asyncio.open_connection(
+                    self._connection_opener(
                         host=approved,
                         port=endpoint.port,
                         ssl=self._ssl_context if use_tls else None,
@@ -193,6 +218,7 @@ def _secure_ssl_context() -> ssl.SSLContext:
 
 __all__ = [
     "AddressResolver",
+    "ConnectionOpener",
     "ExplicitIPTransport",
     "SystemAddressResolver",
     "TransportLimits",

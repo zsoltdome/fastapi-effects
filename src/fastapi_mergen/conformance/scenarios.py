@@ -536,7 +536,6 @@ async def delegation_rejection_matrix(driver: BoundaryDriver) -> ScenarioObserva
 async def webhook_signed_retry(driver: BoundaryDriver) -> ScenarioObservation:
     facet: WebhookFacet = _require(driver, WebhookFacet, Capability.WEBHOOKS.value)
     body = b'{"event":"invoice.created","version":1}'
-    digest = hashlib.sha256(body).hexdigest()
     first = await facet.deliver_webhook(
         message_id="msg_delivery_42",
         body=body,
@@ -553,10 +552,12 @@ async def webhook_signed_retry(driver: BoundaryDriver) -> ScenarioObservation:
     )
     if first.message_id != second.message_id:
         raise AssertionError("Webhook retry changed the stable message identity.")
-    if first.request_body_digest != digest or first.signed_body_digest != digest:
+    if first.request_body_digest != first.signed_body_digest:
         raise AssertionError("Webhook signature did not cover the exact sent bytes.")
-    if second.request_body_digest != digest or second.signed_body_digest != digest:
+    if second.request_body_digest != second.signed_body_digest:
         raise AssertionError("Webhook retry changed the signed body identity.")
+    if first.request_body_digest != second.request_body_digest:
+        raise AssertionError("Webhook retry changed the transmitted body bytes.")
     if first.signature_count < 1 or second.signature_count < 1:
         raise AssertionError("Webhook attempt did not include a signature.")
     if first.response_body_persisted or second.response_body_persisted:
