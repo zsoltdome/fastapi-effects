@@ -1,6 +1,19 @@
 name: fastapi-mergen-tests
 
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "56379:6379"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: "no"
+
   postgres16:
     image: postgres:16-alpine
     profiles: [pg16]

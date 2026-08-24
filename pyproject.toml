@@ -55,6 +55,7 @@ otel = [
 ]
 taskiq = [
   "taskiq>=0.12.5,<0.13",
+  "taskiq-redis>=1.2,<2",
 ]
 fastmcp = [
   "fastmcp>=3.4.7,<4",
@@ -70,6 +71,7 @@ test = [
   "pytest-asyncio>=1.3,<2",
   "standardwebhooks>=1.1,<2",
   "taskiq>=0.12.5,<0.13",
+  "taskiq-redis>=1.2,<2",
 ]
 dev = [
   { include-group = "test" },
@@ -146,6 +148,7 @@ ignore = ["B008"]
 "examples/**" = ["A002"]
 "scripts/benchmark.py" = ["E402"]
 "scripts/rehearse_postgres_restart.py" = ["E402"]
+"scripts/generate_real_certification.py" = ["E402"]
 "tests/**" = ["S101"]
 
 [tool.mypy]

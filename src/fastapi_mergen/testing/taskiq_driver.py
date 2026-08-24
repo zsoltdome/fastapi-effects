@@ -1,15 +1,18 @@
-"""Real PostgreSQL plus Taskiq broker adapter for the executor profile."""
+"""Real PostgreSQL, Redis Streams, and process-isolated Taskiq conformance adapter."""
 
 from __future__ import annotations
 
 import asyncio
+import os
+import sys
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from sqlalchemy import insert, select
+from sqlalchemy import insert, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
-from taskiq import InMemoryBroker
+from taskiq_redis import RedisStreamBroker
 
+from fastapi_mergen import __version__
 from fastapi_mergen.conformance.contract import Capability, Invariant
 from fastapi_mergen.conformance.manifest import CapabilityManifest
 from fastapi_mergen.conformance.protocols import ExecutorHandoffView
@@ -24,41 +27,27 @@ from fastapi_mergen.core.policy import AuthorizationMode
 from fastapi_mergen.core.principal import Principal, PrincipalEnvelope
 from fastapi_mergen.core.retry import RetryPolicy
 from fastapi_mergen.core.routing import RouteSpecification
-from fastapi_mergen.executors.taskiq.adapter import (
-    TaskiqDeliverySink,
-    register_taskiq_bridge,
-)
+from fastapi_mergen.executors.taskiq.adapter import TaskiqDeliverySink, register_taskiq_bridge
 from fastapi_mergen.executors.taskiq.envelope import TaskiqHandoffEnvelope
 from fastapi_mergen.executors.taskiq.models import TaskiqHandoffRow
 from fastapi_mergen.executors.taskiq.store import TaskiqHandoffStore
-from fastapi_mergen.executors.taskiq.worker import TaskiqWorkerBridge
 from fastapi_mergen.postgres.leasing import ClaimedDelivery
 from fastapi_mergen.postgres.roles import RuntimeRoles
 from fastapi_mergen.sqlalchemy.canonical import canonical_sha256, versioned_canonical_bytes
-from fastapi_mergen.sqlalchemy.models import AttemptRow, DeliveryRow, EventRow
+from fastapi_mergen.sqlalchemy.models import SCHEMA, AttemptRow, DeliveryRow, EventRow
+from fastapi_mergen.testing.evidence import postgres_evidence_metadata
 from fastapi_mergen.testing.postgres_driver import PostgresBoundaryDriver
 
 
-class _RecordingExecutor:
-    def __init__(self) -> None:
-        self.execution_count = 0
-
-    async def execute(self, claim: ClaimedDelivery) -> None:
-        Principal.from_envelope(claim.event.principal)
-        self.execution_count += 1
-
-
-class _GatedWorker:
-    def __init__(self, worker: TaskiqWorkerBridge) -> None:
-        self.worker = worker
-        self.gate = asyncio.Event()
-
+class _ParentProcessGuard:
     async def execute(self, envelope: dict[str, object]) -> object:
-        await self.gate.wait()
-        return await self.worker.execute(envelope)
+        del envelope
+        raise AssertionError("Taskiq conformance work executed in the producer process.")
 
 
 class PostgresTaskiqBoundaryDriver(PostgresBoundaryDriver):
+    """Certify a durable handoff across a Redis broker and Taskiq worker process."""
+
     def __init__(
         self,
         *,
@@ -66,6 +55,7 @@ class PostgresTaskiqBoundaryDriver(PostgresBoundaryDriver):
         app_engine: AsyncEngine,
         relay_engine: AsyncEngine,
         roles: RuntimeRoles,
+        redis_url: str | None = None,
     ) -> None:
         super().__init__(
             migration_engine=migration_engine,
@@ -73,24 +63,32 @@ class PostgresTaskiqBoundaryDriver(PostgresBoundaryDriver):
             relay_engine=relay_engine,
             roles=roles,
         )
+        configured_url = redis_url or os.getenv("MERGEN_TEST_REDIS_URL")
+        if not configured_url:
+            raise RuntimeError(
+                "Taskiq conformance requires MERGEN_TEST_REDIS_URL for a Redis Streams broker."
+            )
+        self._redis_url = configured_url
+        self._relay_dsn = relay_engine.url.render_as_string(hide_password=False)
+        self._queue_name = f"fastapi-mergen-conformance-{uuid4().hex}"
         self._relay_sessions = async_sessionmaker(relay_engine, expire_on_commit=False)
-        self._broker = InMemoryBroker()
-        self._store = TaskiqHandoffStore()
-        self._executor = _RecordingExecutor()
-        worker = TaskiqWorkerBridge(
-            sessions=self._relay_sessions,
-            executor=self._executor,
-            store=self._store,
-            execution_timeout=timedelta(seconds=30),
+        self._broker = RedisStreamBroker(
+            url=self._redis_url,
+            queue_name=self._queue_name,
+            consumer_group_name=f"{self._queue_name}-workers",
+            xread_block=100,
+            idle_timeout=30_000,
         )
-        self._gated = _GatedWorker(worker)
-        self._bridge_task = register_taskiq_bridge(self._broker, self._gated)
+        self._store = TaskiqHandoffStore()
+        self._bridge_task = register_taskiq_bridge(self._broker, _ParentProcessGuard())
         self._sink = TaskiqDeliverySink(
             sessions=self._relay_sessions,
             task=self._bridge_task,
             store=self._store,
         )
         self._envelopes: dict[UUID, TaskiqHandoffEnvelope] = {}
+        self._worker_process: asyncio.subprocess.Process | None = None
+        self._worker_process_started = 0
 
     @classmethod
     async def create(
@@ -100,41 +98,57 @@ class PostgresTaskiqBoundaryDriver(PostgresBoundaryDriver):
         app_engine: AsyncEngine,
         relay_engine: AsyncEngine,
         roles: RuntimeRoles,
+        redis_url: str | None = None,
     ) -> PostgresTaskiqBoundaryDriver:
         driver = cls(
             migration_engine=migration_engine,
             app_engine=app_engine,
             relay_engine=relay_engine,
             roles=roles,
+            redis_url=redis_url,
         )
         await driver._prepare_business_table()
+        driver._manifest_metadata = await postgres_evidence_metadata(migration_engine)
         await driver._broker.startup()
         return driver
 
     @property
     def manifest(self) -> CapabilityManifest:
         core = super().manifest
+        metadata = dict(core.metadata)
+        metadata.update(
+            {
+                "executor.broker": "taskiq-redis-streams",
+                "executor.serialization": "taskiq-broker-message",
+                "executor.worker_boundary": "subprocess",
+            }
+        )
         return CapabilityManifest(
-            adapter_name="fastapi-mergen-postgresql-taskiq",
-            adapter_version="0.9.0a1",
+            adapter_name="fastapi-mergen-postgresql-taskiq-redis",
+            adapter_version=__version__,
             implementation="fastapi_mergen.testing.taskiq_driver.PostgresTaskiqBoundaryDriver",
             capabilities=core.capabilities | {Capability.EXTERNAL_EXECUTOR},
             invariants=core.invariants | {Invariant.EXECUTOR_HANDOFF},
-            metadata={"broker": "taskiq-inmemory", "driver": "asyncpg", "store": "postgresql"},
+            metadata=metadata,
         )
 
     async def reset(self) -> None:
-        await self._broker.wait_all()
+        await self._stop_worker()
         await super().reset()
-        self._gated.gate = asyncio.Event()
+        async with self._migration_engine.begin() as connection:
+            await connection.execute(text(f"DELETE FROM {SCHEMA}.taskiq_handoffs"))
         self._envelopes.clear()
-        self._executor.execution_count = 0
+        self._worker_process_started = 0
 
     async def close(self) -> None:
-        self._gated.gate.set()
-        await self._broker.wait_all()
+        await self._stop_worker()
         await self._broker.shutdown()
         await super().close()
+
+    async def public_evidence(self) -> dict[str, int]:
+        evidence = await super().public_evidence()
+        evidence["taskiq_worker_processes"] = self._worker_process_started
+        return evidence
 
     async def enqueue_handoff(
         self,
@@ -166,18 +180,67 @@ class PostgresTaskiqBoundaryDriver(PostgresBoundaryDriver):
     ) -> ExecutorHandoffView:
         del worker_id
         envelope = self._envelopes[handoff_id]
-        if not self._gated.gate.is_set():
-            self._gated.gate.set()
+        if self._worker_process is None:
+            await self._start_worker()
         else:
             await self._bridge_task.kicker().with_task_id(envelope.task_id).kiq(envelope.to_dict())
-        await self._broker.wait_all()
-        async with self._relay_sessions() as session:
-            row = await session.scalar(
-                select(TaskiqHandoffRow).where(TaskiqHandoffRow.handoff_id == handoff_id)
-            )
-        if row is None:
-            raise AssertionError("Taskiq handoff disappeared during execution.")
+            await asyncio.sleep(0.2)
+        row = await self._wait_for_terminal_handoff(handoff_id)
         return _view(row)
+
+    async def _start_worker(self) -> None:
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "MERGEN_TASKIQ_REDIS_URL": self._redis_url,
+                "MERGEN_TASKIQ_RELAY_DSN": self._relay_dsn,
+                "MERGEN_TASKIQ_QUEUE_NAME": self._queue_name,
+                "MERGEN_TASKIQ_PARENT_PID": str(os.getpid()),
+            }
+        )
+        self._worker_process = await asyncio.create_subprocess_exec(
+            sys.executable,
+            "-m",
+            "taskiq",
+            "worker",
+            "--workers",
+            "1",
+            "--max-async-tasks",
+            "1",
+            "fastapi_mergen.testing.taskiq_worker_fixture:broker",
+            env=environment,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        self._worker_process_started += 1
+
+    async def _stop_worker(self) -> None:
+        process = self._worker_process
+        self._worker_process = None
+        if process is None or process.returncode is not None:
+            return
+        process.terminate()
+        try:
+            await asyncio.wait_for(process.wait(), timeout=5)
+        except TimeoutError:
+            process.kill()
+            await process.wait()
+
+    async def _wait_for_terminal_handoff(self, handoff_id: UUID) -> TaskiqHandoffRow:
+        for _ in range(100):
+            process = self._worker_process
+            if process is not None and process.returncode is not None:
+                raise AssertionError(
+                    f"Taskiq worker exited before completing the handoff ({process.returncode})."
+                )
+            async with self._relay_sessions() as session:
+                row = await session.scalar(
+                    select(TaskiqHandoffRow).where(TaskiqHandoffRow.handoff_id == handoff_id)
+                )
+            if row is not None and row.state in {"succeeded", "dead"}:
+                return row
+            await asyncio.sleep(0.05)
+        raise AssertionError("Taskiq worker did not complete the handoff within five seconds.")
 
     async def _seed_claim(
         self,
