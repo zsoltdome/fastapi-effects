@@ -5,11 +5,14 @@ from __future__ import annotations
 import secrets
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime, timedelta
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from fastapi_mergen import __version__
+from fastapi_mergen.api import EffectContext
 from fastapi_mergen.conformance.contract import Capability, Invariant
 from fastapi_mergen.conformance.manifest import CapabilityManifest
 from fastapi_mergen.conformance.protocols import (
@@ -22,13 +25,16 @@ from fastapi_mergen.conformance.protocols import (
     LeaseView,
     PublishedEvent,
 )
+from fastapi_mergen.conformance.safety import JsonValue
 from fastapi_mergen.core.context import current_principal, principal_context
 from fastapi_mergen.core.delivery import DeliveryRecord
 from fastapi_mergen.core.event import Event
 from fastapi_mergen.core.policy import AuthorizationMode
 from fastapi_mergen.core.principal import Principal
+from fastapi_mergen.core.protocols import HandlerSessionProvider
 from fastapi_mergen.core.retry import RetryPolicy
-from fastapi_mergen.core.routing import RouteSpecification
+from fastapi_mergen.core.routing import RouteRegistry, RouteSpecification
+from fastapi_mergen.core.runtime import SystemClock
 from fastapi_mergen.delegation.keys import InMemoryKeyRing, SigningKey
 from fastapi_mergen.delegation.signing import DelegationIssuer, DelegationVerifier
 from fastapi_mergen.errors import (
@@ -37,12 +43,16 @@ from fastapi_mergen.errors import (
     PermanentDeliveryError,
     RetryableDeliveryError,
 )
+from fastapi_mergen.handlers.dependencies import tenant_session_provider
+from fastapi_mergen.handlers.executor import HandlerExecutor
 from fastapi_mergen.postgres.leasing import ClaimedDelivery, LeaseRepository
+from fastapi_mergen.postgres.relay import PollingRelay
 from fastapi_mergen.postgres.roles import RuntimeRoles
 from fastapi_mergen.postgres.store import PostgresStore
 from fastapi_mergen.sqlalchemy.models import SCHEMA, AttemptRow, DeliveryRow, EventRow
 from fastapi_mergen.sqlalchemy.repository import delivery_from_row
 from fastapi_mergen.sqlalchemy.uow import MergenUnitOfWork
+from fastapi_mergen.testing.evidence import postgres_evidence_metadata
 
 _BUSINESS_TABLE = f"{SCHEMA}.conformance_business"
 
@@ -89,6 +99,15 @@ class PostgresBoundaryDriver:
         )
         self._claims: dict[UUID, ClaimedDelivery] = {}
         self._evidence: dict[str, int] = {"published": 0, "finalized": 0}
+        self._manifest_metadata: dict[str, JsonValue] = {
+            "package.version": __version__,
+            "implementation.commit": "unavailable",
+            "database.product": "PostgreSQL",
+            "database.version": "unavailable",
+            "database.driver": "asyncpg",
+            "database.driver_version": "unavailable",
+            "schema.revisions": {},
+        }
 
     @classmethod
     async def create(
@@ -106,13 +125,14 @@ class PostgresBoundaryDriver:
             roles=roles,
         )
         await driver._prepare_business_table()
+        driver._manifest_metadata = await postgres_evidence_metadata(migration_engine)
         return driver
 
     @property
     def manifest(self) -> CapabilityManifest:
         return CapabilityManifest(
             adapter_name="fastapi-mergen-postgresql-core",
-            adapter_version="0.7.0a1",
+            adapter_version=__version__,
             implementation="fastapi_mergen.testing.postgres_driver.PostgresBoundaryDriver",
             capabilities=frozenset(
                 {
@@ -139,7 +159,7 @@ class PostgresBoundaryDriver:
                     Invariant.DELEGATION_BINDING,
                 }
             ),
-            metadata={"driver": "asyncpg", "store": "postgresql"},
+            metadata=dict(self._manifest_metadata),
         )
 
     async def reset(self) -> None:
@@ -229,26 +249,40 @@ class PostgresBoundaryDriver:
         principal: Principal,
         tenant_id: UUID,
     ) -> BoundarySnapshot:
-        if principal.tenant_id != tenant_id:
-            raise ConformanceAccessDenied
         async with self._app_sessions() as session, session.begin():
             await _bind_tenant(session, principal)
             business_keys = tuple(
                 (
                     await session.scalars(
-                        text(f"SELECT business_key FROM {_BUSINESS_TABLE} ORDER BY business_key")
+                        text(
+                            f"SELECT business_key FROM {_BUSINESS_TABLE} "
+                            "WHERE tenant_id = :tenant ORDER BY business_key"
+                        ),
+                        {"tenant": tenant_id},
                     )
                 ).all()
             )
             event_ids = tuple(
                 (
-                    await session.scalars(select(EventRow.event_id).order_by(EventRow.created_at))
+                    await session.scalars(
+                        select(EventRow.event_id)
+                        .where(EventRow.tenant_id == tenant_id)
+                        .order_by(EventRow.created_at)
+                    )
                 ).all()
             )
             deliveries = (
-                await session.scalars(select(DeliveryRow).order_by(DeliveryRow.route_key))
+                await session.scalars(
+                    select(DeliveryRow)
+                    .where(DeliveryRow.tenant_id == tenant_id)
+                    .order_by(DeliveryRow.route_key)
+                )
             ).all()
             views = tuple([await _delivery_view(session, row) for row in deliveries])
+        if principal.tenant_id != tenant_id:
+            if business_keys or event_ids or views:
+                raise AssertionError("PostgreSQL RLS exposed cross-tenant boundary state.")
+            raise ConformanceAccessDenied
         return BoundarySnapshot(
             business_keys=business_keys,
             event_ids=event_ids,
@@ -282,31 +316,12 @@ class PostgresBoundaryDriver:
         if claim is None or claim.lease_token != lease.lease_token:
             raise ConformanceLeaseLost
         try:
-            async with self._relay_sessions() as session:
-                if outcome == "succeeded":
-                    await self._leases.succeed(session, claim, now=datetime.now(UTC))
-                elif outcome == "retryable_failure":
-                    await self._leases.fail(
-                        session,
-                        claim,
-                        RetryableDeliveryError(
-                            code="conformance.retryable",
-                            summary="Injected retryable conformance outcome.",
-                        ),
-                        now=datetime.now(UTC),
-                    )
-                elif outcome == "terminal_failure":
-                    await self._leases.fail(
-                        session,
-                        claim,
-                        PermanentDeliveryError(
-                            code="conformance.terminal",
-                            summary="Injected terminal conformance outcome.",
-                        ),
-                        now=datetime.now(UTC),
-                    )
-                else:
-                    raise ValueError("Unsupported conformance outcome.")
+            relay = PollingRelay(
+                sessions=self._relay_sessions,
+                leases=self._leases,
+                sink=_ConformanceRelaySink(self, outcome),
+            )
+            await relay.execute_claim(claim)
         except LeaseLost as exc:
             raise ConformanceLeaseLost from exc
         self._claims.pop(lease.delivery_id, None)
@@ -437,6 +452,58 @@ class PostgresBoundaryDriver:
             raise LookupError("Delivery not found.")
         return delivery_from_row(row)
 
+    async def _execute_handler(self, claim: ClaimedDelivery) -> None:
+        if claim.delivery.destination_kind != "handler":
+            return
+
+        async def handler(context: EffectContext[object]) -> None:
+            async with context.application_session() as session:
+                tenant = await session.scalar(
+                    text("SELECT nullif(current_setting('mergen.tenant_id', true), '')")
+                )
+                subject = await session.scalar(
+                    text("SELECT nullif(current_setting('mergen.subject_id', true), '')")
+                )
+            if str(tenant) != str(context.principal.tenant_id):
+                raise AssertionError("Handler application session lost tenant continuity.")
+            if str(subject) != context.principal.subject_id:
+                raise AssertionError("Handler application session lost subject continuity.")
+            self._evidence["handled"] = self._evidence.get("handled", 0) + 1
+
+        snapshot = claim.route_snapshot
+        authority = snapshot["authority"]
+        destination = snapshot["destination"]
+        retry = snapshot["retry"]
+        if not isinstance(authority, dict) or not isinstance(destination, dict):
+            raise AssertionError("Conformance handler snapshot is malformed.")
+        if not isinstance(retry, dict):
+            raise AssertionError("Conformance handler retry policy is malformed.")
+        specification = RouteSpecification(
+            event_type=claim.event.event_type,
+            route_key=claim.delivery.route_key,
+            version=claim.delivery.route_version,
+            destination_kind="handler",
+            destination_key=str(destination["key"]),
+            required_scopes=tuple(authority["required_scopes"]),
+            authorization=AuthorizationMode.parse(authority["mode"]),
+            service_policy=None,
+            service_capabilities=None,
+            maximum_snapshot_age_seconds=int(authority["maximum_snapshot_age_seconds"]),
+            retry_policy=RetryPolicy.from_dict(retry),
+        )
+        registry = RouteRegistry()
+        registry.register_route(specification, handler)
+        registry.freeze()
+        executor = HandlerExecutor(
+            registry=registry,
+            clock=SystemClock(),
+            application_sessions=cast(
+                HandlerSessionProvider,
+                tenant_session_provider(self._app_sessions),
+            ),
+        )
+        await executor.execute(claim)
+
     async def _prepare_business_table(self) -> None:
         roles = self._roles
         async with self._migration_engine.begin() as connection:
@@ -480,6 +547,28 @@ class PostgresBoundaryDriver:
 
 class _RollbackRequested(Exception):
     pass
+
+
+class _ConformanceRelaySink:
+    def __init__(self, driver: PostgresBoundaryDriver, outcome: str) -> None:
+        self._driver = driver
+        self._outcome = outcome
+
+    async def execute(self, claim: ClaimedDelivery) -> None:
+        if self._outcome == "succeeded":
+            await self._driver._execute_handler(claim)
+            return
+        if self._outcome == "retryable_failure":
+            raise RetryableDeliveryError(
+                code="conformance.retryable",
+                summary="Injected retryable conformance outcome.",
+            )
+        if self._outcome == "terminal_failure":
+            raise PermanentDeliveryError(
+                code="conformance.terminal",
+                summary="Injected terminal conformance outcome.",
+            )
+        raise ValueError("Unsupported conformance outcome.")
 
 
 def _route(event_type: str, destination: str, index: int) -> RouteSpecification:

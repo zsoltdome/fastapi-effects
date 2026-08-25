@@ -59,3 +59,72 @@ jobs:
           path: build/conformance
           if-no-files-found: error
           retention-days: 14
+
+  real-runtime-suite:
+    name: Real complete / PostgreSQL ${{ matrix.postgres }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - postgres: "16"
+            python: "3.11"
+          - postgres: "18"
+            python: "3.14"
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 56379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      MERGEN_TEST_ADMIN_DSN: postgresql://postgres:postgres@127.0.0.1:55432/postgres
+      MERGEN_TEST_REDIS_URL: redis://127.0.0.1:56379/0
+      MERGEN_IMPLEMENTATION_COMMIT: ${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+          enable-cache: true
+      - name: Install real-runtime environment
+        run: uv sync --group test --all-extras
+      - name: Generate cumulative real-runtime evidence
+        run: >-
+          uv run python scripts/generate_real_certification.py
+          --manifest build/conformance-real/manifest.json
+          --report build/conformance-real/report.json
+      - name: Verify cumulative evidence
+        run: >-
+          uv run fastapi-mergen conformance verify
+          --manifest build/conformance-real/manifest.json
+          --report build/conformance-real/report.json
+      - name: Upload cumulative evidence
+        uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+        with:
+          name: boundary-real-pg${{ matrix.postgres }}-${{ github.sha }}
+          path: build/conformance-real
+          if-no-files-found: error
+          retention-days: 14

@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from fastapi_mergen import __version__
 from fastapi_mergen.conformance.contract import Capability, Invariant
 from fastapi_mergen.conformance.manifest import CapabilityManifest
 from fastapi_mergen.conformance.protocols import CommandResult, ConformanceConflict
@@ -18,6 +19,7 @@ from fastapi_mergen.idempotency.models import CommandIdentity
 from fastapi_mergen.idempotency.responses import CapturedResponse
 from fastapi_mergen.postgres.roles import RuntimeRoles
 from fastapi_mergen.sqlalchemy.models import SCHEMA
+from fastapi_mergen.testing.evidence import postgres_evidence_metadata
 from fastapi_mergen.testing.postgres_driver import PostgresBoundaryDriver
 
 
@@ -57,6 +59,7 @@ class PostgresIdempotencyBoundaryDriver(PostgresBoundaryDriver):
             roles=roles,
         )
         await driver._prepare_business_table()
+        driver._manifest_metadata = await postgres_evidence_metadata(migration_engine)
         return driver
 
     @property
@@ -64,13 +67,13 @@ class PostgresIdempotencyBoundaryDriver(PostgresBoundaryDriver):
         core = super().manifest
         return CapabilityManifest(
             adapter_name="fastapi-mergen-postgresql-commands",
-            adapter_version="0.10.0a1",
+            adapter_version=__version__,
             implementation=(
                 "fastapi_mergen.testing.idempotency_driver.PostgresIdempotencyBoundaryDriver"
             ),
             capabilities=core.capabilities | {Capability.COMMAND_IDEMPOTENCY},
             invariants=core.invariants | {Invariant.COMMAND_IDENTITY},
-            metadata={"driver": "asyncpg", "store": "postgresql", "locking": "advisory"},
+            metadata={**core.metadata, "command.locking": "postgresql-advisory"},
         )
 
     async def reset(self) -> None:
