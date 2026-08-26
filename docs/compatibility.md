@@ -18,11 +18,11 @@ Workflow job names are machine-readable evidence identifiers and appear in GitHu
 runs. A passing table entry means the matching job ran; this document does not convert
 an intended version range into executed evidence.
 
-The repository also publishes [local executed compatibility evidence](evidence/compatibility-local.json)
-captured on 2026-08-30. It records passing unit/security/conformance and clean packaging
-on Python 3.11–3.14, the exact PostgreSQL 16/Python 3.11 and PostgreSQL 18/Python 3.14
-pairings, every lowest-direct optional-extra import boundary, and the highest-resolution
-all-extras boundary. Hosted workflow checks remain separately attributable evidence.
+The repository retains a [historical local compatibility snapshot](evidence/compatibility-local.json)
+that is commit/lock bound and explicitly has no release authority. Each hosted matrix job
+publishes its own execution-bound JSON artifact containing the package version, commit, lock
+digest, runtime, installed distributions, workflow run identity, and database/driver versions
+when applicable.
 
 The certified PostgreSQL DBAPI is `asyncpg`. Async psycopg is deferred because the
 runtime depends on asyncpg-specific operational testing and one driver is sufficient for

@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  checks: read
   id-token: write
   attestations: write
 
@@ -13,6 +14,32 @@ jobs:
   evidence:
     runs-on: ubuntu-latest
     environment: release
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 56379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      MERGEN_TEST_ADMIN_DSN: postgresql://postgres:postgres@127.0.0.1:55432/postgres
+      MERGEN_TEST_REDIS_URL: redis://127.0.0.1:56379/0
+      MERGEN_IMPLEMENTATION_COMMIT: ${{ github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -25,8 +52,21 @@ jobs:
           version: "0.12.4"
           enable-cache: true
       - run: uv sync --group security --all-extras
+      - name: Verify hosted compatibility, security, and conformance checks
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: uv run python scripts/verify_hosted_release_checks.py
+      - name: Run mandatory quality and package gates
+        run: uv run python scripts/check.py
+      - name: Run mandatory integration gates
+        run: uv run pytest -q -m integration
+      - name: Run security gates
+        run: |
+          uv run pip-audit
+          uv run bandit -q -c bandit.yaml -r src
+          uv run python scripts/security_scan.py
       - name: Verify candidate gate
-        run: uv run python scripts/audit_release_candidate.py
+        run: uv run python scripts/audit_release_candidate.py --phase auto
       - name: Build and smoke artifacts
         run: uv run python scripts/build_and_test_artifacts.py
       - name: Generate SBOM, checksums, schemas, and certification
@@ -35,7 +75,8 @@ jobs:
           uv run python scripts/generate_sbom.py --output build/release/sbom.cdx.json
           sha256sum dist/* > build/release/SHA256SUMS
           cp src/fastapi_mergen/conformance/spec/*.json build/release/
-          uv run fastapi-mergen conformance run --reference --profile complete --format json --output build/release/certification.json
+          uv run python scripts/generate_real_certification.py --manifest build/release/certification-manifest.json --report build/release/certification.json
+          uv run fastapi-mergen conformance verify --manifest build/release/certification-manifest.json --report build/release/certification.json
       - name: Attest distributions and SBOM
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:

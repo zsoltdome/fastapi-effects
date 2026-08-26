@@ -40,6 +40,11 @@ def main() -> int:
         "--skip-git-governance",
     )
     run(sys.executable, "scripts/audit_milestone_eight.py")
+    run(sys.executable, "scripts/audit_milestone_nine.py")
+    run(sys.executable, "scripts/audit_milestone_ten.py")
+    run(sys.executable, "scripts/audit_milestone_eleven.py")
+    run(sys.executable, "scripts/audit_milestone_twelve.py")
+    run(sys.executable, "scripts/audit_milestone_thirteen.py")
     run("pytest", "-q", "-m", "not integration and not packaging")
     run(sys.executable, "scripts/build_and_test_artifacts.py")
     distributions = tuple(sorted((ROOT / "dist").glob("*")))

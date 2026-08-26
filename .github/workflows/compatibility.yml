@@ -33,6 +33,18 @@ jobs:
       - run: uv sync --group dev --all-extras
       - run: uv run pytest -q -m "not integration and not packaging"
       - run: uv run python scripts/build_and_test_artifacts.py --offline-system-packages
+      - name: Bind compatibility evidence
+        run: >-
+          uv run python scripts/write_compatibility_evidence.py
+          --evidence-id compat-python-${{ matrix.python }}
+          --selection "non-integration tests and package smoke"
+          --output build/compatibility/compat-python-${{ matrix.python }}.json
+      - name: Upload compatibility evidence
+        uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+        with:
+          name: compat-python-${{ matrix.python }}-${{ github.sha }}
+          path: build/compatibility
+          if-no-files-found: error
 
   postgres:
     name: compat-pg${{ matrix.postgres }}-py${{ matrix.python_id }}
@@ -59,8 +71,18 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 56379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     env:
       MERGEN_TEST_ADMIN_DSN: postgresql://postgres:postgres@127.0.0.1:55432/postgres
+      MERGEN_TEST_REDIS_URL: redis://127.0.0.1:56379/0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -72,6 +94,18 @@ jobs:
           enable-cache: true
       - run: uv sync --group test --all-extras
       - run: uv run pytest -q -m integration
+      - name: Bind compatibility evidence
+        run: >-
+          uv run python scripts/write_compatibility_evidence.py
+          --evidence-id compat-pg${{ matrix.postgres }}-py${{ matrix.python_id }}
+          --selection "all PostgreSQL integration tests"
+          --output build/compatibility/compat-pg${{ matrix.postgres }}-py${{ matrix.python_id }}.json
+      - name: Upload compatibility evidence
+        uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+        with:
+          name: compat-pg${{ matrix.postgres }}-py${{ matrix.python_id }}-${{ github.sha }}
+          path: build/compatibility
+          if-no-files-found: error
 
   dependencies:
     name: ${{ matrix.evidence-id }}
@@ -95,7 +129,7 @@ jobs:
           - evidence-id: compat-min-taskiq
             requirement: .[taskiq]
             resolution: lowest-direct
-            imports: fastapi_mergen.executors.taskiq.adapter,taskiq
+            imports: fastapi_mergen.executors.taskiq.adapter,taskiq,taskiq_redis
           - evidence-id: compat-min-fastmcp
             requirement: .[fastmcp]
             resolution: lowest-direct
@@ -124,3 +158,15 @@ jobs:
         env:
           MERGEN_IMPORTS: ${{ matrix.imports }}
         run: .compat-venv/bin/python -c "import importlib, os; [importlib.import_module(name) for name in os.environ['MERGEN_IMPORTS'].split(',')]"
+      - name: Bind compatibility evidence
+        run: >-
+          .compat-venv/bin/python scripts/write_compatibility_evidence.py
+          --evidence-id ${{ matrix.evidence-id }}
+          --selection "${{ matrix.resolution }} dependency import boundary"
+          --output build/compatibility/${{ matrix.evidence-id }}.json
+      - name: Upload compatibility evidence
+        uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+        with:
+          name: ${{ matrix.evidence-id }}-${{ github.sha }}
+          path: build/compatibility
+          if-no-files-found: error

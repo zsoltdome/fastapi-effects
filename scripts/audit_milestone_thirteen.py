@@ -37,9 +37,13 @@ REQUIRED = (
     ".github/workflows/compatibility.yml",
     ".github/workflows/benchmarks.yml",
     ".github/workflows/release.yml",
+    ".github/workflows/publish.yml",
     "scripts/benchmark.py",
     "scripts/chaos_harness.py",
     "scripts/generate_sbom.py",
+    "scripts/generate_real_certification.py",
+    "scripts/verify_hosted_release_checks.py",
+    "scripts/write_compatibility_evidence.py",
     "scripts/rehearse_postgres_restart.py",
     "scripts/verify_restore.py",
 )
@@ -52,6 +56,41 @@ def main() -> int:
     missing = [path for path in REQUIRED if not (ROOT / path).is_file()]
     if missing:
         raise AssertionError(f"M13 required files missing: {missing}")
+    release_workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    publish_workflow = (ROOT / ".github/workflows/publish.yml").read_text(encoding="utf-8")
+    compatibility_workflow = (ROOT / ".github/workflows/compatibility.yml").read_text(
+        encoding="utf-8"
+    )
+    for name, content, required_tokens in (
+        (
+            "release",
+            release_workflow,
+            (
+                "generate_real_certification.py",
+                "verify_hosted_release_checks.py",
+                "pytest -q -m integration",
+                "pip-audit",
+            ),
+        ),
+        (
+            "publish",
+            publish_workflow,
+            (
+                "generate_real_certification.py",
+                "verify_hosted_release_checks.py",
+                "audit_release_candidate.py",
+                "pip-audit",
+            ),
+        ),
+        (
+            "compatibility",
+            compatibility_workflow,
+            ("write_compatibility_evidence.py", "MERGEN_TEST_REDIS_URL"),
+        ),
+    ):
+        absent = [token for token in required_tokens if token not in content]
+        if absent:
+            raise AssertionError(f"M13 {name} workflow omits mandatory gates: {absent}")
     if MIGRATION_HEAD != "0005_webhook_retention" or dict(SCHEMA_REVISION_REGISTRY) != {
         "core": 1,
         "webhooks": 2,
@@ -88,18 +127,14 @@ def main() -> int:
     compatibility = json.loads(
         (ROOT / "docs/evidence/compatibility-local.json").read_text(encoding="utf-8")
     )
-    compatibility_jobs = [
-        *compatibility["python_jobs"],
-        *compatibility["postgres_jobs"],
-        *compatibility["dependency_jobs"],
-    ]
     if (
-        compatibility["result"] != "pass"
-        or {job["evidence_id"] for job in compatibility_jobs}
-        != set(declared_compatibility["evidence_ids"])
-        or not all(job.get("result", job.get("packaging")) == "pass" for job in compatibility_jobs)
+        compatibility.get("evidence_kind") != "historical-local-snapshot"
+        or compatibility.get("release_authority") is not False
+        or len(compatibility.get("binding", {}).get("implementation_commit", "")) != 40
+        or len(compatibility.get("binding", {}).get("lock_sha256", "")) != 64
+        or not declared_compatibility["evidence_ids"]
     ):
-        raise AssertionError("M13 compatibility evidence is incomplete")
+        raise AssertionError("M13 historical compatibility snapshot is not safely bound")
     readiness = json.loads(
         (ROOT / "docs/planning/production-readiness-record.json").read_text(encoding="utf-8")
     )

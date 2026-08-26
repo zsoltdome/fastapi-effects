@@ -1,5 +1,12 @@
 {
   "schema_version": 1,
+  "evidence_kind": "historical-local-snapshot",
+  "release_authority": false,
+  "binding": {
+    "package_version": "0.11.0a1",
+    "implementation_commit": "b153c1a49357c1344594ad6804a092651ae433d4",
+    "lock_sha256": "7417849a726d34b23791d945b6a007a064ba12417b509d58b32a5f4e8303ac7e"
+  },
   "captured_on": "2026-08-30",
   "platform": "linux-x86_64",
   "result": "pass",

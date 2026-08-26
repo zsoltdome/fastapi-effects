@@ -25,16 +25,11 @@ def test_resolved_framework_lines_are_within_candidate_envelope() -> None:
     assert tuple(int(part) for part in sqlalchemy.__version__.split(".")[:2]) == (2, 0)
 
 
-def test_local_executed_evidence_passes_every_declared_job() -> None:
-    declared = json.loads(Path(__file__).with_name("evidence.json").read_text(encoding="utf-8"))
-    executed = json.loads(
+def test_historical_local_snapshot_is_bound_and_not_release_authority() -> None:
+    snapshot = json.loads(
         (ROOT / "docs/evidence/compatibility-local.json").read_text(encoding="utf-8")
     )
-    jobs = [
-        *executed["python_jobs"],
-        *executed["postgres_jobs"],
-        *executed["dependency_jobs"],
-    ]
-    assert executed["result"] == "pass"
-    assert {job["evidence_id"] for job in jobs} == set(declared["evidence_ids"])
-    assert all(job.get("result", job.get("packaging")) == "pass" for job in jobs)
+    assert snapshot["evidence_kind"] == "historical-local-snapshot"
+    assert snapshot["release_authority"] is False
+    assert len(snapshot["binding"]["implementation_commit"]) == 40
+    assert len(snapshot["binding"]["lock_sha256"]) == 64
