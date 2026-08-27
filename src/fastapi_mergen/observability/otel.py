@@ -70,9 +70,10 @@ def create_otel_sink(name: str = "fastapi_mergen") -> OpenTelemetryEventSink:
         extra="otel",
         modules=("opentelemetry",),
     )
-    from opentelemetry import metrics, trace
+    from opentelemetry.metrics import get_meter
+    from opentelemetry.trace import get_tracer
 
-    return OpenTelemetryEventSink(metrics.get_meter(name), trace.get_tracer(name))
+    return OpenTelemetryEventSink(get_meter(name), get_tracer(name))
 
 
 __all__ = ["OpenTelemetryEventSink", "create_otel_sink"]
