@@ -17,8 +17,13 @@ lease_duration_seconds
 - `attempt_count` counts attempts started at claim.
 - Full-jitter exponential backoff uses injected randomness in tests.
 - Persisted scheduling uses database time.
-- `Retry-After` may increase a delay but is clamped by policy and delivery deadline.
-- No attempt starts after maximum elapsed time or an explicit deadline.
+- `maximum_elapsed_seconds` defines a latest-finish deadline at
+  `delivery.created_at + maximum_elapsed_seconds`.
+- `Retry-After` may increase a delay but never schedules work at or beyond that
+  delivery deadline.
+- Claim, reconciliation, handler/webhook execution, and external-executor admission
+  all enforce the same absolute deadline. An attempt is also bounded by its handler
+  timeout and current lease expiry.
 
 ## Default classification
 
@@ -70,7 +75,14 @@ Replay creates a new delivery row with:
 
 A privileged replay policy may allow selected policy fields to be refreshed, but the
 change is explicit and audited. The original terminal delivery is never edited back
-to pending.
+to pending. A replay starts a fresh elapsed-time budget from the new delivery's
+creation time without changing the original delivery's budget or history.
+
+Webhook replay and webhook retention take the same tenant-scoped transaction advisory
+lock. If replay wins, pruning observes and preserves the original lineage root; if
+retention commits first, a later replay fails cleanly because the terminal source no
+longer exists. This serialization avoids a foreign-key race without granting the
+application role row-update authority.
 
 ## Receiver deduplication
 

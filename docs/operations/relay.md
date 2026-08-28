@@ -74,12 +74,18 @@ Success, retryable failure, and terminal failure update the current attempt and
 delivery in one short transaction. A stale-token mismatch changes no current delivery
 state and produces a `LeaseLost` result and metric.
 
+Lease loss during either success or failure finalization is a per-delivery race. The
+relay records it without cancelling sibling deliveries, and transient SQLAlchemy
+connection failures leave committed leases for normal expiry/reconciliation while the
+supervisor continues polling. Mergen configuration/invariant errors and explicit
+shutdown cancellation still propagate.
+
 ## Lease expiry and reconciliation
 
 The bounded reconciliation pass changes an expired lease to `retry_wait` (or `dead`
-when its budget is exhausted) and marks its open attempt `abandoned`. A later claim
-uses a new token and attempt identity. A stale process cannot finalize either the
-reconciled row or its replacement lease.
+when its attempt or latest-finish budget is exhausted) and marks its open attempt
+`abandoned`. A later claim uses a new token and attempt identity. A stale process
+cannot finalize either the reconciled row or its replacement lease.
 
 ## Polling
 

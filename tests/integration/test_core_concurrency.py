@@ -15,9 +15,11 @@ from fastapi_mergen import (
     LeaseLost,
     MergenUnitOfWork,
     Principal,
+    RetryableDeliveryError,
     RetryPolicy,
 )
 from fastapi_mergen.core.context import current_principal
+from fastapi_mergen.core.delivery import DeliveryState
 from fastapi_mergen.core.routing import RouteSpecification
 from fastapi_mergen.postgres.leasing import ClaimedDelivery, LeaseRepository
 from fastapi_mergen.postgres.relay import PollingRelay, RelayConfig
@@ -30,7 +32,11 @@ from tests.integration.postgres import ProvisionedDatabase
 pytestmark = pytest.mark.integration
 
 
-def _route(route_key: str = "invoice.render") -> RouteSpecification:
+def _route(
+    route_key: str = "invoice.render",
+    *,
+    retry_policy: RetryPolicy | None = None,
+) -> RouteSpecification:
     return RouteSpecification(
         event_type="invoice.created",
         route_key=route_key,
@@ -42,7 +48,8 @@ def _route(route_key: str = "invoice.render") -> RouteSpecification:
         service_policy=None,
         service_capabilities=None,
         maximum_snapshot_age_seconds=300,
-        retry_policy=RetryPolicy(
+        retry_policy=retry_policy
+        or RetryPolicy(
             name="concurrency",
             base_delay_seconds=0,
             maximum_delay_seconds=0,
@@ -283,6 +290,186 @@ async def test_relay_never_leases_more_than_immediate_execution_capacity(
         assert states == {"pending": 4, "succeeded": 2}
     finally:
         await relay_engine.dispose()
+        await application.dispose()
+        await migration.dispose()
+
+
+@pytest.mark.asyncio
+async def test_elapsed_deadline_blocks_scheduling_reconciliation_and_claim(
+    test_database: ProvisionedDatabase,
+) -> None:
+    migration = create_async_engine(test_database.migration_sqlalchemy_dsn)
+    application = create_async_engine(test_database.app_sqlalchemy_dsn)
+    relay = create_async_engine(test_database.relay_sqlalchemy_dsn)
+    roles = RuntimeRoles(
+        migration=test_database.migration_role,
+        application=test_database.app_role,
+        relay=test_database.relay_role,
+    )
+
+    class MaximumRandom:
+        def uniform(self, lower: float, upper: float) -> float:
+            del lower
+            return upper
+
+    policy = RetryPolicy(
+        name="elapsed-deadline",
+        maximum_elapsed_seconds=60,
+        base_delay_seconds=10,
+        maximum_delay_seconds=10,
+        handler_timeout_seconds=1,
+        lease_duration_seconds=120,
+    )
+    try:
+        await install_core_schema(migration, roles=roles)
+        app_sessions = async_sessionmaker(application, expire_on_commit=False)
+        relay_sessions = async_sessionmaker(relay, expire_on_commit=False)
+        principal = Principal(tenant_id=uuid4(), subject_id="user:deadline")
+        leases = LeaseRepository(random_source=MaximumRandom())
+
+        await _emit(
+            app_sessions,
+            principal,
+            routes=(_route("deadline.schedule", retry_policy=policy),),
+        )
+        async with relay_sessions() as session:
+            schedule_claim = (await leases.claim(session, now=datetime.now(UTC)))[0]
+        schedule_at = schedule_claim.delivery.created_at + timedelta(seconds=59)
+        async with relay_sessions() as session:
+            outcome = await leases.fail(
+                session,
+                schedule_claim,
+                RetryableDeliveryError(
+                    code="test.retry",
+                    summary="Retry should not cross the elapsed deadline.",
+                ),
+                now=schedule_at,
+                retry_after=timedelta(seconds=10),
+            )
+        assert outcome is DeliveryState.DEAD
+
+        await _emit(
+            app_sessions,
+            principal,
+            routes=(_route("deadline.reconcile", retry_policy=policy),),
+        )
+        async with relay_sessions() as session:
+            reconcile_claim = (await leases.claim(session, now=datetime.now(UTC)))[0]
+        async with relay_sessions() as session:
+            assert (
+                await leases.reconcile_expired(
+                    session,
+                    now=reconcile_claim.delivery.created_at + timedelta(seconds=121),
+                )
+                == 1
+            )
+
+        await _emit(
+            app_sessions,
+            principal,
+            routes=(_route("deadline.claim", retry_policy=policy),),
+        )
+        async with relay_sessions() as session:
+            pending = await session.scalar(
+                select(DeliveryRow).where(DeliveryRow.destination_key == "deadline.claim")
+            )
+        assert pending is not None
+        async with relay_sessions() as session:
+            assert (
+                await leases.claim(
+                    session,
+                    now=pending.created_at + timedelta(seconds=60),
+                )
+                == ()
+            )
+        async with relay_sessions() as session:
+            states = dict(
+                (
+                    await session.execute(select(DeliveryRow.destination_key, DeliveryRow.state))
+                ).all()
+            )
+        assert states == {
+            "deadline.schedule": "dead",
+            "deadline.reconcile": "dead",
+            "deadline.claim": "dead",
+        }
+    finally:
+        await relay.dispose()
+        await application.dispose()
+        await migration.dispose()
+
+
+@pytest.mark.asyncio
+async def test_finalization_rejects_elapsed_attempt_without_waiting_for_reconciliation(
+    test_database: ProvisionedDatabase,
+) -> None:
+    migration = create_async_engine(test_database.migration_sqlalchemy_dsn)
+    application = create_async_engine(test_database.app_sqlalchemy_dsn)
+    relay = create_async_engine(test_database.relay_sqlalchemy_dsn)
+    roles = RuntimeRoles(
+        migration=test_database.migration_role,
+        application=test_database.app_role,
+        relay=test_database.relay_role,
+    )
+    policy = RetryPolicy(
+        name="finalization-deadline",
+        maximum_elapsed_seconds=60,
+        maximum_delay_seconds=10,
+        handler_timeout_seconds=1,
+        lease_duration_seconds=3,
+    )
+    try:
+        await install_core_schema(migration, roles=roles)
+        app_sessions = async_sessionmaker(application, expire_on_commit=False)
+        relay_sessions = async_sessionmaker(relay, expire_on_commit=False)
+        principal = Principal(tenant_id=uuid4(), subject_id="user:finalization-deadline")
+        leases = LeaseRepository()
+
+        await _emit(
+            app_sessions,
+            principal,
+            routes=(_route("deadline.finalization", retry_policy=policy),),
+        )
+        started = datetime.now(UTC)
+        async with relay_sessions() as session:
+            claim = (await leases.claim(session, now=started))[0]
+
+        with pytest.raises(LeaseLost):
+            async with relay_sessions() as session:
+                await leases.succeed(
+                    session,
+                    claim,
+                    now=claim.attempt.started_at + timedelta(seconds=1),
+                )
+        with pytest.raises(LeaseLost):
+            async with relay_sessions() as session:
+                await leases.fail(
+                    session,
+                    claim,
+                    RetryableDeliveryError(
+                        code="test.expired_lease",
+                        summary="Expired token must not finalize.",
+                    ),
+                    now=claim.delivery.lease_expires_at,
+                )
+
+        async with relay_sessions() as session:
+            assert (
+                await leases.reconcile_expired(
+                    session,
+                    now=claim.delivery.lease_expires_at,
+                )
+                == 1
+            )
+        async with relay_sessions() as session:
+            state = await session.scalar(
+                select(DeliveryRow.state).where(
+                    DeliveryRow.delivery_id == claim.delivery.delivery_id
+                )
+            )
+        assert state == "retry_wait"
+    finally:
+        await relay.dispose()
         await application.dispose()
         await migration.dispose()
 

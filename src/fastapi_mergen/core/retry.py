@@ -148,3 +148,75 @@ def _finite_number(name: str, value: object) -> float:
     if not math.isfinite(numeric):
         raise MergenConfigurationError(f"Retry {name} must be finite.")
     return numeric
+
+
+def delivery_deadline(*, policy: RetryPolicy, created_at: datetime) -> datetime:
+    """Return the immutable latest-finish horizon for one delivery."""
+
+    _aware_time("delivery creation", created_at)
+    return created_at + timedelta(seconds=policy.maximum_elapsed_seconds)
+
+
+def attempt_deadline(
+    *,
+    policy: RetryPolicy,
+    delivery_created_at: datetime,
+    attempt_started_at: datetime,
+    lease_expires_at: datetime,
+) -> datetime:
+    """Return the earliest hard deadline applying to an active attempt."""
+
+    for name, value in (
+        ("delivery creation", delivery_created_at),
+        ("attempt start", attempt_started_at),
+        ("lease expiry", lease_expires_at),
+    ):
+        _aware_time(name, value)
+    return min(
+        delivery_deadline(policy=policy, created_at=delivery_created_at),
+        attempt_started_at + timedelta(seconds=policy.handler_timeout_seconds),
+        lease_expires_at,
+    )
+
+
+def remaining_attempt_seconds(
+    *,
+    policy: RetryPolicy,
+    delivery_created_at: datetime,
+    attempt_started_at: datetime,
+    lease_expires_at: datetime,
+    now: datetime,
+    configured_limit_seconds: float | None = None,
+) -> float:
+    """Return a timeout duration derived from the immutable wall-clock bounds."""
+
+    _aware_time("current", now)
+    remaining = (
+        attempt_deadline(
+            policy=policy,
+            delivery_created_at=delivery_created_at,
+            attempt_started_at=attempt_started_at,
+            lease_expires_at=lease_expires_at,
+        )
+        - now
+    ).total_seconds()
+    if configured_limit_seconds is not None:
+        configured = _finite_number("configured attempt limit", configured_limit_seconds)
+        if configured <= 0:
+            raise MergenConfigurationError("Configured attempt limit must be positive.")
+        remaining = min(remaining, configured)
+    return max(0.0, remaining)
+
+
+def _aware_time(name: str, value: datetime) -> None:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise MergenConfigurationError(f"Retry {name} time must be timezone-aware.")
+
+
+__all__ = [
+    "RetryPolicy",
+    "UniformRandom",
+    "attempt_deadline",
+    "delivery_deadline",
+    "remaining_attempt_seconds",
+]
