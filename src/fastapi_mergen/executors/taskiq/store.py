@@ -10,9 +10,10 @@ from sqlalchemy import or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fastapi_mergen.core.delivery import DeliveryState
+from fastapi_mergen.core.delivery import AttemptOutcome, DeliveryState
 from fastapi_mergen.core.identity import UUIDSource
 from fastapi_mergen.core.protocols import UUIDGenerator
+from fastapi_mergen.core.retry import RetryPolicy, remaining_attempt_seconds
 from fastapi_mergen.errors import (
     LeaseLost,
     MergenConfigurationError,
@@ -188,12 +189,55 @@ class TaskiqHandoffStore:
                 HandoffState.ENQUEUED.value,
             }:
                 return None
-            claim = await _claim_for_row(session, row)
+            try:
+                claim = await _claim_for_row(session, row)
+            except LeaseLost:
+                _set_failed(
+                    row,
+                    outcome=DeliveryState.DEAD,
+                    now=now,
+                    code="executor.stale_attempt",
+                    summary="Taskiq handoff no longer owns the parent delivery attempt.",
+                )
+                await session.flush()
+                return None
             lease_deadline = claim.delivery.lease_expires_at
-            if lease_deadline is None or lease_deadline <= now:
+            if lease_deadline is None:
+                raise LeaseLost(delivery_id=row.delivery_id)
+            retry = claim.route_snapshot.get("retry")
+            if not isinstance(retry, dict):
+                raise MergenConfigurationError("Taskiq retry snapshot is invalid.")
+            policy = RetryPolicy.from_dict(retry)
+            remaining = remaining_attempt_seconds(
+                policy=policy,
+                delivery_created_at=claim.delivery.created_at,
+                attempt_started_at=claim.attempt.started_at,
+                lease_expires_at=lease_deadline,
+                now=now,
+                configured_limit_seconds=execution_timeout.total_seconds(),
+            )
+            if remaining <= 0:
+                error = RetryableDeliveryError(
+                    code="executor.execution_timeout",
+                    summary="Taskiq handoff exceeded the parent attempt deadline before admission.",
+                )
+                outcome = await self._leases.fail_in_transaction(
+                    session,
+                    claim,
+                    error,
+                    now=now,
+                )
+                _set_failed(
+                    row,
+                    outcome=outcome,
+                    now=now,
+                    code=error.code,
+                    summary=error.summary,
+                )
+                await session.flush()
                 return None
             token = self._uuid_source.new_uuid()
-            deadline = min(now + execution_timeout, lease_deadline)
+            deadline = now + timedelta(seconds=remaining)
             row.state = HandoffState.EXECUTING.value
             if row.enqueued_at is None:
                 row.enqueued_at = now
@@ -365,18 +409,30 @@ class TaskiqHandoffStore:
 
 async def _claim_for_row(session: AsyncSession, row: TaskiqHandoffRow) -> ClaimedDelivery:
     delivery = await session.scalar(
-        select(DeliveryRow).where(
+        select(DeliveryRow)
+        .where(
             DeliveryRow.tenant_id == row.tenant_id,
             DeliveryRow.delivery_id == row.delivery_id,
         )
+        .with_for_update()
     )
     attempt = await session.scalar(
-        select(AttemptRow).where(
+        select(AttemptRow)
+        .where(
             AttemptRow.tenant_id == row.tenant_id,
             AttemptRow.attempt_id == row.attempt_id,
         )
+        .with_for_update()
     )
-    if delivery is None or attempt is None:
+    if (
+        delivery is None
+        or attempt is None
+        or delivery.state != DeliveryState.LEASED.value
+        or delivery.lease_token is None
+        or attempt.delivery_id != row.delivery_id
+        or attempt.lease_token != delivery.lease_token
+        or attempt.outcome != AttemptOutcome.STARTED.value
+    ):
         raise LeaseLost(delivery_id=row.delivery_id)
     event = await session.scalar(
         select(EventRow).where(

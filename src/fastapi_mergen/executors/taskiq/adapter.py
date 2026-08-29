@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from fastapi_mergen._optional import require_modules
 from fastapi_mergen.core.protocols import Clock
+from fastapi_mergen.core.retry import RetryPolicy, remaining_attempt_seconds
 from fastapi_mergen.core.runtime import SystemClock
+from fastapi_mergen.errors import MergenConfigurationError
 from fastapi_mergen.executors.taskiq.envelope import TaskiqHandoffEnvelope
 from fastapi_mergen.executors.taskiq.store import TaskiqHandoffStore
 from fastapi_mergen.observability.events import RuntimeEvent, RuntimeEventKind, TraceLineage
@@ -43,6 +45,28 @@ class TaskiqDeliverySink:
     event_sink: EventSink = field(default_factory=NoOpEventSink)
 
     async def execute(self, claim: ClaimedDelivery) -> SinkDisposition:
+        retry = claim.route_snapshot.get("retry")
+        lease_expires_at = claim.delivery.lease_expires_at
+        if not isinstance(retry, dict) or lease_expires_at is None:
+            raise MergenConfigurationError("Taskiq enqueue attempt deadline is invalid.")
+        timeout_seconds = remaining_attempt_seconds(
+            policy=RetryPolicy.from_dict(retry),
+            delivery_created_at=claim.delivery.created_at,
+            attempt_started_at=claim.attempt.started_at,
+            lease_expires_at=lease_expires_at,
+            now=self.clock.now(),
+        )
+        if timeout_seconds <= 0:
+            return SinkDisposition.DEFERRED
+        try:
+            async with asyncio.timeout(timeout_seconds):
+                return await self._execute(claim)
+        except TimeoutError:
+            # Broker acceptance is ambiguous. Any prepared handoff and the stable
+            # task ID let worker execution or bounded recovery win safely.
+            return SinkDisposition.DEFERRED
+
+    async def _execute(self, claim: ClaimedDelivery) -> SinkDisposition:
         now = self.clock.now()
         async with self.sessions() as session:
             envelope = await self.store.prepare(session, claim=claim, now=now)

@@ -25,7 +25,17 @@ factory in workers.
 Do not install Taskiq retry middleware on this task. Mergen snapshots retry policy
 on the delivery and creates the next attempt after a fenced failure. Broker
 redelivery is duplicate transport, not an application retry, and produces a bounded
-no-op once the handoff is already executing or terminal.
+no-op once the handoff is already executing or terminal. Before admitting a handler,
+the worker locks and verifies the handoff, referenced attempt, and parent delivery as
+one coherent state: the parent must still be leased, its current token must belong to
+that still-started attempt, and the aggregate attempt deadline must remain open. A
+delayed handoff from a reclaimed attempt is terminalized without opening an application
+session or invoking the handler.
+
+Broker enqueue shares the parent attempt deadline. A timeout is treated as ambiguous
+acceptance: the durable prepared handoff and stable task ID allow either the delivered
+worker or bounded recovery to win without treating broker acknowledgement as delivery
+success.
 
 Deploy recovery beside the polling relay and call `TaskiqRecovery.run_once()` on a
 bounded interval. Graceful shutdown stops new polling, waits for current broker

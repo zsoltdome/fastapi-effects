@@ -31,7 +31,7 @@ from fastapi_mergen.executors.taskiq.adapter import TaskiqDeliverySink, register
 from fastapi_mergen.executors.taskiq.envelope import TaskiqHandoffEnvelope
 from fastapi_mergen.executors.taskiq.models import TaskiqHandoffRow
 from fastapi_mergen.executors.taskiq.store import TaskiqHandoffStore
-from fastapi_mergen.postgres.leasing import ClaimedDelivery
+from fastapi_mergen.postgres.leasing import ClaimedDelivery, LeaseRepository
 from fastapi_mergen.postgres.roles import RuntimeRoles
 from fastapi_mergen.sqlalchemy.canonical import canonical_sha256, versioned_canonical_bytes
 from fastapi_mergen.sqlalchemy.models import SCHEMA, AttemptRow, DeliveryRow, EventRow
@@ -187,6 +187,54 @@ class PostgresTaskiqBoundaryDriver(PostgresBoundaryDriver):
             await asyncio.sleep(0.2)
         row = await self._wait_for_terminal_handoff(handoff_id)
         return _view(row)
+
+    async def execute_reclaimed_handoff_pair(
+        self,
+        *,
+        principal: Principal,
+        delivery_id: UUID,
+        stale_attempt_id: UUID,
+    ) -> tuple[ExecutorHandoffView, ExecutorHandoffView]:
+        """Delay attempt A, reclaim its parent into B, then run both in a CLI worker."""
+        stale = await self.enqueue_handoff(
+            principal=principal,
+            delivery_id=delivery_id,
+            attempt_id=stale_attempt_id,
+        )
+        reclaimed_at = datetime.now(UTC) + timedelta(seconds=61)
+        leases = LeaseRepository()
+        async with self._relay_sessions() as session:
+            reconciled = await leases.reconcile_expired(session, now=reclaimed_at)
+        if reconciled != 1:
+            raise AssertionError("Taskiq stale-handoff rehearsal did not reclaim attempt A.")
+        async with self._relay_sessions() as session:
+            claims = await leases.claim(session, now=reclaimed_at)
+        if len(claims) != 1:
+            raise AssertionError("Taskiq stale-handoff rehearsal did not create attempt B.")
+        current_claim = claims[0]
+        await self._sink.execute(current_claim)
+        async with self._relay_sessions() as session:
+            current_row = await session.scalar(
+                select(TaskiqHandoffRow).where(
+                    TaskiqHandoffRow.attempt_id == current_claim.attempt.attempt_id
+                )
+            )
+        if current_row is None:
+            raise AssertionError("Taskiq stale-handoff rehearsal did not persist attempt B.")
+        current_envelope = _envelope(current_row)
+        self._envelopes[current_row.handoff_id] = current_envelope
+        await (
+            self._bridge_task.kicker()
+            .with_task_id(current_envelope.task_id)
+            .kiq(current_envelope.to_dict())
+        )
+
+        current = await self.execute_handoff(
+            handoff_id=current_row.handoff_id,
+            worker_id="worker:reclaimed",
+        )
+        stale_row = await self._wait_for_terminal_handoff(stale.handoff_id)
+        return _view(stale_row), current
 
     async def _start_worker(self) -> None:
         environment = os.environ.copy()

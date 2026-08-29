@@ -13,6 +13,7 @@ from fastapi_mergen.core.runtime import SystemClock
 from fastapi_mergen.errors import (
     AuthorizationDenied,
     AuthorizationExpired,
+    LeaseLost,
     MergenConfigurationError,
     PermanentDeliveryError,
     RetryableDeliveryError,
@@ -71,12 +72,17 @@ class TaskiqWorkerBridge:
                 raise MergenConfigurationError("Taskiq duplicate references no handoff.")
             self._record(envelope, record, executed=False)
             return _result(record, executed=False)
+        failure: RetryableDeliveryError | PermanentDeliveryError | None = None
         try:
-            await self.executor.execute(executing.claim)
+            remaining = (executing.execution_deadline - self.clock.now()).total_seconds()
+            if remaining <= 0:
+                raise TimeoutError
+            async with asyncio.timeout(remaining):
+                await self.executor.execute(executing.claim)
         except asyncio.CancelledError:
             raise
         except (AuthorizationDenied, AuthorizationExpired, PermanentDeliveryError) as exc:
-            error = (
+            failure = (
                 exc
                 if isinstance(exc, PermanentDeliveryError)
                 else PermanentDeliveryError(
@@ -84,39 +90,45 @@ class TaskiqWorkerBridge:
                     summary="Taskiq handler authority was denied.",
                 )
             )
-            async with self.sessions() as session:
-                record = await self.store.finalize_failure(
-                    session,
-                    executing=executing,
-                    error=error,
-                    now=self.clock.now(),
-                )
         except RetryableDeliveryError as exc:
-            async with self.sessions() as session:
-                record = await self.store.finalize_failure(
-                    session,
-                    executing=executing,
-                    error=exc,
-                    now=self.clock.now(),
-                )
+            failure = exc
+        except TimeoutError:
+            failure = RetryableDeliveryError(
+                code="executor.execution_timeout",
+                summary="Taskiq handler exceeded its aggregate attempt deadline.",
+            )
         except Exception:
+            failure = RetryableDeliveryError(
+                code="executor.execution_failed",
+                summary="Taskiq handler failed without safe classification.",
+            )
+        try:
             async with self.sessions() as session:
-                record = await self.store.finalize_failure(
-                    session,
-                    executing=executing,
-                    error=RetryableDeliveryError(
-                        code="executor.execution_failed",
-                        summary="Taskiq handler failed without safe classification.",
-                    ),
-                    now=self.clock.now(),
-                )
-        else:
+                if failure is None:
+                    record = await self.store.finalize_success(
+                        session,
+                        executing=executing,
+                        now=self.clock.now(),
+                    )
+                else:
+                    record = await self.store.finalize_failure(
+                        session,
+                        executing=executing,
+                        error=failure,
+                        now=self.clock.now(),
+                    )
+        except LeaseLost as exc:
             async with self.sessions() as session:
-                record = await self.store.finalize_success(
+                current = await self.store.for_id(
                     session,
-                    executing=executing,
-                    now=self.clock.now(),
+                    tenant_id=envelope.tenant_id,
+                    handoff_id=envelope.handoff_id,
                 )
+            if current is None:
+                raise MergenConfigurationError(
+                    "Taskiq stale finalization lost its handoff."
+                ) from exc
+            record = current
         self._record(envelope, record, executed=True)
         return _result(record, executed=True)
 
