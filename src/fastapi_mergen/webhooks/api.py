@@ -1,7 +1,5 @@
 """Optional FastAPI router for explicitly authorized webhook operations."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from datetime import timedelta
 from typing import Annotated, Any

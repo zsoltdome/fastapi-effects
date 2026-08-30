@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import NoReturn
 
-from fastapi_mergen.errors import RetryableDeliveryError
+from fastapi_mergen.errors import PermanentDeliveryError, RetryableDeliveryError
 
 _STATUS_LINE = re.compile(rb"^HTTP/1\.[01] ([0-9]{3})(?: [\x20-\x7e]*)?\r\n$")
 _HEADER_NAME = re.compile(rb"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
@@ -20,6 +20,7 @@ class ResponseLimits:
     read_timeout_seconds: float = 10.0
     maximum_header_bytes: int = 32 * 1024
     maximum_header_count: int = 128
+    maximum_informational_responses: int = 8
     maximum_body_bytes: int = 64 * 1024
 
     def __post_init__(self) -> None:
@@ -28,6 +29,7 @@ class ResponseLimits:
         for value in (
             self.maximum_header_bytes,
             self.maximum_header_count,
+            self.maximum_informational_responses,
             self.maximum_body_bytes,
         ):
             if not isinstance(value, int) or isinstance(value, bool) or value < 1:
@@ -50,38 +52,49 @@ async def parse_response(
     limits: ResponseLimits,
 ) -> HttpResponseMetadata:
     budget = limits.maximum_header_bytes
-    status_line = await _readline(reader, limits.read_timeout_seconds, budget)
-    budget -= len(status_line)
-    match = _STATUS_LINE.fullmatch(status_line)
-    if match is None:
-        _malformed()
-    status = int(match.group(1))
-    headers: dict[str, str] = {}
     count = 0
+    informational_count = 0
     while True:
-        line = await _readline(reader, limits.read_timeout_seconds, budget)
-        budget -= len(line)
-        if line == b"\r\n":
-            break
-        count += 1
-        if count > limits.maximum_header_count or line[:1] in {b" ", b"\t"}:
-            _oversized()
-        name, separator, raw_value = line[:-2].partition(b":")
-        if not separator or _HEADER_NAME.fullmatch(name) is None:
+        status_line = await _readline(reader, limits.read_timeout_seconds, budget)
+        budget -= len(status_line)
+        match = _STATUS_LINE.fullmatch(status_line)
+        if match is None:
             _malformed()
-        try:
-            key = name.decode("ascii").lower()
-            value = raw_value.strip(b" \t").decode("latin-1")
-        except UnicodeError:
-            _malformed()
-        if "\r" in value or "\n" in value or "\x00" in value:
-            _malformed()
-        if key in headers:
-            if key == "content-length" and headers[key] != value:
+        status = int(match.group(1))
+        headers: dict[str, str] = {}
+        while True:
+            line = await _readline(reader, limits.read_timeout_seconds, budget)
+            budget -= len(line)
+            if line == b"\r\n":
+                break
+            count += 1
+            if count > limits.maximum_header_count or line[:1] in {b" ", b"\t"}:
+                _oversized()
+            name, separator, raw_value = line[:-2].partition(b":")
+            if not separator or _HEADER_NAME.fullmatch(name) is None:
                 _malformed()
-            headers[key] = f"{headers[key]}, {value}"
-        else:
-            headers[key] = value
+            try:
+                key = name.decode("ascii").lower()
+                value = raw_value.strip(b" \t").decode("latin-1")
+            except UnicodeError:
+                _malformed()
+            if "\r" in value or "\n" in value or "\x00" in value:
+                _malformed()
+            if key in headers:
+                if key == "content-length" and headers[key] != value:
+                    _malformed()
+                headers[key] = f"{headers[key]}, {value}"
+            else:
+                headers[key] = value
+
+        if status == 101:
+            _unsupported_upgrade()
+        if 100 <= status < 200:
+            informational_count += 1
+            if informational_count > limits.maximum_informational_responses:
+                _oversized()
+            continue
+        break
 
     discarded = await _discard_body(reader, status=status, headers=headers, limits=limits)
     return HttpResponseMetadata(
@@ -209,6 +222,13 @@ def _malformed() -> NoReturn:
     raise RetryableDeliveryError(
         code="webhook.response_malformed",
         summary="Webhook receiver returned malformed HTTP.",
+    )
+
+
+def _unsupported_upgrade() -> NoReturn:
+    raise PermanentDeliveryError(
+        code="webhook.protocol_upgrade_unsupported",
+        summary="Webhook receiver requested an unsupported protocol upgrade.",
     )
 
 

@@ -14,7 +14,15 @@ The production endpoint policy requires HTTPS on port 443, rejects credentials
 and fragments, normalizes IDNA hostnames, and re-resolves DNS for every attempt.
 Every answer must be global unicast. The connection is then made to one approved
 IP while TLS certificate verification, SNI, and the HTTP Host header retain the
-original hostname. Redirects are terminal by default.
+original hostname. Production rejects supplied TLS contexts that disable certificate
+or hostname verification or permit protocols below TLS 1.2; custom CA contexts remain
+supported when those controls stay enabled. Redirects are terminal by default.
+
+One aggregate attempt deadline covers signing-key lookup, DNS, the bounded address
+set (eight by default), redirects, request/response I/O, and connection cleanup. A
+mutable TLS context is revalidated immediately before I/O. Informational HTTP/1.1
+responses are consumed under shared count/header/time budgets until a final response;
+protocol upgrade (`101`) is unsupported and terminal.
 
 Response bodies are drained only up to configured limits and are discarded.
 2xx succeeds; 408, 425, 429, 5xx and transient transport failures retry. Other

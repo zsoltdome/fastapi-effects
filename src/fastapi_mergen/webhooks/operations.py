@@ -250,6 +250,7 @@ class WebhookOperations:
             actor=principal.subject_id,
             reason=reason,
             now=now,
+            destination_kind="webhook",
         )
 
     async def retain(

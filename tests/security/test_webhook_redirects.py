@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -15,7 +16,7 @@ from fastapi_mergen.core.delivery import (
 from fastapi_mergen.core.event import EventRecord
 from fastapi_mergen.core.principal import Principal
 from fastapi_mergen.core.retry import RetryPolicy
-from fastapi_mergen.errors import PermanentDeliveryError
+from fastapi_mergen.errors import PermanentDeliveryError, RetryableDeliveryError
 from fastapi_mergen.postgres.leasing import ClaimedDelivery
 from fastapi_mergen.sqlalchemy.canonical import canonical_sha256, versioned_canonical_bytes
 from fastapi_mergen.webhooks.address_policy import EndpointTarget
@@ -57,8 +58,20 @@ class _Resolver:
 
 
 class _Transport:
-    def __init__(self, *, maximum_redirects: int) -> None:
-        self.limits = TransportLimits(maximum_redirects=maximum_redirects)
+    def __init__(
+        self,
+        *,
+        maximum_redirects: int,
+        total_timeout_seconds: float = 30,
+        maximum_addresses: int = 8,
+    ) -> None:
+        self.limits = TransportLimits(
+            connect_timeout_seconds=min(5, total_timeout_seconds),
+            write_timeout_seconds=min(10, total_timeout_seconds),
+            total_timeout_seconds=total_timeout_seconds,
+            maximum_addresses=maximum_addresses,
+            maximum_redirects=maximum_redirects,
+        )
         self.requests: list[tuple[str, str, bytes, Mapping[str, str]]] = []
 
     async def send(
@@ -125,6 +138,145 @@ async def test_redirects_are_terminal_when_not_explicitly_enabled() -> None:
 
     assert raised.value.code == "webhook.redirect"
     assert len(transport.requests) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stalled_dependency", ["key_provider", "dns"])
+async def test_attempt_budget_includes_keys_and_dns(stalled_dependency: str) -> None:
+    class StalledSecrets(_Secrets):
+        async def eligible_for_signing(
+            self, *args: object, **kwargs: object
+        ) -> tuple[SigningSecret]:
+            if stalled_dependency == "key_provider":
+                await asyncio.Event().wait()
+            return await super().eligible_for_signing(*args, **kwargs)
+
+    class StalledResolver(_Resolver):
+        async def resolve(self, hostname: str, port: int) -> tuple[str, ...]:
+            if stalled_dependency == "dns":
+                await asyncio.Event().wait()
+            return await super().resolve(hostname, port)
+
+    sink = WebhookDeliverySink(
+        sessions=_Sessions(),  # type: ignore[arg-type]
+        secrets=StalledSecrets(),  # type: ignore[arg-type]
+        resolver=StalledResolver(),
+        transport=_Transport(  # type: ignore[arg-type]
+            maximum_redirects=0,
+            total_timeout_seconds=0.01,
+        ),
+        clock=_Clock(),
+    )
+    started = asyncio.get_running_loop().time()
+    with pytest.raises(RetryableDeliveryError, match=r"webhook\.attempt_timeout"):
+        await sink.deliver_attempt(_claim())
+    assert asyncio.get_running_loop().time() - started < 0.1
+
+
+@pytest.mark.asyncio
+async def test_address_attempt_count_is_bounded() -> None:
+    class ManyAddresses:
+        async def resolve(self, hostname: str, port: int) -> tuple[str, ...]:
+            del hostname, port
+            return tuple(f"93.184.216.{value}" for value in range(1, 21))
+
+    class FailingTransport(_Transport):
+        async def send(
+            self,
+            *,
+            endpoint: EndpointTarget,
+            connected_ip: str,
+            body: bytes,
+            headers: Mapping[str, str],
+        ) -> TransportResult:
+            self.requests.append((endpoint.url, connected_ip, body, headers))
+            raise RetryableDeliveryError(
+                code="webhook.transport_failed",
+                summary="Controlled address failure.",
+            )
+
+    transport = FailingTransport(maximum_redirects=0, maximum_addresses=3)
+    sink = WebhookDeliverySink(
+        sessions=_Sessions(),  # type: ignore[arg-type]
+        secrets=_Secrets(),  # type: ignore[arg-type]
+        resolver=ManyAddresses(),
+        transport=transport,  # type: ignore[arg-type]
+        clock=_Clock(),
+    )
+    with pytest.raises(RetryableDeliveryError, match=r"webhook\.transport_failed"):
+        await sink.deliver_attempt(_claim())
+    assert len(transport.requests) == 3
+
+
+@pytest.mark.asyncio
+async def test_address_limit_does_not_hide_a_disallowed_dns_answer() -> None:
+    class MixedAddresses:
+        async def resolve(self, hostname: str, port: int) -> tuple[str, ...]:
+            del hostname, port
+            return (
+                *(f"93.184.216.{value}" for value in range(1, 9)),
+                "127.0.0.1",
+            )
+
+    sink = WebhookDeliverySink(
+        sessions=_Sessions(),  # type: ignore[arg-type]
+        secrets=_Secrets(),  # type: ignore[arg-type]
+        resolver=MixedAddresses(),
+        transport=_Transport(  # type: ignore[arg-type]
+            maximum_redirects=0,
+            maximum_addresses=8,
+        ),
+        clock=_Clock(),
+    )
+    with pytest.raises(PermanentDeliveryError, match=r"webhook\.address_forbidden"):
+        await sink.deliver_attempt(_claim())
+
+
+@pytest.mark.asyncio
+async def test_retry_after_date_uses_the_post_response_clock() -> None:
+    started = datetime(2026, 8, 30, 12, tzinfo=UTC)
+
+    class AdvancingClock:
+        def __init__(self) -> None:
+            self.value = started
+
+        def now(self) -> datetime:
+            return self.value
+
+    clock = AdvancingClock()
+
+    class DelayedRetryTransport(_Transport):
+        async def send(
+            self,
+            *,
+            endpoint: EndpointTarget,
+            connected_ip: str,
+            body: bytes,
+            headers: Mapping[str, str],
+        ) -> TransportResult:
+            self.requests.append((endpoint.url, connected_ip, body, headers))
+            clock.value = started + timedelta(seconds=5)
+            return TransportResult(
+                connected_ip=connected_ip,
+                response=HttpResponseMetadata(
+                    status_code=503,
+                    headers={"retry-after": "Sun, 30 Aug 2026 12:00:10 GMT"},
+                    discarded_body_bytes=0,
+                ),
+            )
+
+    sink = WebhookDeliverySink(
+        sessions=_Sessions(),  # type: ignore[arg-type]
+        secrets=_Secrets(),  # type: ignore[arg-type]
+        resolver=_Resolver(),
+        transport=DelayedRetryTransport(maximum_redirects=0),  # type: ignore[arg-type]
+        clock=clock,
+    )
+
+    with pytest.raises(RetryableDeliveryError) as raised:
+        await sink.deliver_attempt(_claim())
+
+    assert raised.value.retry_after == timedelta(seconds=5)
 
 
 def _claim() -> ClaimedDelivery:

@@ -6,7 +6,6 @@ import asyncio
 import socket
 import ssl
 from collections.abc import Mapping
-from contextlib import suppress
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -67,6 +66,7 @@ class TransportLimits:
     write_timeout_seconds: float = 10.0
     total_timeout_seconds: float = 30.0
     maximum_request_bytes: int = 512 * 1024
+    maximum_addresses: int = 8
     maximum_redirects: int = 0
     response: ResponseLimits = field(default_factory=ResponseLimits)
 
@@ -77,6 +77,12 @@ class TransportLimits:
             raise ValueError("Webhook write timeout is invalid.")
         if not isinstance(self.maximum_request_bytes, int) or self.maximum_request_bytes < 1:
             raise ValueError("Webhook maximum request size must be positive.")
+        if (
+            not isinstance(self.maximum_addresses, int)
+            or isinstance(self.maximum_addresses, bool)
+            or not 1 <= self.maximum_addresses <= 64
+        ):
+            raise ValueError("Webhook address attempt limit must be in [1, 64].")
         if (
             not isinstance(self.maximum_redirects, int)
             or isinstance(self.maximum_redirects, bool)
@@ -106,6 +112,8 @@ class ExplicitIPTransport:
         self._production = production
         self._ssl_context = ssl_context or _secure_ssl_context()
         self._connection_opener = connection_opener or asyncio.open_connection
+        if self._production:
+            _validate_ssl_context(self._ssl_context)
 
     @property
     def limits(self) -> TransportLimits:
@@ -120,6 +128,11 @@ class ExplicitIPTransport:
         body: bytes,
         headers: Mapping[str, str],
     ) -> TransportResult:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._limits.total_timeout_seconds
+        if self._production:
+            # SSLContext is mutable, so revalidate immediately before every use.
+            _validate_ssl_context(self._ssl_context)
         approved = (
             validate_public_addresses([connected_ip])[0] if self._production else connected_ip
         )
@@ -131,7 +144,7 @@ class ExplicitIPTransport:
             )
         writer: asyncio.StreamWriter | None = None
         try:
-            async with asyncio.timeout(self._limits.total_timeout_seconds):
+            async with asyncio.timeout_at(deadline):
                 use_tls = endpoint.scheme == "https"
                 reader, connected_writer = await asyncio.wait_for(
                     self._connection_opener(
@@ -158,8 +171,14 @@ class ExplicitIPTransport:
         finally:
             if writer is not None:
                 writer.close()
-                with suppress(OSError, ssl.SSLError):
-                    await writer.wait_closed()
+                remaining = deadline - loop.time()
+                if remaining > 0:
+                    try:
+                        await asyncio.wait_for(writer.wait_closed(), timeout=remaining)
+                    except (OSError, ssl.SSLError, TimeoutError):
+                        _abort_writer(writer)
+                else:
+                    _abort_writer(writer)
 
 
 async def resolve_endpoint(
@@ -168,6 +187,7 @@ async def resolve_endpoint(
     resolver: AddressResolver,
     production: bool = True,
     allowed_ports: frozenset[int] = frozenset({443}),
+    maximum_addresses: int = 8,
 ) -> tuple[EndpointTarget, tuple[str, ...]]:
     endpoint = parse_endpoint(
         value,
@@ -175,11 +195,17 @@ async def resolve_endpoint(
         allowed_ports=allowed_ports,
     )
     addresses = await resolver.resolve(endpoint.hostname, endpoint.port)
+    if (
+        not isinstance(maximum_addresses, int)
+        or isinstance(maximum_addresses, bool)
+        or not 1 <= maximum_addresses <= 64
+    ):
+        raise MergenConfigurationError("Webhook address attempt limit is invalid.")
     if production:
         addresses = validate_public_addresses(list(addresses))
     elif not addresses:
         raise MergenConfigurationError("Webhook DNS resolver returned no addresses.")
-    return endpoint, addresses
+    return endpoint, tuple(addresses[:maximum_addresses])
 
 
 def _request_bytes(
@@ -214,6 +240,25 @@ def _secure_ssl_context() -> ssl.SSLContext:
     context.check_hostname = True
     context.verify_mode = ssl.CERT_REQUIRED
     return context
+
+
+def _validate_ssl_context(context: ssl.SSLContext) -> None:
+    if context.verify_mode != ssl.CERT_REQUIRED or not context.check_hostname:
+        raise MergenConfigurationError(
+            "Production webhook TLS requires certificate and hostname verification."
+        )
+    if int(context.minimum_version) < int(ssl.TLSVersion.TLSv1_2):
+        raise MergenConfigurationError("Production webhook TLS requires TLS 1.2 or newer.")
+    maximum = context.maximum_version
+    if maximum != ssl.TLSVersion.MAXIMUM_SUPPORTED and int(maximum) < int(ssl.TLSVersion.TLSv1_2):
+        raise MergenConfigurationError("Production webhook TLS maximum excludes TLS 1.2.")
+
+
+def _abort_writer(writer: asyncio.StreamWriter) -> None:
+    transport = getattr(writer, "transport", None)
+    abort = getattr(transport, "abort", None)
+    if callable(abort):
+        abort()
 
 
 __all__ = [

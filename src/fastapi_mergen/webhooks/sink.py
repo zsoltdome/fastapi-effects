@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -12,7 +13,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from fastapi_mergen.core.protocols import Clock
-from fastapi_mergen.core.retry import RetryPolicy
+from fastapi_mergen.core.retry import RetryPolicy, remaining_attempt_seconds
 from fastapi_mergen.core.runtime import SystemClock
 from fastapi_mergen.errors import (
     MergenConfigurationError,
@@ -84,6 +85,39 @@ class WebhookDeliverySink:
             del result
 
     async def deliver_attempt(self, claim: ClaimedDelivery) -> WebhookAttemptResult:
+        retry = claim.route_snapshot.get("retry")
+        lease_expires_at = claim.delivery.lease_expires_at
+        if not isinstance(retry, dict) or lease_expires_at is None:
+            raise MergenConfigurationError("Webhook attempt deadline is invalid.")
+        policy = RetryPolicy.from_dict(retry)
+        timeout_seconds = remaining_attempt_seconds(
+            policy=policy,
+            delivery_created_at=claim.delivery.created_at,
+            attempt_started_at=claim.attempt.started_at,
+            lease_expires_at=lease_expires_at,
+            now=self.clock.now(),
+            configured_limit_seconds=self.transport.limits.total_timeout_seconds,
+        )
+        if timeout_seconds <= 0:
+            raise RetryableDeliveryError(
+                code="webhook.attempt_timeout",
+                summary="Webhook attempt exceeded its aggregate deadline before execution.",
+            )
+        try:
+            async with asyncio.timeout(timeout_seconds):
+                return await self._deliver_attempt(claim, policy=policy)
+        except TimeoutError as exc:
+            raise RetryableDeliveryError(
+                code="webhook.attempt_timeout",
+                summary="Webhook attempt exceeded its aggregate deadline.",
+            ) from exc
+
+    async def _deliver_attempt(
+        self,
+        claim: ClaimedDelivery,
+        *,
+        policy: RetryPolicy,
+    ) -> WebhookAttemptResult:
         if claim.delivery.destination_kind != "webhook":
             raise PermanentDeliveryError(
                 code="webhook.destination_mismatch",
@@ -119,6 +153,7 @@ class WebhookDeliverySink:
                 resolver=self.resolver,
                 production=self.production,
                 allowed_ports=self.allowed_ports,
+                maximum_addresses=self.transport.limits.maximum_addresses,
             )
             last_error: RetryableDeliveryError | None = None
             transport_result = None
@@ -159,11 +194,11 @@ class WebhookDeliverySink:
                 )
             current_url = urljoin(endpoint.url, location.strip())
             redirect_count += 1
-        policy = RetryPolicy.from_dict(dict(claim.route_snapshot["retry"]))
+        response_received_at = self.clock.now()
         classification = classify_response(
             response.status_code,
             response.headers,
-            now=now,
+            now=response_received_at,
             maximum_retry_after=timedelta(seconds=policy.maximum_delay_seconds),
             deadline=claim.delivery.created_at + timedelta(seconds=policy.maximum_elapsed_seconds),
         )

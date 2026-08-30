@@ -22,7 +22,7 @@ from fastapi_mergen.webhooks.secrets import (
 )
 from fastapi_mergen.webhooks.sink import WebhookDeliverySink
 from fastapi_mergen.webhooks.subscriptions import SubscriptionRepository, WebhookRouteProvider
-from fastapi_mergen.webhooks.transport import TransportResult
+from fastapi_mergen.webhooks.transport import TransportLimits, TransportResult
 from tests.integration.postgres import ProvisionedDatabase
 
 pytestmark = [pytest.mark.integration, pytest.mark.security]
@@ -36,6 +36,7 @@ class LoopbackResolver:
 
 class DeduplicatingReceiverTransport:
     def __init__(self) -> None:
+        self.limits = TransportLimits()
         self.requests: list[tuple[bytes, dict[str, str]]] = []
         self.effective: set[str] = set()
 

@@ -129,6 +129,12 @@ def webhook_retention_sql(roles: RuntimeRoles | None = None) -> tuple[str, ...]:
                 RAISE EXCEPTION 'webhook retention arguments are invalid'
                     USING ERRCODE = 'invalid_parameter_value';
             END IF;
+            PERFORM pg_catalog.pg_advisory_xact_lock(
+                pg_catalog.hashtextextended(
+                    'fastapi-mergen:webhook-retention:' || requested_tenant::text,
+                    0
+                )
+            );
 
             WITH locked AS (
                 SELECT a.tenant_id, a.attempt_id
@@ -162,6 +168,11 @@ def webhook_retention_sql(roles: RuntimeRoles | None = None) -> tuple[str, ...]:
                       SELECT 1 FROM {SCHEMA}.attempts AS a
                       WHERE a.tenant_id = d.tenant_id
                         AND a.delivery_id = d.delivery_id
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM {SCHEMA}.deliveries AS replay
+                      WHERE replay.tenant_id = d.tenant_id
+                        AND replay.replay_of = d.delivery_id
                   )
                 ORDER BY d.updated_at, d.delivery_id
                 LIMIT requested_batch FOR UPDATE OF d SKIP LOCKED
