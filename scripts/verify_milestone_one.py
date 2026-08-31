@@ -16,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "src" / "fastapi_mergen"
 AUTHOR_NAME = "mergen-institute"
 AUTHOR_EMAIL = "mergen-institute@users.noreply.github.com"
+RECOVERED_BASELINE_COMMIT = "6b8d3626445bd577cc6c5af80f3b84e30e2c7712"
+RECOVERED_BASELINE_EMAIL = "zsemed@gmail.com"
 ALLOWED_BRANCH_PREFIXES = {"build", "chore", "ci", "docs", "feat", "fix", "refactor", "test"}
 REQUIRED_PATHS = {
     "pyproject.toml",
@@ -377,12 +379,23 @@ def check_git_governance(*, require_clean: bool) -> None:
     records = run_git(
         "log",
         "--branches",
-        "--format=%an%x1f%ae%x1f%cn%x1f%ce%x1f%s",
+        "--format=%H%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%s",
     ).splitlines()
     if not records:
         fail("Git history is empty")
     for record in records:
-        author, author_email, committer, committer_email, subject = record.split("\x1f")
+        commit, author, author_email, committer, committer_email, subject = record.split("\x1f")
+        if commit == RECOVERED_BASELINE_COMMIT:
+            expected = (
+                AUTHOR_NAME,
+                RECOVERED_BASELINE_EMAIL,
+                AUTHOR_NAME,
+                RECOVERED_BASELINE_EMAIL,
+                ".gitignore",
+            )
+            if (author, author_email, committer, committer_email, subject) != expected:
+                fail("documented recovered baseline identity changed")
+            continue
         if (author, committer) != (AUTHOR_NAME, AUTHOR_NAME):
             fail(f"non-Mergen author or committer found: {subject}")
         if (author_email, committer_email) != (AUTHOR_EMAIL, AUTHOR_EMAIL):

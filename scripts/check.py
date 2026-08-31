@@ -24,6 +24,12 @@ def require(command: str) -> None:
         )
 
 
+def built_distributions(directory: Path) -> tuple[Path, ...]:
+    """Return only distribution formats produced by ``uv build``."""
+    artifacts = (*directory.glob("*.whl"), *directory.glob("*.tar.gz"))
+    return tuple(sorted(artifacts))
+
+
 def main() -> int:
     for command in ("uv", "ruff", "mypy", "pytest", "twine"):
         require(command)
@@ -45,9 +51,11 @@ def main() -> int:
     run(sys.executable, "scripts/audit_milestone_eleven.py")
     run(sys.executable, "scripts/audit_milestone_twelve.py")
     run(sys.executable, "scripts/audit_milestone_thirteen.py")
+    run(sys.executable, "scripts/audit_release_candidate.py", "--phase", "auto")
+    run(sys.executable, "scripts/check_documentation.py")
     run("pytest", "-q", "-m", "not integration and not packaging")
     run(sys.executable, "scripts/build_and_test_artifacts.py")
-    distributions = tuple(sorted((ROOT / "dist").glob("*")))
+    distributions = built_distributions(ROOT / "dist")
     if not distributions:
         raise SystemExit("Artifact build did not create wheel or sdist files.")
     run("twine", "check", *(str(path) for path in distributions))

@@ -5,10 +5,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import fastapi_mergen
 from fastapi_mergen.postgres.revisions import MIGRATION_HEAD, SCHEMA_REVISION_REGISTRY
+from fastapi_mergen.readiness import validate_readiness_record
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = (
@@ -138,19 +141,22 @@ def main() -> int:
     readiness = json.loads(
         (ROOT / "docs/planning/production-readiness-record.json").read_text(encoding="utf-8")
     )
-    externally_blocked = (
-        len(readiness.get("partners", [])) < 2
-        or readiness.get("independent_security_review", {}).get("status") != "complete"
-        or readiness.get("rc_observation", {}).get("status") != "complete"
-        or readiness.get("approval", {}).get("decision") != "go"
+    release_phase = fastapi_mergen.__version__ in {"1.0.0rc1", "1.0.0"}
+    record_errors = validate_readiness_record(
+        readiness,
+        require_candidate=release_phase,
     )
-    if not externally_blocked:
-        raise AssertionError("Pre-RC repository unexpectedly reports external approval")
+    if record_errors:
+        raise AssertionError(f"M13 readiness record is invalid: {record_errors}")
     if args.require_external:
-        raise AssertionError(
-            "External design-partner, independent-review, and RC observation gates are incomplete"
+        if not release_phase:
+            raise AssertionError("External readiness is not applicable before an RC/final version")
+        subprocess.run(
+            [sys.executable, "scripts/audit_release_candidate.py", "--phase", "auto"],
+            cwd=ROOT,
+            check=True,
         )
-    print("Milestone 13 local hardening audit passed; external RC/v1 gates remain fail-closed.")
+    print("Milestone 13 implementation and readiness-record structure audit passed.")
     return 0
 
 

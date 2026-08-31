@@ -9,63 +9,149 @@ from pathlib import Path
 from typing import Any
 
 from fastapi_mergen import __version__
+from fastapi_mergen.readiness import (
+    partner_is_complete,
+    valid_digest,
+    valid_observation_interval,
+    validate_readiness_record,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 RECORD = ROOT / "docs" / "planning" / "production-readiness-record.json"
 
 
-def audit(phase: str = "final") -> dict[str, Any]:
-    readiness = json.loads(RECORD.read_text(encoding="utf-8"))
+def audit(
+    phase: str = "final",
+    *,
+    readiness: dict[str, Any] | None = None,
+    version: str | None = None,
+) -> dict[str, Any]:
+    if readiness is None:
+        readiness = json.loads(RECORD.read_text(encoding="utf-8"))
+    current_version = __version__ if version is None else version
+    selected_phase = _release_phase(phase, version=current_version)
+    selected_capabilities = readiness.get("selected_capabilities")
+    if not isinstance(selected_capabilities, list) or any(
+        not isinstance(item, str) for item in selected_capabilities
+    ):
+        selected_capabilities = []
     partners = readiness.get("partners", [])
-    completed_partners = [
-        partner
-        for partner in partners
-        if partner.get("status") == "complete"
-        and partner.get("approved_by_partner") is True
-        and partner.get("approved_by_maintainer") is True
-        and partner.get("evidence_digest")
-    ]
+    completed_partners = (
+        [
+            partner
+            for partner in partners
+            if partner_is_complete(
+                partner,
+                selected_capabilities=selected_capabilities,
+            )
+        ]
+        if isinstance(partners, list)
+        else []
+    )
     security = readiness.get("independent_security_review", {})
     observation = readiness.get("rc_observation", {})
     approval = readiness.get("approval", {})
-    selected_phase = _release_phase(phase)
+    record_errors = validate_readiness_record(
+        readiness,
+        require_candidate=selected_phase != "pre-v1",
+    )
+    if selected_phase == "pre-v1":
+        checks = {
+            "readiness_record_valid": not record_errors,
+            "v1_readiness_gate_not_yet_applicable": True,
+        }
+        return _report(
+            checks=checks,
+            record_errors=record_errors,
+            phase=selected_phase,
+            version=current_version,
+        )
     checks = {
+        "readiness_record_valid": not record_errors,
         "release_version_matches_phase": (
-            __version__ == "1.0.0rc1" if selected_phase == "rc" else __version__ == "1.0.0"
+            current_version == "1.0.0rc1" if selected_phase == "rc" else current_version == "1.0.0"
         ),
         "candidate_record_matches": readiness.get("candidate_version") == "1.0.0rc1",
+        "candidate_source_and_artifacts_bound": (
+            isinstance(readiness.get("candidate_source_commit"), str)
+            and len(readiness["candidate_source_commit"]) == 40
+            and isinstance(readiness.get("candidate_artifact_digests"), list)
+            and bool(readiness["candidate_artifact_digests"])
+            and all(valid_digest(value) for value in readiness["candidate_artifact_digests"])
+        ),
         "two_completed_external_partners": len(completed_partners) >= 2,
-        "independent_security_review_complete": security.get("status") == "complete",
-        "no_unresolved_critical_or_high": security.get("unresolved_critical_or_high") is False,
+        "independent_security_review_complete": (
+            isinstance(security, dict)
+            and security.get("status") == "complete"
+            and valid_digest(security.get("evidence_digest"))
+        ),
+        "no_unresolved_critical_or_high": (
+            isinstance(security, dict) and security.get("unresolved_critical_or_high") is False
+        ),
     }
     if selected_phase == "final":
         checks.update(
-            rc_observation_complete=observation.get("status") == "complete",
-            observation_not_reset=observation.get("reset_by_contract_change") is False,
-            no_observation_blockers=observation.get("release_blockers") == [],
-            explicit_go_decision=approval.get("decision") == "go",
-            two_approvers=len(approval.get("approvers", [])) >= 2,
+            rc_observation_complete=(
+                isinstance(observation, dict)
+                and observation.get("status") == "complete"
+                and valid_observation_interval(observation)
+            ),
+            observation_not_reset=(
+                isinstance(observation, dict)
+                and observation.get("reset_by_contract_change") is False
+            ),
+            no_observation_blockers=(
+                isinstance(observation, dict) and observation.get("release_blockers") == []
+            ),
+            explicit_go_decision=(isinstance(approval, dict) and approval.get("decision") == "go"),
+            two_approvers=_has_two_distinct_approvers(approval),
         )
-    if selected_phase == "pre-v1":
-        checks = {"v1_readiness_gate_not_yet_applicable": True}
+    return _report(
+        checks=checks,
+        record_errors=record_errors,
+        phase=selected_phase,
+        version=current_version,
+    )
+
+
+def _report(
+    *,
+    checks: dict[str, bool],
+    record_errors: tuple[str, ...],
+    phase: str,
+    version: str,
+) -> dict[str, Any]:
     return {
-        "schema_version": 1,
-        "version": __version__,
-        "phase": selected_phase,
+        "schema_version": 2,
+        "version": version,
+        "phase": phase,
         "result": "pass" if all(checks.values()) else "blocked",
         "checks": checks,
         "blocking_checks": [name for name, passed in checks.items() if not passed],
+        "record_errors": list(record_errors),
     }
 
 
-def _release_phase(requested: str) -> str:
+def _release_phase(requested: str, *, version: str) -> str:
     if requested != "auto":
         return requested
-    if __version__ == "1.0.0rc1":
+    if version == "1.0.0rc1":
         return "rc"
-    if __version__ == "1.0.0":
+    if version == "1.0.0":
         return "final"
     return "pre-v1"
+
+
+def _has_two_distinct_approvers(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    approvers = value.get("approvers")
+    return (
+        isinstance(approvers, list)
+        and len(approvers) >= 2
+        and all(isinstance(item, str) and item for item in approvers)
+        and len(approvers) == len(set(approvers))
+    )
 
 
 def main() -> int:

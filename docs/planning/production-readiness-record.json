@@ -1,14 +1,21 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "candidate_version": null,
+  "candidate_source_commit": null,
+  "candidate_artifact_digests": [],
+  "selected_capabilities": [],
   "partners": [],
   "independent_security_review": {
     "status": "pending",
     "evidence_digest": null,
-    "unresolved_critical_or_high": null
+    "unresolved_critical_or_high": null,
+    "issues": []
   },
   "rc_observation": {
     "status": "not_started",
+    "candidate_version": null,
+    "candidate_source_commit": null,
+    "candidate_artifact_digests": [],
     "started_at": null,
     "completed_at": null,
     "reset_by_contract_change": false,

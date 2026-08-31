@@ -130,4 +130,7 @@ python scripts/audit_milestone_seven.py \
 The audit checks source structure, metadata, packaged specifications, every reference
 profile, every injected fault, all report formats, public API boundaries, pinned
 GitHub Actions, Git authorship, branch ancestry, commit-message length, clean state,
-and Git object integrity.
+and Git object integrity. Commit `6b8d362` is an explicit immutable recovery-baseline
+exception for its original email and `.gitignore` subject; later commits remain subject
+to the normal identity and subject rules. The exception preserves provenance rather
+than rewriting published history.
