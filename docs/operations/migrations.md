@@ -26,10 +26,19 @@ components, and never invokes Alembic.
 
 Every published revision is upgraded to head in the PostgreSQL 16/18 matrix with seeded
 rows. Tests verify row preservation, ownership, forced RLS, and the command mutation
-trigger. Empty-schema downgrades are supported for disposable environments. A downgrade
-that would drop a nonempty component is deliberately rejected.
+trigger. Revisions `0001` through `0005` use immutable versioned DDL and security SQL,
+not current ORM collections or current grant/RLS helpers. A golden digest detects any
+attempt to rewrite that published migration contract; schema evolution requires a new
+revision. Empty-schema downgrades are supported for disposable environments. A
+downgrade that would drop a nonempty component is deliberately rejected.
 Revision `0005_webhook_retention` has a data-preserving downgrade to `0004_commands`:
 it removes only the retention function and restores the webhook marker to revision 1.
+
+The 2026-09-07 [published-artifact inventory](../audits/2026-09-07/published-artifact-inventory.json)
+found no PyPI/TestPyPI release, local repository tag, or retained historical
+distribution. Upgrading from a historical published artifact is therefore recorded as
+`NOT_APPLICABLE`, with the explicit limitation that any privately retained artifact
+outside this workspace must be added to the inventory before candidate approval.
 
 For a production rollback, stop writers and relays, retain the old application artifact,
 take and verify a logical backup, restore it into a separate database, run the desired

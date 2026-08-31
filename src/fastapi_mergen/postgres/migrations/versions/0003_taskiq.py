@@ -8,11 +8,14 @@ from __future__ import annotations
 
 from alembic import op
 
-from fastapi_mergen.executors.taskiq.models import TASKIQ_TABLES
-from fastapi_mergen.postgres.executor_schema import executor_schema_sql
+from fastapi_mergen.postgres.migrations.frozen_v1 import (
+    SCHEMA_V1,
+    TASKIQ_DDL_V1,
+    TASKIQ_TABLE_NAMES_V1,
+    executor_schema_sql_v1,
+    role_names_v1,
+)
 from fastapi_mergen.postgres.migrations.safety import reject_nonempty_downgrade
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.sqlalchemy.models import SCHEMA
 
 revision = "0003_taskiq"
 down_revision = "0002_webhooks"
@@ -21,28 +24,26 @@ depends_on = None
 
 
 def upgrade() -> None:
-    connection = op.get_bind()
     config = op.get_context().config
     if config is None:
         raise RuntimeError("Alembic migration configuration is unavailable.")
-    configured = config.attributes.get("runtime_roles", RuntimeRoles())
-    if not isinstance(configured, RuntimeRoles):
-        raise TypeError("runtime_roles must be a RuntimeRoles value.")
-    for table in TASKIQ_TABLES:
-        table.create(connection, checkfirst=True)
-        op.execute(f"ALTER TABLE {SCHEMA}.{table.name} OWNER TO {configured.migration}")
+    configured = role_names_v1(config)
+    for statement in TASKIQ_DDL_V1:
+        op.execute(statement)
+    for table in TASKIQ_TABLE_NAMES_V1:
+        op.execute(f"ALTER TABLE {SCHEMA_V1}.{table} OWNER TO {configured.migration}")
     op.execute(
-        f"INSERT INTO {SCHEMA}.schema_revision(component, revision, installed_at) "
+        f"INSERT INTO {SCHEMA_V1}.schema_revision(component, revision, installed_at) "
         "VALUES ('executor.taskiq', 1, CURRENT_TIMESTAMP) ON CONFLICT (component) "
         "DO UPDATE SET revision = EXCLUDED.revision, installed_at = EXCLUDED.installed_at"
     )
-    for statement in executor_schema_sql(configured):
+    for statement in executor_schema_sql_v1(configured):
         op.execute(statement)
 
 
 def downgrade() -> None:
     connection = op.get_bind()
-    reject_nonempty_downgrade(connection, tuple(table.name for table in TASKIQ_TABLES))
-    op.execute(f"DELETE FROM {SCHEMA}.schema_revision WHERE component = 'executor.taskiq'")
-    for table in reversed(TASKIQ_TABLES):
-        table.drop(connection, checkfirst=True)
+    reject_nonempty_downgrade(connection, TASKIQ_TABLE_NAMES_V1)
+    op.execute(f"DELETE FROM {SCHEMA_V1}.schema_revision WHERE component = 'executor.taskiq'")
+    for table in reversed(TASKIQ_TABLE_NAMES_V1):
+        op.execute(f"DROP TABLE IF EXISTS {SCHEMA_V1}.{table}")
