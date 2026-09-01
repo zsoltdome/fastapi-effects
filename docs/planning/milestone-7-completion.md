@@ -42,7 +42,7 @@ queue, a hosted control plane, or a replacement MCP implementation.
 | Complete-profile checks | PASS | Nineteen checks passed |
 | Fault-injection oracle | PASS | Twenty injected defects detected |
 | Evidence/report formats | PASS | JSON, JUnit, SARIF, and Markdown |
-| Git governance | PASS | Sole author/committer, compliant subjects and branches |
+| Git governance | PASS with documented recovered-baseline exception | New history uses the project no-reply identity and compliant subjects/branches; recovered commit `6b8d362` retains its original email and one-word subject rather than rewriting history |
 | Git object integrity | PASS | `git fsck --full` |
 | Live PostgreSQL integration | SKIPPED | `MERGEN_TEST_ADMIN_DSN` was not configured |
 | Ruff | NOT RUN | Executable unavailable in the packaging environment |

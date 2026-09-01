@@ -1,12 +1,28 @@
-# FastAPI-Mergen — Audited 9/10 Product and Engineering Plan
+# FastAPI-Mergen — Product and Engineering Plan
 
 **Date:** 2026-08-24  
-**Status:** pre-alpha; no production code exists yet  
+**Current baseline:** 2026-09-07, production-hardening alpha `0.11.0a1`
+**Status:** substantial runtime exists; repaired behavior needs candidate-bound hosted
+and external verification before a production-support promise
 **Distribution:** `fastapi-mergen`  
 **Import package:** `fastapi_mergen`  
 **Console command:** `fastapi-mergen`  
 **Market category:** tenant-safe effects  
 **Technical category:** principal-preserving transactional eventing
+
+The scorecard and milestone estimates below are preserved as the historical design
+baseline. They are not the current implementation status. The repository now contains
+the PostgreSQL runtime, handlers, webhooks, Taskiq handoffs, command idempotency,
+delegation/FastMCP, migrations, operations, and conformance adapters. The truthful
+recovery provenance remains in [runtime-recovery.md](runtime-recovery.md); current
+capability maturity and evidence are tracked separately in
+[capability-evidence-ledger.md](capability-evidence-ledger.md).
+
+The immediate engineering baseline is: findings F01–F18 have implementations and local
+regressions in the remediation tree, including evidence/governance repair F10.
+PostgreSQL 16/18, exact-candidate artifacts, hosted CI, external deployment, independent
+review, and RC observation remain distinct gates. No checked historical milestone or
+local result implies those later gates.
 
 > **Verdict: build it.** The product is now narrow enough to execute, internally coherent enough to test, and differentiated enough to justify a separate library.
 >

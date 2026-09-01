@@ -45,6 +45,32 @@ with explicit pre-1.0 contract and evidence-schema notes.
 - Version advanced to the delegation/FastMCP alpha `0.11.0a1`.
 - The invoicing example now completes request → atomic publication → relay →
   tenant-bound handler end to end.
+- Taskiq worker admission now rejects handoffs from reclaimed attempts before handler
+  execution; relay lease loss is isolated per delivery.
+- Retry elapsed time is a latest-finish deadline enforced during scheduling, claim,
+  reconciliation, webhook/handler execution, Taskiq admission/enqueue, and finalization;
+  expired leases cannot finalize before reconciliation.
+- Webhook attempts now share one aggregate dependency/network/cleanup budget, validate
+  production TLS contexts, validate the complete DNS answer set before bounding address
+  attempts, and consume informational HTTP responses before classifying the final
+  response.
+- Tenant webhook replay now uses an atomic insert-from-terminal-source path that works
+  with the application role's least-privilege `SELECT, INSERT` grant.
+- The webhook router now resolves its closure-scoped FastAPI dependencies correctly;
+  replay and management endpoints no longer treat injected principal/session values as
+  required query fields.
+- Historical revisions now use immutable versioned DDL/security definitions, protected
+  by migration-matrix and golden-contract tests.
+- RC/final readiness auditing is phase-aware and validates candidate-bound partner,
+  review, observation, issue, digest, and approval evidence instead of truthy placeholders.
+- The shared release check selects its readiness phase automatically, allowing populated
+  RC/final records to reach their applicable gate.
+- Git governance preserves the exact documented recovery-baseline provenance exception
+  while continuing to enforce current identity and subject rules for later commits.
+- The local release gate now passes only wheel and sdist files to Twine, so metadata
+  such as `dist/.gitignore` cannot create a false artifact-validation failure.
+- Documentation and capability evidence paths must resolve inside the repository, and
+  ledger source, timestamp, lock, and artifact bindings receive structural validation.
 
 ### Documentation
 

@@ -128,6 +128,7 @@ Start with:
 4. [Production operations](docs/operations/migrations.md);
 5. [Certification operations](docs/operations/certification.md);
 6. [Security policy](SECURITY.md).
+7. [Current remediation and open evidence gates](docs/planning/current-remediation.md).
 
 ## Development
 

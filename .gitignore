@@ -28,4 +28,11 @@ Thumbs.db
 .env.*
 !.env.example
 .mergen-test-state/
-sup/
+
+# Preserve the supplied planning/audit record while ignoring unrelated scratch files.
+sup/*
+!sup/audit_road.md
+!sup/remediation.md
+!sup/plan.md
+!sup/todo.md
+!sup/next-development-phase-todo.md
