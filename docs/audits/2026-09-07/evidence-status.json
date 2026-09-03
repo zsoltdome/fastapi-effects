@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "audit_date": "2026-09-07",
+  "recorded_at": "2026-09-07T18:30:00+02:00",
+  "historical_archive": {
+    "supplied_name": "FastAPI-Mergen-main(1).zip",
+    "claimed_sha256": "14db08002daa8771699d03b925dbccba46e5a39857db4a637818ebb2e3039fb0",
+    "availability": "unavailable",
+    "digest_recomputed": false
+  },
+  "available_sources": [
+    {"supplied_name": "audit_road.md", "repository_path": "sup/audit_road.md"},
+    {"supplied_name": "remediation.md", "repository_path": "sup/remediation.md"},
+    {"supplied_name": "plan(8).md", "repository_path": "sup/plan.md"},
+    {"supplied_name": "todo(8).md", "repository_path": "sup/todo.md"}
+  ],
+  "unavailable_evidence": [
+    "results/audit-manifest.json",
+    "results/pytest-available.log",
+    "results/pytest-available.xml",
+    "results/probes.json",
+    "reproduce_findings.py",
+    "source-evidence.md",
+    "results/artifact-build.json",
+    "results/planning-reconciliation.json"
+  ],
+  "classification": "historical_audit_narrative_only",
+  "current_evidence_source": "docs/planning/capability-evidence-ledger.json"
+}

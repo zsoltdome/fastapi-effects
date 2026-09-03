@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-07T18:37:35+02:00",
+  "distribution": "fastapi-mergen",
+  "source_repository": "https://github.com/mergen-institute/FastAPI-Mergen",
+  "queries": [
+    {
+      "kind": "pypi_json",
+      "url": "https://pypi.org/pypi/fastapi-mergen/json",
+      "http_status": 404
+    },
+    {
+      "kind": "testpypi_json",
+      "url": "https://test.pypi.org/pypi/fastapi-mergen/json",
+      "http_status": 404
+    },
+    {
+      "kind": "github_releases_unauthenticated",
+      "url": "https://api.github.com/repos/mergen-institute/FastAPI-Mergen/releases",
+      "http_status": 404,
+      "limitation": "A 404 cannot distinguish a private repository from an absent repository or release collection."
+    }
+  ],
+  "local_repository": {
+    "tags": [],
+    "remote_refs_available": ["refs/remotes/origin/main"],
+    "historical_retained_distributions": [],
+    "current_local_non_authoritative_distributions": [
+      "dist/fastapi_mergen-0.11.0a1-py3-none-any.whl",
+      "dist/fastapi_mergen-0.11.0a1.tar.gz"
+    ]
+  },
+  "historical_schema_bearing_artifacts": {
+    "status": "NOT_APPLICABLE",
+    "reason": "No public index release, repository tag, or locally retained historical distribution was identifiable. Private artifacts, if any exist outside this workspace, must be added before candidate approval."
+  },
+  "candidate_revision_coverage": [
+    "0001_core_runtime",
+    "0002_webhooks",
+    "0003_taskiq",
+    "0004_commands",
+    "0005_webhook_retention"
+  ]
+}

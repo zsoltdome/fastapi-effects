@@ -236,7 +236,7 @@ locations, and attestation identifiers.
 - [ ] Keep partner, independent-review, observation, and publication stages open.
 - [ ] Validate every ledger path, digest, timestamp, dependency version, and owner.
 - [ ] Regenerate the human-readable ledger from or reconcile it against the same facts.
-- [ ] Review the findings register; attach hosted regressions to F01–F16 and reopen any
+- [ ] Review the findings register; attach hosted regressions to F01–F18 and reopen any
   contradicted disposition.
 
 **Done when:** another maintainer can reproduce every hosted claim from the ledger
