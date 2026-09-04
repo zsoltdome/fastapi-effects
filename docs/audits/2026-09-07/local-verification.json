@@ -3,7 +3,7 @@
   "recorded_at": "2026-09-08T12:35:17+02:00",
   "release_evidence_authority": false,
   "source": {
-    "base_commit": "dfbd96d970cf330e7eea6ae09d9a3cc13b72de63",
+    "base_commit": "3437084796206308f42a9517616f7bda0c7a0901",
     "state": "committed_local_verification",
     "limitation": "Results are bound to this local source commit and local artifacts, not protected hosted or release evidence."
   },
