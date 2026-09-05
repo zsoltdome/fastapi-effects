@@ -3,6 +3,10 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
+
+import pytest
+from scripts import audit_milestone_seven
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -17,3 +21,39 @@ def test_milestone_seven_structural_gate() -> None:
         cwd=ROOT,
         check=True,
     )
+
+
+def test_git_governance_scopes_history_and_preserves_exact_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recovery = (
+        "6b8d3626445bd577cc6c5af80f3b84e30e2c7712\x00"
+        "mergen-institute\x00zsemed@gmail.com\x00"
+        "mergen-institute\x00zsemed@gmail.com\x00.gitignore"
+    )
+    current = (
+        "a" * 40
+        + "\x00mergen-institute\x00mergen-institute@users.noreply.github.com"
+        + "\x00mergen-institute\x00mergen-institute@users.noreply.github.com"
+        + "\x00Harden delivery runtime boundaries"
+    )
+
+    def run_git(*arguments: str) -> str:
+        if arguments[:2] == ("log", "--branches"):
+            return f"{current}\n{recovery}"
+        if arguments[0] == "for-each-ref":
+            return "main"
+        if arguments[0] == "status":
+            return ""
+        raise AssertionError(f"Unexpected Git arguments: {arguments}")
+
+    def run(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        del args, kwargs
+        return subprocess.CompletedProcess([], 0, "", "")
+
+    monkeypatch.setattr(audit_milestone_seven, "run_git", run_git)
+    monkeypatch.setattr(audit_milestone_seven.subprocess, "run", run)
+
+    result = audit_milestone_seven.check_git_governance()
+
+    assert "governed identities" in result

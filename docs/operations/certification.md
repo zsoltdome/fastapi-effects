@@ -133,4 +133,6 @@ GitHub Actions, Git authorship, branch ancestry, commit-message length, clean st
 and Git object integrity. Commit `6b8d362` is an explicit immutable recovery-baseline
 exception for its original email and `.gitignore` subject; later commits remain subject
 to the normal identity and subject rules. The exception preserves provenance rather
-than rewriting published history.
+than rewriting published history. Governance evaluates commits reachable from
+controlled local branches; fetched remote bot or contributor refs are outside that
+authorship assertion and do not weaken checks on `main`.

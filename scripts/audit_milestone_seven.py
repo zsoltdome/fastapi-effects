@@ -47,6 +47,8 @@ from fastapi_mergen.testing import Fault, ReferenceBoundaryDriver  # noqa: E402
 MINIMUM_RELEASE = (0, 6, 0)
 AUTHOR_NAME = "mergen-institute"
 AUTHOR_EMAIL = "mergen-institute@users.noreply.github.com"
+RECOVERED_BASELINE_COMMIT = "6b8d3626445bd577cc6c5af80f3b84e30e2c7712"
+RECOVERED_BASELINE_EMAIL = "zsemed@gmail.com"
 ALLOWED_BRANCH_PREFIXES = {
     "build",
     "chore",
@@ -318,16 +320,45 @@ def check_workflow_pins() -> str:
 
 
 def check_git_governance() -> str:
-    identities = set(run_git("log", "--all", "--format=%an%x00%ae%x00%cn%x00%ce").splitlines())
-    expected = f"{AUTHOR_NAME}\x00{AUTHOR_EMAIL}\x00{AUTHOR_NAME}\x00{AUTHOR_EMAIL}"
-    if identities != {expected}:
-        raise AssertionError(f"unexpected Git identities: {sorted(identities)}")
+    records = run_git(
+        "log",
+        "--branches",
+        "--format=%H%x00%an%x00%ae%x00%cn%x00%ce%x00%s",
+    ).splitlines()
+    if not records:
+        raise AssertionError("Git history is empty")
+    bad_identities: list[str] = []
     bad_subjects: list[str] = []
-    for line in run_git("log", "--all", "--format=%H%x00%s").splitlines():
-        commit, subject = line.split("\x00", 1)
+    for line in records:
+        commit, author, author_email, committer, committer_email, subject = line.split("\x00", 5)
+        if commit == RECOVERED_BASELINE_COMMIT:
+            recovered = (
+                author,
+                author_email,
+                committer,
+                committer_email,
+                subject,
+            )
+            expected_recovered = (
+                AUTHOR_NAME,
+                RECOVERED_BASELINE_EMAIL,
+                AUTHOR_NAME,
+                RECOVERED_BASELINE_EMAIL,
+                ".gitignore",
+            )
+            if recovered != expected_recovered:
+                bad_identities.append(f"{commit[:10]}:recovered baseline changed")
+            continue
+        if (author, committer) != (AUTHOR_NAME, AUTHOR_NAME) or (
+            author_email,
+            committer_email,
+        ) != (AUTHOR_EMAIL, AUTHOR_EMAIL):
+            bad_identities.append(f"{commit[:10]}:{subject}")
         words = subject.split()
         if not 3 <= len(words) <= 7:
             bad_subjects.append(f"{commit[:10]}:{subject}")
+    if bad_identities:
+        raise AssertionError(f"unexpected Git identities: {bad_identities}")
     if bad_subjects:
         raise AssertionError(f"commit subjects outside 3-7 words: {bad_subjects}")
     branches = run_git("for-each-ref", "--format=%(refname:short)", "refs/heads").splitlines()
@@ -351,7 +382,9 @@ def check_git_governance() -> str:
     if run_git("status", "--porcelain"):
         raise AssertionError("Git working tree is not clean")
     subprocess.run(("git", "fsck", "--full"), cwd=ROOT, check=True, capture_output=True)
-    return f"{len(branches)} branches, sole identity, clean tree, and Git integrity passed"
+    return (
+        f"{len(branches)} local branches, governed identities, clean tree, and Git integrity passed"
+    )
 
 
 def execute_gate(gate: Gate, callback: Callable[[], str]) -> None:
