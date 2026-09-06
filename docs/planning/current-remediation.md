@@ -1,7 +1,7 @@
 # Current remediation status
 
 **Baseline:** `0.11.0a1`, committed local-verification source
-`3437084796206308f42a9517616f7bda0c7a0901`
+`9d6896d3fd4e083946fe1bb620835322b8af6d37`
 **Detailed audit-origin plan:** the supplied `sup/audit_road.md`, `sup/remediation.md`,
 `sup/plan.md`, and `sup/todo.md` now have explicit Git-trackable exceptions. The missing
 ZIP and evidence files are governed as unavailable in

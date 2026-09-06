@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-09-08T12:35:17+02:00",
+  "recorded_at": "2026-09-08T12:47:08+02:00",
   "release_evidence_authority": false,
   "source": {
-    "base_commit": "3437084796206308f42a9517616f7bda0c7a0901",
+    "base_commit": "9d6896d3fd4e083946fe1bb620835322b8af6d37",
     "state": "committed_local_verification",
     "limitation": "Results are bound to this local source commit and local artifacts, not protected hosted or release evidence."
   },
@@ -51,6 +51,11 @@
       "command": "MERGEN_TEST_ADMIN_DSN=<postgresql-18> MERGEN_TEST_REDIS_URL=<redis> uv run pytest -q -m integration",
       "result": "pass",
       "detail": "45 passed; 273 deselected; no skipped tests."
+    },
+    {
+      "command": "uv run python scripts/audit_milestone_seven.py",
+      "result": "pass",
+      "detail": "Full Git governance passed over controlled local branches with the exact documented recovery-baseline exception; fetched remote bot refs did not enter the project-authorship assertion."
     }
   ]
 }

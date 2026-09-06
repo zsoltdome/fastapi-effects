@@ -2,7 +2,7 @@
 
 This ledger separates implementation from local, hosted, external, and release evidence.
 The local verification is bound to source commit
-`3437084796206308f42a9517616f7bda0c7a0901`. Its results are reproducible local
+`9d6896d3fd4e083946fe1bb620835322b8af6d37`. Its results are reproducible local
 evidence, but they are not protected hosted or release evidence. A local wheel and
 sdist were built from that commit and verified; their hashes remain non-authoritative
 until the candidate is built by the protected workflow. The lock digest is
