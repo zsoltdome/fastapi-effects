@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-09-08T12:47:08+02:00",
+  "recorded_at": "2026-09-08T12:53:48+02:00",
   "release_evidence_authority": false,
   "source": {
-    "base_commit": "9d6896d3fd4e083946fe1bb620835322b8af6d37",
+    "base_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
     "state": "committed_local_verification",
     "limitation": "Results are bound to this local source commit and local artifacts, not protected hosted or release evidence."
   },
   "package_version": "0.11.0a1",
   "lock_sha256": "b7fd3f0a58418806d1c39922c4899cef0d9ea45ef68bedd0425973aee9b3e3df",
   "artifact_digests": {
-    "fastapi_mergen-0.11.0a1-py3-none-any.whl": "2510f7252de4f2fc141cefa8e14200824a5a9d701ae617b302874f05877bfde4",
-    "fastapi_mergen-0.11.0a1.tar.gz": "739c8ddd193148b5e88283dc773c8aa317ca2feea8a0728dc2448a75721280e1"
+    "fastapi_mergen-0.11.0a1-py3-none-any.whl": "41481b472b29a6591b8e67419eafac8605c951cf7dfed1fe39a6a64fcf6a9b9a",
+    "fastapi_mergen-0.11.0a1.tar.gz": "14cccb2a755172246708a792f34015c7d57908e3b41667c47fa940de0fce8354"
   },
   "infrastructure": {
     "postgresql": ["16.15", "18.6"],
@@ -40,7 +40,7 @@
     {
       "command": "uv run python scripts/check.py",
       "result": "pass",
-      "detail": "Ruff, mypy, milestone audits, automatic readiness-phase audit, documentation inventory, 265 non-integration/non-packaging tests, clean artifact smoke tests, and Twine passed."
+      "detail": "Ruff, mypy, milestone audits, automatic readiness-phase audit, documentation inventory, 266 non-integration/non-packaging tests, clean artifact smoke tests, and Twine passed."
     },
     {
       "command": "MERGEN_TEST_ADMIN_DSN=<postgresql-16> MERGEN_TEST_REDIS_URL=<redis> uv run pytest -q -m integration",

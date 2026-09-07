@@ -1,24 +1,24 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-09-08T12:47:08+02:00",
+  "recorded_at": "2026-09-08T12:53:48+02:00",
   "package_version": "0.11.0a1",
   "source": {
-    "base_commit": "9d6896d3fd4e083946fe1bb620835322b8af6d37",
+    "base_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
     "state": "committed_local_verification",
     "release_evidence_authority": false
   },
   "lock_sha256": "b7fd3f0a58418806d1c39922c4899cef0d9ea45ef68bedd0425973aee9b3e3df",
   "artifact_digests": [],
   "local_non_authoritative_artifact_digests": {
-    "fastapi_mergen-0.11.0a1-py3-none-any.whl": "2510f7252de4f2fc141cefa8e14200824a5a9d701ae617b302874f05877bfde4",
-    "fastapi_mergen-0.11.0a1.tar.gz": "739c8ddd193148b5e88283dc773c8aa317ca2feea8a0728dc2448a75721280e1"
+    "fastapi_mergen-0.11.0a1-py3-none-any.whl": "41481b472b29a6591b8e67419eafac8605c951cf7dfed1fe39a6a64fcf6a9b9a",
+    "fastapi_mergen-0.11.0a1.tar.gz": "14cccb2a755172246708a792f34015c7d57908e3b41667c47fa940de0fce8354"
   },
   "entries": [
     {
       "capability": "core_postgresql_runtime",
       "owner": "maintainer",
       "status": "LOCAL_VERIFIED",
-      "source_commit": "9d6896d3fd4e083946fe1bb620835322b8af6d37",
+      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
       "artifact_digests": [],
       "applicable_stages": ["IMPLEMENTED", "LOCAL_VERIFIED", "HOSTED_VERIFIED", "RELEASED"],
       "evidence_command": "MERGEN_TEST_ADMIN_DSN=<pg16-or-pg18> MERGEN_TEST_REDIS_URL=<redis> uv run pytest -q -m integration",
@@ -32,7 +32,7 @@
       "capability": "webhooks",
       "owner": "maintainer",
       "status": "LOCAL_VERIFIED",
-      "source_commit": "9d6896d3fd4e083946fe1bb620835322b8af6d37",
+      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
       "artifact_digests": [],
       "applicable_stages": ["IMPLEMENTED", "LOCAL_VERIFIED", "HOSTED_VERIFIED", "EXTERNALLY_VALIDATED", "RELEASED"],
       "evidence_command": "uv run pytest -q tests/security/test_explicit_ip_tls.py tests/security/test_webhook_redirects.py tests/security/test_webhook_response_bounds.py; run integration selection on PostgreSQL 16/18",
@@ -46,7 +46,7 @@
       "capability": "taskiq_executor",
       "owner": "maintainer",
       "status": "LOCAL_VERIFIED",
-      "source_commit": "9d6896d3fd4e083946fe1bb620835322b8af6d37",
+      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
       "artifact_digests": [],
       "applicable_stages": ["IMPLEMENTED", "LOCAL_VERIFIED", "HOSTED_VERIFIED", "EXTERNALLY_VALIDATED", "RELEASED"],
       "evidence_command": "uv run pytest -q tests/integration/test_taskiq_worker_claim.py tests/unit/test_relay_boundaries.py",
@@ -60,7 +60,7 @@
       "capability": "commands_and_delegation",
       "owner": "maintainer",
       "status": "LOCAL_VERIFIED",
-      "source_commit": "9d6896d3fd4e083946fe1bb620835322b8af6d37",
+      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
       "artifact_digests": [],
       "applicable_stages": ["IMPLEMENTED", "LOCAL_VERIFIED", "HOSTED_VERIFIED", "EXTERNALLY_VALIDATED", "RELEASED"],
       "evidence_command": "MERGEN_TEST_ADMIN_DSN=<pg16-or-pg18> MERGEN_TEST_REDIS_URL=<redis> uv run pytest -q -m integration",
@@ -74,7 +74,7 @@
       "capability": "published_migrations_0001_0005",
       "owner": "maintainer",
       "status": "LOCAL_VERIFIED",
-      "source_commit": "9d6896d3fd4e083946fe1bb620835322b8af6d37",
+      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
       "artifact_digests": [],
       "applicable_stages": ["IMPLEMENTED", "LOCAL_VERIFIED", "HOSTED_VERIFIED", "RELEASED"],
       "evidence_command": "MERGEN_TEST_ADMIN_DSN=<pg16-or-pg18> uv run pytest -q tests/migrations/test_revision_matrix.py tests/integration/test_core_migration.py; uv run pytest -q tests/unit/test_migration_immutability.py",
@@ -88,7 +88,7 @@
       "capability": "release_readiness_validation",
       "owner": "maintainer",
       "status": "LOCAL_VERIFIED",
-      "source_commit": "9d6896d3fd4e083946fe1bb620835322b8af6d37",
+      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
       "artifact_digests": [],
       "applicable_stages": ["IMPLEMENTED", "LOCAL_VERIFIED", "HOSTED_VERIFIED", "RELEASED"],
       "evidence_command": "uv run python scripts/check.py; uv run pytest -q tests/unit/test_release_gate.py tests/unit/test_milestone_thirteen_gate.py tests/unit/test_check_script.py",
@@ -102,10 +102,10 @@
       "capability": "packaging",
       "owner": "maintainer",
       "status": "LOCAL_VERIFIED",
-      "source_commit": "9d6896d3fd4e083946fe1bb620835322b8af6d37",
+      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
       "artifact_digests": [
-        "sha256:2510f7252de4f2fc141cefa8e14200824a5a9d701ae617b302874f05877bfde4",
-        "sha256:739c8ddd193148b5e88283dc773c8aa317ca2feea8a0728dc2448a75721280e1"
+        "sha256:41481b472b29a6591b8e67419eafac8605c951cf7dfed1fe39a6a64fcf6a9b9a",
+        "sha256:14cccb2a755172246708a792f34015c7d57908e3b41667c47fa940de0fce8354"
       ],
       "applicable_stages": ["IMPLEMENTED", "LOCAL_VERIFIED", "HOSTED_VERIFIED", "RELEASED"],
       "evidence_command": "uv run python scripts/check.py",
@@ -119,10 +119,10 @@
       "capability": "documentation_journeys",
       "owner": "maintainer",
       "status": "LOCAL_VERIFIED",
-      "source_commit": "9d6896d3fd4e083946fe1bb620835322b8af6d37",
+      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
       "artifact_digests": [
-        "sha256:2510f7252de4f2fc141cefa8e14200824a5a9d701ae617b302874f05877bfde4",
-        "sha256:739c8ddd193148b5e88283dc773c8aa317ca2feea8a0728dc2448a75721280e1"
+        "sha256:41481b472b29a6591b8e67419eafac8605c951cf7dfed1fe39a6a64fcf6a9b9a",
+        "sha256:14cccb2a755172246708a792f34015c7d57908e3b41667c47fa940de0fce8354"
       ],
       "applicable_stages": ["LOCAL_VERIFIED", "HOSTED_VERIFIED", "EXTERNALLY_VALIDATED", "RELEASED"],
       "evidence_command": "uv run python scripts/check_documentation.py; uv run python scripts/check.py",
@@ -136,7 +136,7 @@
       "capability": "hosted_security_provenance",
       "owner": "maintainer",
       "status": "OPEN",
-      "source_commit": "9d6896d3fd4e083946fe1bb620835322b8af6d37",
+      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
       "artifact_digests": [],
       "applicable_stages": ["HOSTED_VERIFIED", "RELEASED"],
       "evidence_command": null,
@@ -150,7 +150,7 @@
       "capability": "external_validation",
       "owner": "external_owners_unassigned",
       "status": "OPEN",
-      "source_commit": "9d6896d3fd4e083946fe1bb620835322b8af6d37",
+      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
       "artifact_digests": [],
       "applicable_stages": ["EXTERNALLY_VALIDATED", "RELEASED"],
       "evidence_command": null,
