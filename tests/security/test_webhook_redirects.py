@@ -123,6 +123,24 @@ async def test_enabled_redirect_revalidates_dns_and_preserves_signed_body() -> N
 
 
 @pytest.mark.asyncio
+async def test_invalid_persisted_endpoint_is_a_terminal_delivery_failure() -> None:
+    claim = _claim()
+    claim.route_snapshot["destination"]["endpoint_url"] = "https://example.com/%GG"
+    sink = WebhookDeliverySink(
+        sessions=_Sessions(),  # type: ignore[arg-type]
+        secrets=_Secrets(),  # type: ignore[arg-type]
+        resolver=_Resolver(),
+        transport=_Transport(maximum_redirects=0),  # type: ignore[arg-type]
+        clock=_Clock(),
+    )
+
+    with pytest.raises(PermanentDeliveryError) as raised:
+        await sink.deliver_attempt(claim)
+
+    assert raised.value.code == "webhook.endpoint_invalid"
+
+
+@pytest.mark.asyncio
 async def test_redirects_are_terminal_when_not_explicitly_enabled() -> None:
     transport = _Transport(maximum_redirects=0)
     sink = WebhookDeliverySink(

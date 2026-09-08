@@ -189,11 +189,20 @@ async def resolve_endpoint(
     allowed_ports: frozenset[int] = frozenset({443}),
     maximum_addresses: int = 8,
 ) -> tuple[EndpointTarget, tuple[str, ...]]:
-    endpoint = parse_endpoint(
-        value,
-        production=production,
-        allowed_ports=allowed_ports,
-    )
+    try:
+        endpoint = parse_endpoint(
+            value,
+            production=production,
+            allowed_ports=allowed_ports,
+        )
+    except MergenConfigurationError as exc:
+        # Management APIs call parse_endpoint() directly and reject invalid input.
+        # Here the value came from a durable delivery snapshot (or a redirect), so
+        # old/remote bad data is one terminal delivery failure, not relay config.
+        raise PermanentDeliveryError(
+            code="webhook.endpoint_invalid",
+            summary="Webhook endpoint or redirect URL is invalid.",
+        ) from exc
     addresses = await resolver.resolve(endpoint.hostname, endpoint.port)
     if (
         not isinstance(maximum_addresses, int)

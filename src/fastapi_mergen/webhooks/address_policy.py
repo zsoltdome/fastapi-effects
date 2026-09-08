@@ -5,11 +5,14 @@ from __future__ import annotations
 import ipaddress
 import re
 from dataclasses import dataclass
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from fastapi_mergen.errors import MergenConfigurationError, PermanentDeliveryError
 
 _CONTROL_OR_SPACE = re.compile(r"[\x00-\x20\x7f]")
+_INVALID_PERCENT_ESCAPE = re.compile(r"%(?![0-9A-Fa-f]{2})")
+_PATH_SAFE = "/:@-._~!$&'()*+,;=%"
+_QUERY_SAFE = "/?:@-._~!$&'()*+,;=%"
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,9 +71,17 @@ def parse_endpoint(
     authority = (
         display_host if effective_port == default_port else f"{display_host}:{effective_port}"
     )
-    path = parsed.path or "/"
-    request_target = path + (f"?{parsed.query}" if parsed.query else "")
-    normalized = urlunsplit((parsed.scheme.lower(), authority, path, parsed.query, ""))
+    if _INVALID_PERCENT_ESCAPE.search(parsed.path) or _INVALID_PERCENT_ESCAPE.search(parsed.query):
+        raise MergenConfigurationError("Webhook endpoint URL contains an invalid percent escape.")
+    # HTTP/1.1 request targets are URI bytes, not raw IRIs. Encode Unicode once
+    # while retaining existing percent escapes and all RFC 3986 reserved syntax.
+    try:
+        path = quote(parsed.path or "/", safe=_PATH_SAFE, encoding="utf-8", errors="strict")
+        query = quote(parsed.query, safe=_QUERY_SAFE, encoding="utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise MergenConfigurationError("Webhook endpoint URL contains invalid Unicode.") from exc
+    request_target = path + (f"?{query}" if query else "")
+    normalized = urlunsplit((parsed.scheme.lower(), authority, path, query, ""))
     return EndpointTarget(
         url=normalized,
         scheme=parsed.scheme.lower(),
