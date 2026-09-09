@@ -29,7 +29,7 @@ from fastapi_mergen.postgres.roles import RuntimeRoles
 from fastapi_mergen.postgres.schema import install_core_schema
 from fastapi_mergen.postgres.store import PostgresStore
 from fastapi_mergen.sqlalchemy.models import SCHEMA, EventRow
-from tests.integration.postgres import ProvisionedDatabase
+from tests.integration.postgres import ObservedDatabaseClock, ProvisionedDatabase
 
 pytestmark = pytest.mark.integration
 
@@ -127,6 +127,7 @@ async def test_rollback_conflict_expiry_trigger_rls_and_pruning(
     identity = _identity(principal, "rollback-key")
     fingerprint = _fingerprint(b"rollback")
     started = datetime(2026, 8, 30, 10, tzinfo=UTC)
+    store = CommandStore(database_clock=ObservedDatabaseClock())
 
     async def roll_back_request() -> None:
         async with sessions() as session:
@@ -135,6 +136,7 @@ async def test_rollback_conflict_expiry_trigger_rls_and_pruning(
                 principal=principal,
                 identity=identity,
                 fingerprint=fingerprint,
+                store=store,
                 clock=_FixedClock(started),
                 ttl=timedelta(seconds=1),
             )
@@ -159,6 +161,7 @@ async def test_rollback_conflict_expiry_trigger_rls_and_pruning(
                 principal=mismatched_principal,
                 identity=identity,
                 fingerprint=mismatched_fingerprint,
+                store=store,
                 clock=_FixedClock(started),
                 ttl=timedelta(seconds=1),
             ),
@@ -187,6 +190,7 @@ async def test_rollback_conflict_expiry_trigger_rls_and_pruning(
                 principal=principal,
                 identity=identity,
                 fingerprint=fingerprint,
+                store=store,
                 clock=_FixedClock(started),
                 ttl=timedelta(seconds=1),
             )
@@ -217,6 +221,7 @@ async def test_rollback_conflict_expiry_trigger_rls_and_pruning(
                 principal=principal,
                 identity=identity,
                 fingerprint=_fingerprint(b"new-generation"),
+                store=store,
                 clock=_FixedClock(started + timedelta(seconds=2)),
                 ttl=timedelta(seconds=1),
             )

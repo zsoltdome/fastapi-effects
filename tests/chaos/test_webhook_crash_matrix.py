@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import func, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from fastapi_mergen import Event, MergenUnitOfWork, Principal, RetryPolicy
@@ -13,6 +14,7 @@ from fastapi_mergen.postgres.leasing import LeaseRepository
 from fastapi_mergen.postgres.roles import RuntimeRoles
 from fastapi_mergen.postgres.schema import install_core_schema
 from fastapi_mergen.postgres.webhook_schema import install_webhook_schema
+from fastapi_mergen.sqlalchemy.models import DeliveryRow
 from fastapi_mergen.webhooks.address_policy import EndpointTarget
 from fastapi_mergen.webhooks.http11 import HttpResponseMetadata
 from fastapi_mergen.webhooks.secrets import (
@@ -127,7 +129,13 @@ async def test_receiver_success_then_relay_crash_retries_stable_identity(
             first = (await leases.claim(session, now=first_time))[0]
         await sink.deliver_attempt(first)
 
-        retry_time = first_time + timedelta(seconds=3)
+        async with migration_engine.begin() as connection:
+            await connection.execute(
+                update(DeliveryRow)
+                .where(DeliveryRow.delivery_id == first.delivery.delivery_id)
+                .values(lease_expires_at=func.clock_timestamp() - timedelta(seconds=1))
+            )
+        retry_time = datetime.now(UTC)
         async with relay_sessions() as session:
             assert await leases.reconcile_expired(session, now=retry_time) == 1
         async with relay_sessions() as session:

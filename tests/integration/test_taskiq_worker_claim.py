@@ -38,7 +38,7 @@ from fastapi_mergen.postgres.roles import RuntimeRoles
 from fastapi_mergen.postgres.schema import install_core_schema
 from fastapi_mergen.sqlalchemy.models import DeliveryRow
 from fastapi_mergen.testing.taskiq_driver import PostgresTaskiqBoundaryDriver
-from tests.integration.postgres import ProvisionedDatabase
+from tests.integration.postgres import ObservedDatabaseClock, ProvisionedDatabase
 
 pytestmark = pytest.mark.integration
 
@@ -233,7 +233,9 @@ async def test_expired_execution_rejects_stale_finalization(
     relay_engine = create_async_engine(test_database.relay_sqlalchemy_dsn)
     app_sessions = async_sessionmaker(app_engine, expire_on_commit=False)
     relay_sessions = async_sessionmaker(relay_engine, expire_on_commit=False)
-    store = TaskiqHandoffStore()
+    database_clock = ObservedDatabaseClock()
+    leases = LeaseRepository(database_clock=database_clock)
+    store = TaskiqHandoffStore(leases=leases, database_clock=database_clock)
     tenant_id = uuid4()
     principal = Principal(tenant_id=tenant_id, subject_id="user:expiry")
 
@@ -266,7 +268,7 @@ async def test_expired_execution_rejects_stale_finalization(
             await uow.emit(Event(type="expiry.test", version=1, data={}))
         started = datetime.now(UTC)
         async with relay_sessions() as session:
-            claim = (await LeaseRepository().claim(session, now=started))[0]
+            claim = (await leases.claim(session, now=started))[0]
         async with relay_sessions() as session:
             envelope = await store.prepare(session, claim=claim, now=started)
         async with relay_sessions() as session:
@@ -327,8 +329,9 @@ async def test_old_handoff_is_rejected_after_parent_attempt_is_reclaimed(
     relay_engine = create_async_engine(test_database.relay_sqlalchemy_dsn)
     app_sessions = async_sessionmaker(app_engine, expire_on_commit=False)
     relay_sessions = async_sessionmaker(relay_engine, expire_on_commit=False)
-    store = TaskiqHandoffStore()
-    leases = LeaseRepository()
+    database_clock = ObservedDatabaseClock()
+    leases = LeaseRepository(database_clock=database_clock)
+    store = TaskiqHandoffStore(leases=leases, database_clock=database_clock)
     tenant_id = uuid4()
     principal = Principal(tenant_id=tenant_id, subject_id="user:stale-handoff")
 

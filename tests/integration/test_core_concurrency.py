@@ -27,7 +27,7 @@ from fastapi_mergen.postgres.roles import RuntimeRoles
 from fastapi_mergen.postgres.schema import install_core_schema
 from fastapi_mergen.postgres.store import PostgresStore
 from fastapi_mergen.sqlalchemy.models import AttemptRow, DeliveryRow, EventRow
-from tests.integration.postgres import ProvisionedDatabase
+from tests.integration.postgres import ObservedDatabaseClock, ProvisionedDatabase
 
 pytestmark = pytest.mark.integration
 
@@ -198,7 +198,7 @@ async def test_claim_fairness_and_expired_lease_fencing(
             await _emit(app_sessions, first_tenant)
         await _emit(app_sessions, second_tenant)
 
-        leases = LeaseRepository()
+        leases = LeaseRepository(database_clock=ObservedDatabaseClock())
         claimed_at = datetime.now(UTC)
         async with relay_sessions() as session:
             claims = await leases.claim(
@@ -325,7 +325,10 @@ async def test_elapsed_deadline_blocks_scheduling_reconciliation_and_claim(
         app_sessions = async_sessionmaker(application, expire_on_commit=False)
         relay_sessions = async_sessionmaker(relay, expire_on_commit=False)
         principal = Principal(tenant_id=uuid4(), subject_id="user:deadline")
-        leases = LeaseRepository(random_source=MaximumRandom())
+        leases = LeaseRepository(
+            random_source=MaximumRandom(),
+            database_clock=ObservedDatabaseClock(),
+        )
 
         await _emit(
             app_sessions,
@@ -423,7 +426,7 @@ async def test_finalization_rejects_elapsed_attempt_without_waiting_for_reconcil
         app_sessions = async_sessionmaker(application, expire_on_commit=False)
         relay_sessions = async_sessionmaker(relay, expire_on_commit=False)
         principal = Principal(tenant_id=uuid4(), subject_id="user:finalization-deadline")
-        leases = LeaseRepository()
+        leases = LeaseRepository(database_clock=ObservedDatabaseClock())
 
         await _emit(
             app_sessions,
@@ -468,6 +471,116 @@ async def test_finalization_rejects_elapsed_attempt_without_waiting_for_reconcil
                 )
             )
         assert state == "retry_wait"
+    finally:
+        await relay.dispose()
+        await application.dispose()
+        await migration.dispose()
+
+
+@pytest.mark.asyncio
+async def test_finalization_refreshes_database_time_after_waiting_for_row_lock(
+    test_database: ProvisionedDatabase,
+) -> None:
+    migration = create_async_engine(test_database.migration_sqlalchemy_dsn)
+    application = create_async_engine(test_database.app_sqlalchemy_dsn)
+    relay = create_async_engine(test_database.relay_sqlalchemy_dsn)
+    roles = RuntimeRoles(
+        migration=test_database.migration_role,
+        application=test_database.app_role,
+        relay=test_database.relay_role,
+    )
+    policy = RetryPolicy(
+        name="lock-delayed-finalization",
+        maximum_elapsed_seconds=60,
+        maximum_delay_seconds=10,
+        handler_timeout_seconds=0.05,
+        lease_duration_seconds=0.15,
+    )
+    try:
+        await install_core_schema(migration, roles=roles)
+        app_sessions = async_sessionmaker(application, expire_on_commit=False)
+        relay_sessions = async_sessionmaker(relay, expire_on_commit=False)
+        principal = Principal(tenant_id=uuid4(), subject_id="user:lock-delay")
+        leases = LeaseRepository()
+        await _emit(
+            app_sessions,
+            principal,
+            routes=(_route("deadline.lock-delay", retry_policy=policy),),
+        )
+        async with relay_sessions() as session:
+            claim = (await leases.claim(session, now=datetime.now(UTC)))[0]
+
+        async def finalize() -> None:
+            async with relay_sessions() as finalizer:
+                await leases.succeed(finalizer, claim, now=claim.attempt.started_at)
+
+        async with relay_sessions() as blocker, blocker.begin():
+            await blocker.scalar(
+                select(DeliveryRow)
+                .where(DeliveryRow.delivery_id == claim.delivery.delivery_id)
+                .with_for_update()
+            )
+            task = asyncio.create_task(finalize())
+            await asyncio.sleep(0.2)
+        with pytest.raises(LeaseLost):
+            await asyncio.wait_for(task, timeout=1)
+
+        async with relay_sessions() as session:
+            state = await session.scalar(
+                select(DeliveryRow.state).where(
+                    DeliveryRow.delivery_id == claim.delivery.delivery_id
+                )
+            )
+        assert state == DeliveryState.LEASED.value
+    finally:
+        await relay.dispose()
+        await application.dispose()
+        await migration.dispose()
+
+
+@pytest.mark.asyncio
+async def test_database_clock_ignores_fast_and_slow_application_observations(
+    test_database: ProvisionedDatabase,
+) -> None:
+    migration = create_async_engine(test_database.migration_sqlalchemy_dsn)
+    application = create_async_engine(test_database.app_sqlalchemy_dsn)
+    relay = create_async_engine(test_database.relay_sqlalchemy_dsn)
+    roles = RuntimeRoles(
+        migration=test_database.migration_role,
+        application=test_database.app_role,
+        relay=test_database.relay_role,
+    )
+    policy = RetryPolicy(
+        name="database-clock-authority",
+        maximum_elapsed_seconds=60,
+        maximum_delay_seconds=10,
+        handler_timeout_seconds=1,
+        lease_duration_seconds=3,
+    )
+    try:
+        await install_core_schema(migration, roles=roles)
+        app_sessions = async_sessionmaker(application, expire_on_commit=False)
+        relay_sessions = async_sessionmaker(relay, expire_on_commit=False)
+        principal = Principal(tenant_id=uuid4(), subject_id="user:clock-skew")
+        leases = LeaseRepository()
+
+        wall_start = datetime.now(UTC)
+        observations = (
+            wall_start + timedelta(days=1),
+            wall_start - timedelta(days=1),
+        )
+        for index, observed_at in enumerate(observations):
+            await _emit(
+                app_sessions,
+                principal,
+                routes=(_route(f"clock.skew.{index}", retry_policy=policy),),
+            )
+            async with relay_sessions() as session:
+                claim = (await leases.claim(session, now=observed_at))[0]
+            assert wall_start - timedelta(seconds=1) <= claim.attempt.started_at
+            assert claim.attempt.started_at <= datetime.now(UTC) + timedelta(seconds=1)
+            async with relay_sessions() as session:
+                await leases.succeed(session, claim, now=observed_at)
     finally:
         await relay.dispose()
         await application.dispose()

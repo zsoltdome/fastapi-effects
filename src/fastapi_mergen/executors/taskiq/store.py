@@ -24,6 +24,7 @@ from fastapi_mergen.executors.protocols import HandoffState
 from fastapi_mergen.executors.taskiq.envelope import TaskiqHandoffEnvelope, stable_task_id
 from fastapi_mergen.executors.taskiq.models import TaskiqHandoffRow
 from fastapi_mergen.postgres.leasing import ClaimedDelivery, LeaseRepository
+from fastapi_mergen.postgres.time import DatabaseClock, PostgresDatabaseClock
 from fastapi_mergen.sqlalchemy.models import AttemptRow, DeliveryRow, EventRow
 from fastapi_mergen.sqlalchemy.repository import attempt_from_row, delivery_from_row, event_from_row
 
@@ -55,9 +56,11 @@ class TaskiqHandoffStore:
         *,
         uuid_source: UUIDGenerator | None = None,
         leases: LeaseRepository | None = None,
+        database_clock: DatabaseClock | None = None,
     ) -> None:
         self._uuid_source = uuid_source or UUIDSource()
-        self._leases = leases or LeaseRepository()
+        self._database_clock = database_clock or PostgresDatabaseClock()
+        self._leases = leases or LeaseRepository(database_clock=self._database_clock)
 
     async def prepare(
         self,
@@ -71,6 +74,7 @@ class TaskiqHandoffStore:
         handoff_token = self._uuid_source.new_uuid()
         task_id = stable_task_id(claim.attempt.attempt_id)
         async with session.begin():
+            prepared_at = await self._database_clock.now(session, observed_at=now)
             statement = (
                 pg_insert(TaskiqHandoffRow)
                 .values(
@@ -91,8 +95,8 @@ class TaskiqHandoffStore:
                         "occurred_at": claim.event.occurred_at.isoformat(),
                     },
                     execution_count=0,
-                    prepared_at=now,
-                    updated_at=now,
+                    prepared_at=prepared_at,
+                    updated_at=prepared_at,
                 )
                 .on_conflict_do_nothing(
                     index_elements=(
@@ -125,14 +129,15 @@ class TaskiqHandoffStore:
         _require_idle(session)
         async with session.begin():
             row = await self._locked_for_envelope(session, envelope)
+            enqueued_at = await self._database_clock.now(session, observed_at=now)
             if row.state != HandoffState.PREPARED.value:
                 if row.enqueued_at is None:
-                    row.enqueued_at = now
-                    row.updated_at = now
+                    row.enqueued_at = enqueued_at
+                    row.updated_at = enqueued_at
                 return _record(row)
             row.state = HandoffState.ENQUEUED.value
-            row.enqueued_at = now
-            row.updated_at = now
+            row.enqueued_at = enqueued_at
+            row.updated_at = enqueued_at
             await session.flush()
             return _record(row)
 
@@ -158,7 +163,13 @@ class TaskiqHandoffStore:
                 ),
                 now=now,
             )
-            _set_failed(row, outcome=outcome, now=now, code="executor.enqueue_failed")
+            failed_at = await self._database_clock.now(session, observed_at=now)
+            _set_failed(
+                row,
+                outcome=outcome,
+                now=failed_at,
+                code="executor.enqueue_failed",
+            )
             await session.flush()
             return _record(row)
 
@@ -175,6 +186,7 @@ class TaskiqHandoffStore:
             raise MergenConfigurationError("Taskiq execution timeout is invalid.")
         async with session.begin():
             row = await self._locked_for_envelope(session, envelope)
+            locked_at = await self._database_clock.now(session, observed_at=now)
             if row.state in {
                 HandoffState.SUCCEEDED.value,
                 HandoffState.RETRY_WAIT.value,
@@ -182,7 +194,7 @@ class TaskiqHandoffStore:
             }:
                 return None
             if row.state == HandoffState.EXECUTING.value:
-                if row.execution_deadline is not None and row.execution_deadline > now:
+                if row.execution_deadline is not None and row.execution_deadline > locked_at:
                     return None
             elif row.state not in {
                 HandoffState.PREPARED.value,
@@ -195,12 +207,13 @@ class TaskiqHandoffStore:
                 _set_failed(
                     row,
                     outcome=DeliveryState.DEAD,
-                    now=now,
+                    now=locked_at,
                     code="executor.stale_attempt",
                     summary="Taskiq handoff no longer owns the parent delivery attempt.",
                 )
                 await session.flush()
                 return None
+            locked_at = await self._database_clock.now(session, observed_at=locked_at)
             lease_deadline = claim.delivery.lease_expires_at
             if lease_deadline is None:
                 raise LeaseLost(delivery_id=row.delivery_id)
@@ -213,7 +226,7 @@ class TaskiqHandoffStore:
                 delivery_created_at=claim.delivery.created_at,
                 attempt_started_at=claim.attempt.started_at,
                 lease_expires_at=lease_deadline,
-                now=now,
+                now=locked_at,
                 configured_limit_seconds=execution_timeout.total_seconds(),
             )
             if remaining <= 0:
@@ -225,27 +238,27 @@ class TaskiqHandoffStore:
                     session,
                     claim,
                     error,
-                    now=now,
+                    now=locked_at,
                 )
                 _set_failed(
                     row,
                     outcome=outcome,
-                    now=now,
+                    now=locked_at,
                     code=error.code,
                     summary=error.summary,
                 )
                 await session.flush()
                 return None
             token = self._uuid_source.new_uuid()
-            deadline = now + timedelta(seconds=remaining)
+            deadline = locked_at + timedelta(seconds=remaining)
             row.state = HandoffState.EXECUTING.value
             if row.enqueued_at is None:
-                row.enqueued_at = now
+                row.enqueued_at = locked_at
             row.execution_token = token
             row.execution_deadline = deadline
             row.execution_count += 1
-            row.started_at = now
-            row.updated_at = now
+            row.started_at = locked_at
+            row.updated_at = locked_at
             await session.flush()
             return ExecutingHandoff(
                 record=_record(row),
@@ -264,10 +277,14 @@ class TaskiqHandoffStore:
         _require_idle(session)
         async with session.begin():
             row = await self._locked_execution(session, executing)
-            await self._leases.succeed_in_transaction(session, executing.claim, now=now)
+            finished_at = await self._leases.succeed_in_transaction(
+                session,
+                executing.claim,
+                now=now,
+            )
             row.state = HandoffState.SUCCEEDED.value
-            row.finished_at = now
-            row.updated_at = now
+            row.finished_at = finished_at
+            row.updated_at = finished_at
             _clear_execution(row)
             await session.flush()
             return _record(row)
@@ -292,7 +309,14 @@ class TaskiqHandoffStore:
                     error.retry_after if isinstance(error, RetryableDeliveryError) else None
                 ),
             )
-            _set_failed(row, outcome=outcome, now=now, code=error.code, summary=error.summary)
+            finished_at = await self._database_clock.now(session, observed_at=now)
+            _set_failed(
+                row,
+                outcome=outcome,
+                now=finished_at,
+                code=error.code,
+                summary=error.summary,
+            )
             await session.flush()
             return _record(row)
 
@@ -309,6 +333,7 @@ class TaskiqHandoffStore:
             raise MergenConfigurationError("Taskiq recovery batch size is invalid.")
         recovered = 0
         async with session.begin():
+            selection_time = await self._database_clock.now(session, observed_at=now)
             rows = (
                 await session.scalars(
                     select(TaskiqHandoffRow)
@@ -318,11 +343,11 @@ class TaskiqHandoffStore:
                                 TaskiqHandoffRow.state.in_(
                                     (HandoffState.PREPARED.value, HandoffState.ENQUEUED.value)
                                 )
-                                & (TaskiqHandoffRow.updated_at <= now - enqueue_timeout)
+                                & (TaskiqHandoffRow.updated_at <= selection_time - enqueue_timeout)
                             ),
                             (
                                 (TaskiqHandoffRow.state == HandoffState.EXECUTING.value)
-                                & (TaskiqHandoffRow.execution_deadline <= now)
+                                & (TaskiqHandoffRow.execution_deadline <= selection_time)
                             ),
                         )
                     )
@@ -345,7 +370,13 @@ class TaskiqHandoffStore:
                     )
                 except LeaseLost:
                     outcome = DeliveryState.DEAD
-                _set_failed(row, outcome=outcome, now=now, code="executor.handoff_expired")
+                recovered_at = await self._database_clock.now(session, observed_at=now)
+                _set_failed(
+                    row,
+                    outcome=outcome,
+                    now=recovered_at,
+                    code="executor.handoff_expired",
+                )
                 recovered += 1
         return recovered
 

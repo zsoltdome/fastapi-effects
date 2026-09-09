@@ -8,7 +8,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from sqlalchemy import insert, select, text
+from sqlalchemy import func, insert, select, text, update
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from taskiq_redis import RedisStreamBroker
 
@@ -201,7 +201,13 @@ class PostgresTaskiqBoundaryDriver(PostgresBoundaryDriver):
             delivery_id=delivery_id,
             attempt_id=stale_attempt_id,
         )
-        reclaimed_at = datetime.now(UTC) + timedelta(seconds=61)
+        async with self._migration_engine.begin() as connection:
+            await connection.execute(
+                update(DeliveryRow)
+                .where(DeliveryRow.delivery_id == delivery_id)
+                .values(lease_expires_at=func.clock_timestamp() - timedelta(seconds=1))
+            )
+        reclaimed_at = datetime.now(UTC)
         leases = LeaseRepository()
         async with self._relay_sessions() as session:
             reconciled = await leases.reconcile_expired(session, now=reclaimed_at)

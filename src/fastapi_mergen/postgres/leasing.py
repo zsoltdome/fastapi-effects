@@ -30,6 +30,7 @@ from fastapi_mergen.errors import (
 )
 from fastapi_mergen.observability.events import RuntimeEvent, RuntimeEventKind, TraceLineage
 from fastapi_mergen.observability.protocols import EventSink, NoOpEventSink, record_safely
+from fastapi_mergen.postgres.time import DatabaseClock, PostgresDatabaseClock
 from fastapi_mergen.sqlalchemy.models import AttemptRow, DeliveryRow, EventRow
 from fastapi_mergen.sqlalchemy.repository import attempt_from_row, delivery_from_row, event_from_row
 
@@ -53,10 +54,12 @@ class LeaseRepository:
         uuid_source: UUIDGenerator | None = None,
         random_source: RandomSource | None = None,
         event_sink: EventSink | None = None,
+        database_clock: DatabaseClock | None = None,
     ) -> None:
         self._uuid_source = uuid_source or UUIDSource()
         self._random_source = random_source or SystemRandom()
         self._event_sink = event_sink or NoOpEventSink()
+        self._database_clock = database_clock or PostgresDatabaseClock()
 
     async def claim(
         self,
@@ -72,6 +75,7 @@ class LeaseRepository:
         claimed: list[ClaimedDelivery] = []
         expired: list[tuple[UUID, str, UUID | None]] = []
         async with session.begin():
+            selection_time = await self._database_clock.now(session, observed_at=now)
             tenant_rank = func.row_number().over(
                 partition_by=DeliveryRow.tenant_id,
                 order_by=(DeliveryRow.next_attempt_at, DeliveryRow.created_at),
@@ -86,7 +90,7 @@ class LeaseRepository:
                     DeliveryRow.state.in_(
                         (DeliveryState.PENDING.value, DeliveryState.RETRY_WAIT.value)
                     ),
-                    DeliveryRow.next_attempt_at <= now,
+                    DeliveryRow.next_attempt_at <= selection_time,
                 )
                 .cte("ranked_claimable_deliveries")
             )
@@ -108,6 +112,7 @@ class LeaseRepository:
                     .with_for_update(of=DeliveryRow, skip_locked=True)
                 )
             ).all()
+            effective_now = await self._database_clock.now(session, observed_at=now)
             counts: Counter[UUID] = Counter()
             for delivery in candidates:
                 if len(claimed) >= batch_size:
@@ -116,10 +121,13 @@ class LeaseRepository:
                     continue
                 snapshot = dict(delivery.route_snapshot)
                 policy = _snapshot_policy(snapshot)
-                if now >= delivery_deadline(policy=policy, created_at=delivery.created_at):
+                if effective_now >= delivery_deadline(
+                    policy=policy,
+                    created_at=delivery.created_at,
+                ):
                     delivery.state = DeliveryState.DEAD.value
-                    delivery.next_attempt_at = now
-                    delivery.updated_at = now
+                    delivery.next_attempt_at = effective_now
+                    delivery.updated_at = effective_now
                     expired.append(
                         (delivery.delivery_id, delivery.destination_kind, delivery.replay_of)
                     )
@@ -130,8 +138,10 @@ class LeaseRepository:
                 delivery.state = DeliveryState.LEASED.value
                 delivery.attempts_started = attempt_number
                 delivery.lease_token = token
-                delivery.lease_expires_at = now + timedelta(seconds=policy.lease_duration_seconds)
-                delivery.updated_at = now
+                delivery.lease_expires_at = effective_now + timedelta(
+                    seconds=policy.lease_duration_seconds
+                )
+                delivery.updated_at = effective_now
                 attempt = AttemptRow(
                     tenant_id=delivery.tenant_id,
                     attempt_id=attempt_id,
@@ -139,7 +149,7 @@ class LeaseRepository:
                     attempt_number=attempt_number,
                     lease_token=token,
                     outcome=AttemptOutcome.STARTED.value,
-                    started_at=now,
+                    started_at=effective_now,
                 )
                 session.add(attempt)
                 event = await session.scalar(
@@ -163,7 +173,7 @@ class LeaseRepository:
         for claim in claimed:
             self._record(
                 RuntimeEventKind.CLAIMED,
-                now,
+                effective_now,
                 claim,
                 {"destination.kind": claim.delivery.destination_kind},
             )
@@ -172,7 +182,7 @@ class LeaseRepository:
                 self._event_sink,
                 RuntimeEvent(
                     RuntimeEventKind.DEAD,
-                    now,
+                    effective_now,
                     {
                         "destination.kind": destination_kind,
                         "failure.code": "delivery.deadline_exceeded",
@@ -190,10 +200,10 @@ class LeaseRepository:
         now: datetime,
     ) -> None:
         async with _owned_transaction(session):
-            await self.succeed_in_transaction(session, claim, now=now)
+            finished_at = await self.succeed_in_transaction(session, claim, now=now)
         self._record(
             RuntimeEventKind.SUCCEEDED,
-            now,
+            finished_at,
             claim,
             {"destination.kind": claim.delivery.destination_kind},
         )
@@ -204,13 +214,18 @@ class LeaseRepository:
         claim: ClaimedDelivery,
         *,
         now: datetime,
-    ) -> None:
+    ) -> datetime:
         if not session.in_transaction():
             raise MergenConfigurationError("Transactional success requires an active transaction.")
-        delivery, attempt = await _locked_active_rows(session, claim, now=now)
+        delivery, attempt, finished_at = await _locked_active_rows(
+            session,
+            claim,
+            now=now,
+            database_clock=self._database_clock,
+        )
         policy = _snapshot_policy(dict(delivery.route_snapshot))
         lease_expires_at = delivery.lease_expires_at
-        if lease_expires_at is None or now >= attempt_deadline(
+        if lease_expires_at is None or finished_at >= attempt_deadline(
             policy=policy,
             delivery_created_at=delivery.created_at,
             attempt_started_at=attempt.started_at,
@@ -218,9 +233,10 @@ class LeaseRepository:
         ):
             raise LeaseLost(delivery_id=claim.delivery.delivery_id)
         attempt.outcome = AttemptOutcome.SUCCEEDED.value
-        attempt.finished_at = now
+        attempt.finished_at = finished_at
         delivery.state = DeliveryState.SUCCEEDED.value
-        _clear_lease(delivery, now)
+        _clear_lease(delivery, finished_at)
+        return finished_at
 
     async def fail(
         self,
@@ -241,11 +257,12 @@ class LeaseRepository:
                 now=now,
                 retry_after=retry_after,
             )
+            recorded_at = await self._database_clock.now(session, observed_at=now)
         self._record(
             RuntimeEventKind.RETRY_SCHEDULED
             if outcome is DeliveryState.RETRY_WAIT
             else RuntimeEventKind.DEAD,
-            now,
+            recorded_at,
             claim,
             {"destination.kind": claim.delivery.destination_kind, "state": outcome.value},
         )
@@ -262,16 +279,21 @@ class LeaseRepository:
     ) -> DeliveryState:
         if not session.in_transaction():
             raise MergenConfigurationError("Transactional failure requires an active transaction.")
-        delivery, attempt = await _locked_active_rows(session, claim, now=now)
+        delivery, attempt, finished_at = await _locked_active_rows(
+            session,
+            claim,
+            now=now,
+            database_clock=self._database_clock,
+        )
         policy = _snapshot_policy(dict(delivery.route_snapshot))
-        attempt.finished_at = now
+        attempt.finished_at = finished_at
         attempt.failure_code = error.code
         attempt.failure_summary = error.summary
         retryable = isinstance(error, RetryableDeliveryError)
         if retryable and policy.permits_retry(
             attempt_number=attempt.attempt_number,
             first_attempt_at=delivery.created_at,
-            now=now,
+            now=finished_at,
         ):
             attempt.outcome = AttemptOutcome.RETRYABLE.value
             delay = policy.retry_delay(attempt.attempt_number, self._random_source)
@@ -280,7 +302,7 @@ class LeaseRepository:
                     raise MergenConfigurationError("Retry-After cannot be negative.")
                 delay = max(delay, retry_after)
             delay = min(delay, timedelta(seconds=policy.maximum_delay_seconds))
-            scheduled_at = now + delay
+            scheduled_at = finished_at + delay
             if scheduled_at < delivery_deadline(policy=policy, created_at=delivery.created_at):
                 delivery.state = DeliveryState.RETRY_WAIT.value
                 delivery.next_attempt_at = scheduled_at
@@ -291,7 +313,7 @@ class LeaseRepository:
                     "Retry scheduling would exceed the delivery elapsed-time deadline."
                 )
                 delivery.state = DeliveryState.DEAD.value
-                delivery.next_attempt_at = now
+                delivery.next_attempt_at = finished_at
                 outcome = DeliveryState.DEAD
         else:
             attempt.outcome = (
@@ -299,7 +321,7 @@ class LeaseRepository:
             )
             delivery.state = DeliveryState.DEAD.value
             outcome = DeliveryState.DEAD
-        _clear_lease(delivery, now)
+        _clear_lease(delivery, finished_at)
         return outcome
 
     async def reconcile_expired(
@@ -312,13 +334,15 @@ class LeaseRepository:
         _require_idle(session)
         _positive("batch_size", batch_size)
         reconciled = 0
+        reconciled_at: datetime | None = None
         async with session.begin():
+            selection_time = await self._database_clock.now(session, observed_at=now)
             rows = (
                 await session.scalars(
                     select(DeliveryRow)
                     .where(
                         DeliveryRow.state == DeliveryState.LEASED.value,
-                        DeliveryRow.lease_expires_at <= now,
+                        DeliveryRow.lease_expires_at <= selection_time,
                     )
                     .order_by(DeliveryRow.lease_expires_at)
                     .limit(batch_size)
@@ -326,11 +350,6 @@ class LeaseRepository:
                 )
             ).all()
             for delivery in rows:
-                policy = _snapshot_policy(dict(delivery.route_snapshot))
-                elapsed_deadline_reached = now >= delivery_deadline(
-                    policy=policy,
-                    created_at=delivery.created_at,
-                )
                 attempt = await session.scalar(
                     select(AttemptRow)
                     .where(
@@ -341,9 +360,15 @@ class LeaseRepository:
                     )
                     .with_for_update()
                 )
+                effective_now = await self._database_clock.now(session, observed_at=now)
+                policy = _snapshot_policy(dict(delivery.route_snapshot))
+                elapsed_deadline_reached = effective_now >= delivery_deadline(
+                    policy=policy,
+                    created_at=delivery.created_at,
+                )
                 if attempt is not None:
                     attempt.outcome = AttemptOutcome.ABANDONED.value
-                    attempt.finished_at = now
+                    attempt.finished_at = effective_now
                     attempt.failure_code = (
                         "delivery.deadline_exceeded"
                         if elapsed_deadline_reached
@@ -360,15 +385,18 @@ class LeaseRepository:
                     and not elapsed_deadline_reached
                     else DeliveryState.DEAD.value
                 )
-                delivery.next_attempt_at = now
-                _clear_lease(delivery, now)
+                delivery.next_attempt_at = effective_now
+                _clear_lease(delivery, effective_now)
                 reconciled += 1
+                reconciled_at = effective_now
         if reconciled:
+            if reconciled_at is None:  # Defensive: increment and timestamp move together.
+                raise RuntimeError("Reconciliation timestamp was not captured.")
             record_safely(
                 self._event_sink,
                 RuntimeEvent(
                     RuntimeEventKind.RECONCILED,
-                    now,
+                    reconciled_at,
                     {"reconciled.count": reconciled},
                 ),
             )
@@ -539,7 +567,8 @@ async def _locked_active_rows(
     claim: ClaimedDelivery,
     *,
     now: datetime,
-) -> tuple[DeliveryRow, AttemptRow]:
+    database_clock: DatabaseClock,
+) -> tuple[DeliveryRow, AttemptRow, datetime]:
     delivery = await session.scalar(
         select(DeliveryRow)
         .where(
@@ -553,7 +582,6 @@ async def _locked_active_rows(
         or delivery.state != DeliveryState.LEASED.value
         or delivery.lease_token != claim.lease_token
         or delivery.lease_expires_at is None
-        or delivery.lease_expires_at <= now
     ):
         raise LeaseLost(delivery_id=claim.delivery.delivery_id)
     attempt = await session.scalar(
@@ -568,7 +596,10 @@ async def _locked_active_rows(
     )
     if attempt is None:
         raise LeaseLost(delivery_id=claim.delivery.delivery_id)
-    return delivery, attempt
+    locked_at = await database_clock.now(session, observed_at=now)
+    if delivery.lease_expires_at <= locked_at:
+        raise LeaseLost(delivery_id=claim.delivery.delivery_id)
+    return delivery, attempt, locked_at
 
 
 def _snapshot_policy(snapshot: dict[str, Any]) -> RetryPolicy:

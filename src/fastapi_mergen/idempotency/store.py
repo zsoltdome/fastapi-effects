@@ -19,6 +19,7 @@ from fastapi_mergen.idempotency.models import CommandIdentity, CommandRow, Comma
 from fastapi_mergen.idempotency.responses import CapturedResponse
 from fastapi_mergen.observability.events import RuntimeEvent, RuntimeEventKind, TraceLineage
 from fastapi_mergen.observability.protocols import EventSink, NoOpEventSink, record_safely
+from fastapi_mergen.postgres.time import DatabaseClock, PostgresDatabaseClock
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,9 +42,11 @@ class CommandStore:
         *,
         uuid_source: UUIDGenerator | None = None,
         event_sink: EventSink | None = None,
+        database_clock: DatabaseClock | None = None,
     ) -> None:
         self._uuid_source = uuid_source or UUIDSource()
         self._event_sink = event_sink or NoOpEventSink()
+        self._database_clock = database_clock or PostgresDatabaseClock()
 
     async def acquire(
         self,
@@ -72,13 +75,14 @@ class CommandStore:
             )
             .with_for_update()
         )
+        locked_at = await self._database_clock.now(session, observed_at=now)
         generation = 1
-        if row is not None and row.expires_at <= now:
+        if row is not None and row.expires_at <= locked_at:
             generation = row.generation + 1
             row.state = CommandState.SUPERSEDED.value
             row.is_current = False
-            row.superseded_at = now
-            row.updated_at = now
+            row.superseded_at = locked_at
+            row.updated_at = locked_at
             await session.flush()
             row = None
         if row is None:
@@ -100,15 +104,15 @@ class CommandStore:
                     response_headers=None,
                     response_body=None,
                     response_media_type=None,
-                    created_at=now,
-                    updated_at=now,
-                    expires_at=now + ttl,
+                    created_at=locked_at,
+                    updated_at=locked_at,
+                    expires_at=locked_at + ttl,
                     completed_at=None,
                     superseded_at=None,
                 )
             )
             await session.flush()
-            self._record(RuntimeEventKind.COMMAND_STARTED, now, command_id)
+            self._record(RuntimeEventKind.COMMAND_STARTED, locked_at, command_id)
             return CommandAcquisition(
                 command_id=command_id,
                 generation=generation,
@@ -119,17 +123,17 @@ class CommandStore:
             or row.fingerprint_version != fingerprint.version
             or row.fingerprint != fingerprint.digest
         ):
-            self._record(RuntimeEventKind.COMMAND_CONFLICT, now, row.command_id)
+            self._record(RuntimeEventKind.COMMAND_CONFLICT, locked_at, row.command_id)
             raise CommandConflict
         if row.state == CommandState.COMPLETED.value:
-            self._record(RuntimeEventKind.COMMAND_REPLAYED, now, row.command_id)
+            self._record(RuntimeEventKind.COMMAND_REPLAYED, locked_at, row.command_id)
             return CommandAcquisition(
                 command_id=row.command_id,
                 generation=row.generation,
                 replayed=True,
                 response=_response_from_row(row),
             )
-        self._record(RuntimeEventKind.COMMAND_CONFLICT, now, row.command_id)
+        self._record(RuntimeEventKind.COMMAND_CONFLICT, locked_at, row.command_id)
         raise CommandInProgress
 
     async def complete(
@@ -155,15 +159,16 @@ class CommandStore:
         )
         if row is None or row.state != CommandState.IN_PROGRESS.value or not row.is_current:
             raise CommandInProgress
+        completed_at = await self._database_clock.now(session, observed_at=now)
         row.state = CommandState.COMPLETED.value
         row.response_status = response.status_code
         row.response_headers = dict(response.headers)
         row.response_body = response.body
         row.response_media_type = response.media_type
-        row.completed_at = now
-        row.updated_at = now
+        row.completed_at = completed_at
+        row.updated_at = completed_at
         await session.flush()
-        self._record(RuntimeEventKind.COMMAND_COMPLETED, now, acquisition.command_id)
+        self._record(RuntimeEventKind.COMMAND_COMPLETED, completed_at, acquisition.command_id)
 
     async def prune(
         self,

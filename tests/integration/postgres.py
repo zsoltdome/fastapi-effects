@@ -8,11 +8,22 @@ import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 from urllib.parse import quote, urlsplit, urlunsplit
 from uuid import uuid4
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
+
+
+class ObservedDatabaseClock:
+    """Deterministic test clock; production never uses caller-observed time."""
+
+    async def now(self, session: AsyncSession, *, observed_at: datetime) -> datetime:
+        del session
+        return observed_at
 
 
 def _quote_identifier(value: str) -> str:
