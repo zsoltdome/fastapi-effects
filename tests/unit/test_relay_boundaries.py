@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import DBAPIError, OperationalError, ProgrammingError
 
 from fastapi_mergen import Principal, RetryPolicy
 from fastapi_mergen.core.delivery import (
@@ -221,6 +221,37 @@ async def test_failure_finalization_lease_loss_does_not_cancel_a_sibling() -> No
 
 
 @pytest.mark.asyncio
+async def test_poisoned_delivery_failure_does_not_cancel_an_unrelated_tenant() -> None:
+    now = datetime.now(UTC)
+    poisoned = _claim(now)
+    healthy = _claim(now)
+    completed: list[UUID] = []
+
+    class Sink:
+        async def execute(self, claim: ClaimedDelivery) -> None:
+            if claim.delivery.delivery_id == poisoned.delivery.delivery_id:
+                raise PermanentDeliveryError(
+                    code="webhook.endpoint_invalid",
+                    summary="Controlled persisted endpoint failure.",
+                )
+            await asyncio.sleep(0.01)
+            completed.append(claim.delivery.delivery_id)
+
+    leases = _Leases((poisoned, healthy))
+    relay = PollingRelay(
+        sessions=_Sessions(),  # type: ignore[arg-type]
+        sink=Sink(),
+        leases=leases,  # type: ignore[arg-type]
+        clock=_Clock(now),
+    )
+
+    assert await relay.run_once() == 2
+    assert completed == [healthy.delivery.delivery_id]
+    assert leases.succeeded == [healthy.delivery.delivery_id]
+    assert leases.failures == ["webhook.endpoint_invalid"]
+
+
+@pytest.mark.asyncio
 async def test_relay_enforces_the_aggregate_attempt_deadline() -> None:
     now = datetime.now(UTC)
     claim = _claim(now, handler_timeout=0.01)
@@ -340,6 +371,186 @@ async def test_relay_supervisor_resumes_polling_after_transient_database_failure
     relay.request_stop()
     await asyncio.wait_for(task, timeout=0.1)
     assert leases.reconcile_calls >= 2
+
+
+@pytest.mark.asyncio
+async def test_relay_supervisor_handles_generic_invalidated_dbapi_error() -> None:
+    class FlakyLeases(_Leases):
+        def __init__(self) -> None:
+            super().__init__(())
+            self.calls = 0
+            self.resumed = asyncio.Event()
+
+        async def reconcile_expired(self, session: object, **kwargs: object) -> int:
+            del session, kwargs
+            self.calls += 1
+            if self.calls == 1:
+                raise DBAPIError(
+                    "controlled",
+                    {},
+                    RuntimeError("connection disappeared"),
+                    connection_invalidated=True,
+                )
+            self.resumed.set()
+            return 0
+
+    leases = FlakyLeases()
+    relay = PollingRelay(
+        sessions=_Sessions(),  # type: ignore[arg-type]
+        sink=object(),  # type: ignore[arg-type]
+        leases=leases,  # type: ignore[arg-type]
+        config=RelayConfig(poll_interval_seconds=0.001),
+    )
+    task = asyncio.create_task(relay.run())
+    await asyncio.wait_for(leases.resumed.wait(), timeout=0.1)
+    relay.request_stop()
+    await asyncio.wait_for(task, timeout=0.1)
+    assert leases.calls >= 2
+
+
+@pytest.mark.asyncio
+async def test_relay_supervisor_retries_a_bounded_control_plane_timeout() -> None:
+    class SlowThenHealthyLeases(_Leases):
+        def __init__(self) -> None:
+            super().__init__(())
+            self.calls = 0
+            self.resumed = asyncio.Event()
+
+        async def reconcile_expired(self, session: object, **kwargs: object) -> int:
+            del session, kwargs
+            self.calls += 1
+            if self.calls == 1:
+                await asyncio.Event().wait()
+            self.resumed.set()
+            return 0
+
+    leases = SlowThenHealthyLeases()
+    relay = PollingRelay(
+        sessions=_Sessions(),  # type: ignore[arg-type]
+        sink=object(),  # type: ignore[arg-type]
+        leases=leases,  # type: ignore[arg-type]
+        config=RelayConfig(
+            poll_interval_seconds=0.001,
+            control_plane_timeout_seconds=0.01,
+        ),
+    )
+    task = asyncio.create_task(relay.run())
+    await asyncio.wait_for(leases.resumed.wait(), timeout=0.1)
+    relay.request_stop()
+    await asyncio.wait_for(task, timeout=0.1)
+    assert leases.calls >= 2
+
+
+@pytest.mark.asyncio
+async def test_relay_does_not_hide_database_programming_errors() -> None:
+    class BrokenLeases(_Leases):
+        async def reconcile_expired(self, session: object, **kwargs: object) -> int:
+            del session, kwargs
+            raise ProgrammingError("bad schema", {}, RuntimeError("undefined table"))
+
+    relay = PollingRelay(
+        sessions=_Sessions(),  # type: ignore[arg-type]
+        sink=object(),  # type: ignore[arg-type]
+        leases=BrokenLeases(()),  # type: ignore[arg-type]
+        config=RelayConfig(poll_interval_seconds=0.001),
+    )
+
+    with pytest.raises(ProgrammingError):
+        await relay.run()
+
+
+@pytest.mark.asyncio
+async def test_invalidated_handler_connection_isolated_without_inline_business_retry() -> None:
+    now = datetime.now(UTC)
+    disconnected = _claim(now)
+    healthy = _claim(now)
+
+    class Sink:
+        async def execute(self, claim: ClaimedDelivery) -> None:
+            if claim.delivery.delivery_id == disconnected.delivery.delivery_id:
+                raise DBAPIError(
+                    "controlled",
+                    {},
+                    RuntimeError("connection disappeared"),
+                    connection_invalidated=True,
+                )
+
+    leases = _Leases((disconnected, healthy))
+    events = _Events()
+    relay = PollingRelay(
+        sessions=_Sessions(),  # type: ignore[arg-type]
+        sink=Sink(),
+        leases=leases,  # type: ignore[arg-type]
+        clock=_Clock(now),
+        event_sink=events,
+    )
+
+    assert await relay.run_once() == 2
+    assert leases.succeeded == [healthy.delivery.delivery_id]
+    assert leases.failures == []
+    assert [event.kind for event in events.values] == [RuntimeEventKind.CONTROL_PLANE_FAILED]
+
+
+@pytest.mark.asyncio
+async def test_success_finalization_is_bounded_and_leaves_lease_recoverable() -> None:
+    now = datetime.now(UTC)
+    claim = _claim(now)
+
+    class BlockedLeases(_Leases):
+        async def succeed(
+            self,
+            session: object,
+            claim: ClaimedDelivery,
+            **kwargs: object,
+        ) -> None:
+            del session, claim, kwargs
+            await asyncio.Event().wait()
+
+    class SuccessfulSink:
+        async def execute(self, claim: ClaimedDelivery) -> None:
+            del claim
+
+    relay = PollingRelay(
+        sessions=_Sessions(),  # type: ignore[arg-type]
+        sink=SuccessfulSink(),
+        leases=BlockedLeases((claim,)),  # type: ignore[arg-type]
+        clock=_Clock(now),
+        config=RelayConfig(finalization_timeout_seconds=0.01),
+    )
+    started = asyncio.get_running_loop().time()
+    await relay.execute_claim(claim)
+
+    assert asyncio.get_running_loop().time() - started < 0.1
+
+
+@pytest.mark.asyncio
+async def test_stop_cancels_inflight_work_after_bounded_grace() -> None:
+    now = datetime.now(UTC)
+    claim = _claim(now, handler_timeout=1)
+    admitted = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    class StalledSink:
+        async def execute(self, claim: ClaimedDelivery) -> None:
+            del claim
+            admitted.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+    relay = PollingRelay(
+        sessions=_Sessions(),  # type: ignore[arg-type]
+        sink=StalledSink(),
+        leases=_Leases((claim,)),  # type: ignore[arg-type]
+        clock=_Clock(now),
+        config=RelayConfig(shutdown_grace_seconds=0.01),
+    )
+    task = asyncio.create_task(relay.run())
+    await asyncio.wait_for(admitted.wait(), timeout=0.1)
+    relay.request_stop()
+    await asyncio.wait_for(task, timeout=0.1)
+    await asyncio.wait_for(cancelled.wait(), timeout=0.1)
 
 
 @pytest.mark.asyncio

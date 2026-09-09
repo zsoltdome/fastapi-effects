@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rehearse a disposable PostgreSQL restart without exposing database credentials."""
+"""Rehearse a disposable PostgreSQL server restart without exposing credentials."""
 
 from __future__ import annotations
 
@@ -90,6 +90,32 @@ async def _wait_for_server(admin_dsn: str, *, timeout_seconds: float) -> tuple[s
     ) from last_error
 
 
+async def _ensure_restart_persists_cluster(container: str) -> None:
+    process = await asyncio.create_subprocess_exec(
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .Mounts}}",
+        container,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await process.communicate()
+    if process.returncode != 0:
+        detail = stderr.decode(errors="replace").strip()
+        raise RuntimeError(f"Docker inspect failed: {detail or 'no diagnostic supplied'}")
+    mounts = json.loads(stdout)
+    if any(
+        mount.get("Type") == "tmpfs"
+        and str(mount.get("Destination", "")).startswith("/var/lib/postgresql")
+        for mount in mounts
+        if isinstance(mount, dict)
+    ):
+        raise RuntimeError(
+            "Restart rehearsal requires persistent PostgreSQL storage; tmpfs would discard it."
+        )
+
+
 async def _restart_container(container: str) -> None:
     process = await asyncio.create_subprocess_exec(
         "docker",
@@ -113,6 +139,7 @@ async def _rehearse(
     expected_major: int,
     timeout_seconds: float,
 ) -> dict[str, Any]:
+    await _ensure_restart_persists_cluster(container)
     before_version, before_started_at = await _server_identity(admin_dsn)
     if before_version.split(".", maxsplit=1)[0] != str(expected_major):
         raise RuntimeError(

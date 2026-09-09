@@ -17,6 +17,7 @@
 | [ADR-012](ADR-012-command-idempotency.md) | Accepted | Transactional command idempotency |
 | [ADR-013](ADR-013-delegation.md) | Accepted | Target-bound delegated authority |
 | [ADR-014](ADR-014-webhook-retention.md) | Accepted | Tenant-bound bounded webhook retention |
+| [ADR-015](ADR-015-control-plane-budgets.md) | Accepted | Bounded control-plane, finalization, and shutdown work |
 
 ## Decision rule
 

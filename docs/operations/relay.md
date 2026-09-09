@@ -103,6 +103,19 @@ enabled and recovers missed notifications.
 6. close sessions and reset contexts;
 7. exit non-zero on an internal invariant failure.
 
+`RelayConfig` separates the effect deadline from
+`control_plane_timeout_seconds`, `finalization_timeout_seconds`, and
+`shutdown_grace_seconds`. Database acquisition, statements, transaction completion,
+rollback, and cooperative session cleanup are inside the applicable control budget.
+Finalization allowance records an already-finished effect and never authorizes more
+effect execution. A timeout or ambiguous commit leaves the fenced lease for inspection
+and expiry recovery; it is not blindly replayed inline. See ADR-015.
+
+The CLI installs explicit SIGTERM and SIGINT handlers on platforms that support event
+loop signal handlers. Cancellation is cooperative; the process supervisor owns hard
+termination of CPU-bound or cancellation-suppressing application code after its own
+deadline.
+
 ## Operational signals
 
 Required bounded-cardinality metrics include due age, claims, active work, outcome,

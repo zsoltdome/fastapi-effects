@@ -66,6 +66,7 @@ class RuntimeEventKind(StrEnum):
     DELEGATION_ALLOWED = "delegation_allowed"
     DELEGATION_DENIED = "delegation_denied"
     BACKLOG_OBSERVED = "backlog_observed"
+    CONTROL_PLANE_FAILED = "control_plane_failed"
 
 
 @dataclass(frozen=True, slots=True)

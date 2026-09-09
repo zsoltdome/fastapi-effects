@@ -23,6 +23,7 @@ from fastapi_mergen.executors.taskiq.envelope import TaskiqHandoffEnvelope
 from fastapi_mergen.executors.taskiq.store import HandoffRecord, TaskiqHandoffStore
 from fastapi_mergen.observability.events import RuntimeEvent, RuntimeEventKind, TraceLineage
 from fastapi_mergen.observability.protocols import EventSink, NoOpEventSink, record_safely
+from fastapi_mergen.postgres.errors import is_transient_database_error
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,24 +51,36 @@ class TaskiqWorkerBridge:
     store: TaskiqHandoffStore = field(default_factory=TaskiqHandoffStore)
     clock: Clock = field(default_factory=SystemClock)
     execution_timeout: timedelta = timedelta(minutes=5)
+    control_plane_timeout: timedelta = timedelta(seconds=10)
     event_sink: EventSink = field(default_factory=NoOpEventSink)
+
+    def __post_init__(self) -> None:
+        if (
+            self.execution_timeout <= timedelta(0)
+            or self.execution_timeout > timedelta(hours=1)
+            or self.control_plane_timeout <= timedelta(0)
+            or self.control_plane_timeout > timedelta(minutes=5)
+        ):
+            raise MergenConfigurationError("Taskiq worker operation budgets are invalid.")
 
     async def execute(self, value: dict[str, object]) -> WorkerResult:
         envelope = TaskiqHandoffEnvelope.from_dict(value)
-        async with self.sessions() as session:
-            executing = await self.store.claim_execution(
-                session,
-                envelope=envelope,
-                now=self.clock.now(),
-                execution_timeout=self.execution_timeout,
-            )
-        if executing is None:
+        async with asyncio.timeout(self.control_plane_timeout.total_seconds()):
             async with self.sessions() as session:
-                record = await self.store.for_id(
+                executing = await self.store.claim_execution(
                     session,
-                    tenant_id=envelope.tenant_id,
-                    handoff_id=envelope.handoff_id,
+                    envelope=envelope,
+                    now=self.clock.now(),
+                    execution_timeout=self.execution_timeout,
                 )
+        if executing is None:
+            async with asyncio.timeout(self.control_plane_timeout.total_seconds()):
+                async with self.sessions() as session:
+                    record = await self.store.for_id(
+                        session,
+                        tenant_id=envelope.tenant_id,
+                        handoff_id=envelope.handoff_id,
+                    )
             if record is None:
                 raise MergenConfigurationError("Taskiq duplicate references no handoff.")
             self._record(envelope, record, executed=False)
@@ -97,33 +110,39 @@ class TaskiqWorkerBridge:
                 code="executor.execution_timeout",
                 summary="Taskiq handler exceeded its aggregate attempt deadline.",
             )
-        except Exception:
+        except Exception as exc:
+            if is_transient_database_error(exc):
+                # Commit status may be unknown. Leave the executing handoff for
+                # fenced recovery instead of manufacturing a business retry.
+                raise
             failure = RetryableDeliveryError(
                 code="executor.execution_failed",
                 summary="Taskiq handler failed without safe classification.",
             )
         try:
-            async with self.sessions() as session:
-                if failure is None:
-                    record = await self.store.finalize_success(
-                        session,
-                        executing=executing,
-                        now=self.clock.now(),
-                    )
-                else:
-                    record = await self.store.finalize_failure(
-                        session,
-                        executing=executing,
-                        error=failure,
-                        now=self.clock.now(),
-                    )
+            async with asyncio.timeout(self.control_plane_timeout.total_seconds()):
+                async with self.sessions() as session:
+                    if failure is None:
+                        record = await self.store.finalize_success(
+                            session,
+                            executing=executing,
+                            now=self.clock.now(),
+                        )
+                    else:
+                        record = await self.store.finalize_failure(
+                            session,
+                            executing=executing,
+                            error=failure,
+                            now=self.clock.now(),
+                        )
         except LeaseLost as exc:
-            async with self.sessions() as session:
-                current = await self.store.for_id(
-                    session,
-                    tenant_id=envelope.tenant_id,
-                    handoff_id=envelope.handoff_id,
-                )
+            async with asyncio.timeout(self.control_plane_timeout.total_seconds()):
+                async with self.sessions() as session:
+                    current = await self.store.for_id(
+                        session,
+                        tenant_id=envelope.tenant_id,
+                        handoff_id=envelope.handoff_id,
+                    )
             if current is None:
                 raise MergenConfigurationError(
                     "Taskiq stale finalization lost its handoff."
