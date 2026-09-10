@@ -20,7 +20,7 @@ keywords = [
   "webhooks",
 ]
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
+  "Development Status :: 3 - Alpha",
   "Framework :: FastAPI",
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
@@ -39,6 +39,7 @@ dependencies = [
   # Starlette 1.x transport required by the FastMCP 3.4 integration.
   "fastapi>=0.141,<0.142",
   "pydantic>=2.13,<3",
+  "packaging>=25,<27",
   "SQLAlchemy[asyncio]>=2.0.50,<2.1",
   "starlette>=1.0.1,<2",
 ]

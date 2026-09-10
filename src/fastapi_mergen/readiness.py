@@ -5,7 +5,9 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
+
+from packaging.version import InvalidVersion, Version
 
 READINESS_SCHEMA_VERSION = 2
 MANDATORY_PARTNER_EXERCISES = frozenset(
@@ -28,6 +30,46 @@ _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 
+ReleasePhase = Literal["pre-v1", "rc", "final", "unsupported"]
+
+
+def classify_release_version(value: str) -> ReleasePhase:
+    """Map supported PEP 440 publication versions to fail-closed phases."""
+
+    try:
+        version = Version(value)
+    except InvalidVersion:
+        return "unsupported"
+    if version.epoch != 0 or version.local is not None or version.post is not None:
+        return "unsupported"
+    if version.release[0] < 1:
+        return "pre-v1"
+    if version.dev is not None:
+        return "unsupported"
+    if version.pre is not None:
+        return "rc" if version.pre[0] == "rc" else "unsupported"
+    return "final"
+
+
+def candidate_matches_release(candidate: object, release: str, *, phase: str) -> bool:
+    """Bind an RC record to that RC or to the stable release with the same base."""
+
+    if not isinstance(candidate, str) or classify_release_version(candidate) != "rc":
+        return False
+    try:
+        candidate_version = Version(candidate)
+        release_version = Version(release)
+    except InvalidVersion:
+        return False
+    if phase == "rc":
+        return candidate_version == release_version
+    if phase == "final":
+        return (
+            classify_release_version(release) == "final"
+            and candidate_version.release == release_version.release
+        )
+    return False
+
 
 def validate_readiness_record(
     record: Mapping[str, Any],
@@ -46,7 +88,10 @@ def validate_readiness_record(
     candidate_digest_values = candidate_digests or []
     selected_capabilities = _string_list(record.get("selected_capabilities"))
     if require_candidate:
-        if candidate_version != "1.0.0rc1":
+        if (
+            not isinstance(candidate_version, str)
+            or classify_release_version(candidate_version) != "rc"
+        ):
             errors.append("candidate_version")
         if not _valid_commit(candidate_commit):
             errors.append("candidate_source_commit")
@@ -307,6 +352,9 @@ __all__ = [
     "LIVE_DEPLOYMENT_CLASSES",
     "MANDATORY_PARTNER_EXERCISES",
     "READINESS_SCHEMA_VERSION",
+    "ReleasePhase",
+    "candidate_matches_release",
+    "classify_release_version",
     "partner_is_complete",
     "valid_digest",
     "valid_observation_interval",

@@ -10,6 +10,8 @@ from typing import Any
 
 from fastapi_mergen import __version__
 from fastapi_mergen.readiness import (
+    candidate_matches_release,
+    classify_release_version,
     partner_is_complete,
     valid_digest,
     valid_observation_interval,
@@ -29,7 +31,7 @@ def audit(
     if readiness is None:
         readiness = json.loads(RECORD.read_text(encoding="utf-8"))
     current_version = __version__ if version is None else version
-    selected_phase = _release_phase(phase, version=current_version)
+    selected_phase, phase_consistent = _release_phase(phase, version=current_version)
     selected_capabilities = readiness.get("selected_capabilities")
     if not isinstance(selected_capabilities, list) or any(
         not isinstance(item, str) for item in selected_capabilities
@@ -57,6 +59,7 @@ def audit(
     )
     if selected_phase == "pre-v1":
         checks = {
+            "release_phase_supported_and_consistent": phase_consistent,
             "readiness_record_valid": not record_errors,
             "v1_readiness_gate_not_yet_applicable": True,
         }
@@ -67,11 +70,15 @@ def audit(
             version=current_version,
         )
     checks = {
+        "release_phase_supported_and_consistent": phase_consistent,
         "readiness_record_valid": not record_errors,
-        "release_version_matches_phase": (
-            current_version == "1.0.0rc1" if selected_phase == "rc" else current_version == "1.0.0"
+        "release_version_matches_phase": classify_release_version(current_version)
+        == selected_phase,
+        "candidate_record_matches": candidate_matches_release(
+            readiness.get("candidate_version"),
+            current_version,
+            phase=selected_phase,
         ),
-        "candidate_record_matches": readiness.get("candidate_version") == "1.0.0rc1",
         "candidate_source_and_artifacts_bound": (
             isinstance(readiness.get("candidate_source_commit"), str)
             and len(readiness["candidate_source_commit"]) == 40
@@ -132,14 +139,11 @@ def _report(
     }
 
 
-def _release_phase(requested: str, *, version: str) -> str:
-    if requested != "auto":
-        return requested
-    if version == "1.0.0rc1":
-        return "rc"
-    if version == "1.0.0":
-        return "final"
-    return "pre-v1"
+def _release_phase(requested: str, *, version: str) -> tuple[str, bool]:
+    inferred = classify_release_version(version)
+    if requested == "auto":
+        return inferred, inferred != "unsupported"
+    return requested, inferred == requested
 
 
 def _has_two_distinct_approvers(value: object) -> bool:

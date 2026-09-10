@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from scripts.audit_release_candidate import audit
 
-from fastapi_mergen.readiness import MANDATORY_PARTNER_EXERCISES
+from fastapi_mergen.readiness import MANDATORY_PARTNER_EXERCISES, classify_release_version
 
 
 def test_release_gate_fails_closed_without_external_evidence() -> None:
@@ -122,6 +122,12 @@ def test_release_gate_is_phase_aware() -> None:
     assert audit("auto", readiness=ready, version="1.0.0rc1")["phase"] == "rc"
     assert audit("auto", readiness=ready, version="1.0.0")["phase"] == "final"
 
+    for version in ("1.0.0rc2", "1.0.1", "1.1.0", "2.0.0", "2.0.0rc3"):
+        assert audit("auto", readiness=pre_v1, version=version)["result"] == "blocked"
+
+    assert audit("pre-v1", readiness=pre_v1, version="1.0.1")["result"] == "blocked"
+    assert audit("final", readiness=ready, version="1.0.0rc1")["result"] == "blocked"
+
     unobserved = deepcopy(ready)
     unobserved["rc_observation"] = {
         "status": "not_started",
@@ -135,6 +141,52 @@ def test_release_gate_is_phase_aware() -> None:
     }
     assert audit("rc", readiness=unobserved, version="1.0.0rc1")["result"] == "pass"
     assert audit("final", readiness=unobserved, version="1.0.0")["result"] == "blocked"
+
+
+@pytest.mark.parametrize(
+    ("version", "phase"),
+    [
+        ("0.11.0a1", "pre-v1"),
+        ("0.11.0b2", "pre-v1"),
+        ("0.11.0.dev3", "pre-v1"),
+        ("1.0.0rc1", "rc"),
+        ("1.0.0rc2", "rc"),
+        ("2.0.0rc4", "rc"),
+        ("1.0.0", "final"),
+        ("1.0.1", "final"),
+        ("1.1.0", "final"),
+        ("2.0.0", "final"),
+        ("1.0.0a1", "unsupported"),
+        ("1.0.0b1", "unsupported"),
+        ("1.0.0.dev1", "unsupported"),
+        ("1.0.0.post1", "unsupported"),
+        ("1.0.0+local", "unsupported"),
+        ("not-a-version", "unsupported"),
+    ],
+)
+def test_release_version_policy_is_semantic_and_fail_closed(version: str, phase: str) -> None:
+    assert classify_release_version(version) == phase
+
+
+@pytest.mark.parametrize(
+    ("version", "candidate"),
+    [
+        ("1.0.0rc2", "1.0.0rc2"),
+        ("2.0.0rc4", "2.0.0rc4"),
+        ("1.0.1", "1.0.1rc3"),
+        ("1.1.0", "1.1.0rc2"),
+        ("2.0.0", "2.0.0rc1"),
+    ],
+)
+def test_later_candidates_and_stable_releases_bind_to_their_actual_rc(
+    version: str,
+    candidate: str,
+) -> None:
+    ready = _ready_record()
+    ready["candidate_version"] = candidate
+    ready["rc_observation"]["candidate_version"] = candidate
+
+    assert audit("auto", readiness=ready, version=version)["result"] == "pass"
 
 
 @pytest.mark.parametrize(
