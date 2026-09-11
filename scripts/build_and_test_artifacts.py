@@ -232,6 +232,11 @@ def inspect_sdist(sdist: Path) -> None:
         "/src/fastapi_mergen/conformance/spec/boundary-contract-v1.json",
         "/src/fastapi_mergen/conformance/spec/manifest-v1.schema.json",
         "/src/fastapi_mergen/conformance/spec/report-v1.schema.json",
+        "/docs/tutorials/quickstart.md",
+        "/examples/deployment/.env.example",
+        "/tests/integration/test_invoicing_postgres_boot.py",
+        "/examples/invoicing/relay.py",
+        "/scripts/build_and_test_artifacts.py",
     )
     missing = [suffix for suffix in suffixes if not any(name.endswith(suffix) for name in names)]
     if missing:

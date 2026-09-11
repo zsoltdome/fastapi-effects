@@ -7,78 +7,62 @@ on:
 permissions:
   contents: read
   checks: read
+  actions: read
 
 jobs:
   publish:
     if: github.repository == 'mergen-institute/fastapi-mergen'
     runs-on: ubuntu-latest
     environment: pypi
-    timeout-minutes: 30
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 55432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 56379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-    env:
-      MERGEN_TEST_ADMIN_DSN: postgresql://postgres:postgres@127.0.0.1:55432/postgres
-      MERGEN_TEST_REDIS_URL: redis://127.0.0.1:56379/0
-      MERGEN_IMPLEMENTATION_COMMIT: ${{ github.sha }}
+    timeout-minutes: 10
     permissions:
       contents: read
       checks: read
+      actions: read
       id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.13"
-      - name: Set up uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          version: "0.12.4"
-      - name: Install packaging environment
-        run: uv sync --group security --all-extras
       - name: Verify release version
         run: |
-          package_version="$(uv run python -c 'from fastapi_mergen import __version__; print(__version__)')"
-          test "v${package_version}" = "${GITHUB_REF_NAME}"
-      - name: Verify hosted compatibility, security, and conformance checks
+          package_version="$(python -c 'exec(open("src/fastapi_mergen/_version.py").read()); print(__version__)')"
+          test "v${package_version}" = "${{ github.event.release.tag_name }}"
+      - name: Resolve the successful evidence workflow for this exact tag and commit
+        id: evidence
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: uv run python scripts/verify_hosted_release_checks.py
-      - name: Build and test distributions
-        run: uv run python scripts/build_and_test_artifacts.py
-      - name: Run mandatory release gates
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          uv run python scripts/check.py
-          uv run pytest -q -m integration
-          uv run pip-audit
-          uv run bandit -q -c bandit.yaml -r src
-          uv run python scripts/security_scan.py
-          uv run python scripts/audit_release_candidate.py --phase auto
-      - name: Generate and verify real cumulative certification
+          runs="$(gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/release.yml/runs" \
+            -f event=push -f status=success -f head_sha="${GITHUB_SHA}" -f per_page=100)"
+          run_id="$(jq -r --arg sha "${GITHUB_SHA}" --arg tag "${RELEASE_TAG}" \
+            '[.workflow_runs[] | select(.head_sha == $sha and .head_branch == $tag and .conclusion == "success")] | if length == 1 then .[0].id else empty end' \
+            <<<"${runs}")"
+          test -n "${run_id}"
+          echo "run_id=${run_id}" >> "${GITHUB_OUTPUT}"
+      - name: Download the exact approved release artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: >-
+          gh run download "${{ steps.evidence.outputs.run_id }}"
+          --repo "${GITHUB_REPOSITORY}"
+          --name "release-evidence-${RELEASE_TAG}"
+          --dir approved
+      - name: Verify promoted artifact identity
         run: |
-          uv run python scripts/generate_real_certification.py --manifest build/publish/certification-manifest.json --report build/publish/certification.json
-          uv run fastapi-mergen conformance verify --manifest build/publish/certification-manifest.json --report build/publish/certification.json
+          package_version="$(python -c 'exec(open("src/fastapi_mergen/_version.py").read()); print(__version__)')"
+          python scripts/release_artifacts.py verify \
+            --root approved \
+            --manifest approved/build/release/artifact-manifest.json \
+            --source-commit "${GITHUB_SHA}" \
+            --package-version "${package_version}" \
+            --workflow-identity "${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${{ github.event.release.tag_name }}#${{ steps.evidence.outputs.run_id }}" \
+            --lock-file uv.lock
       - name: Publish with trusted identity
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: approved/dist/

@@ -1,0 +1,6 @@
+include CHANGELOG.md CONTRIBUTING.md SECURITY.md compose.yaml mkdocs.yml uv.lock
+include examples/deployment/.env.example
+recursive-include docs *.md *.json
+recursive-include examples *.py *.md *.sql *.yml
+recursive-include scripts *.py
+recursive-include tests *.py *.json

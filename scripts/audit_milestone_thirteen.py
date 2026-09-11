@@ -11,7 +11,7 @@ from pathlib import Path
 
 import fastapi_mergen
 from fastapi_mergen.postgres.revisions import MIGRATION_HEAD, SCHEMA_REVISION_REGISTRY
-from fastapi_mergen.readiness import validate_readiness_record
+from fastapi_mergen.readiness import classify_release_version, validate_readiness_record
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = (
@@ -45,6 +45,7 @@ REQUIRED = (
     "scripts/chaos_harness.py",
     "scripts/generate_sbom.py",
     "scripts/generate_real_certification.py",
+    "scripts/release_artifacts.py",
     "scripts/verify_hosted_release_checks.py",
     "scripts/write_compatibility_evidence.py",
     "scripts/rehearse_postgres_restart.py",
@@ -79,10 +80,10 @@ def main() -> int:
             "publish",
             publish_workflow,
             (
-                "generate_real_certification.py",
-                "verify_hosted_release_checks.py",
-                "audit_release_candidate.py",
-                "pip-audit",
+                "gh run download",
+                "release_artifacts.py verify",
+                "packages-dir: approved/dist/",
+                "actions: read",
             ),
         ),
         (
@@ -141,7 +142,7 @@ def main() -> int:
     readiness = json.loads(
         (ROOT / "docs/planning/production-readiness-record.json").read_text(encoding="utf-8")
     )
-    release_phase = fastapi_mergen.__version__ in {"1.0.0rc1", "1.0.0"}
+    release_phase = classify_release_version(fastapi_mergen.__version__) in {"rc", "final"}
     record_errors = validate_readiness_record(
         readiness,
         require_candidate=release_phase,

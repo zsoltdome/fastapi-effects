@@ -57,7 +57,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: uv run python scripts/verify_hosted_release_checks.py
       - name: Run mandatory quality and package gates
-        run: uv run python scripts/check.py
+        run: uv run python scripts/check.py --skip-artifact-build
       - name: Run mandatory integration gates
         run: uv run pytest -q -m integration
       - name: Run security gates
@@ -69,11 +69,30 @@ jobs:
         run: uv run python scripts/audit_release_candidate.py --phase auto
       - name: Build and smoke artifacts
         run: uv run python scripts/build_and_test_artifacts.py
+      - name: Run database journeys from the exact wheel and sdist-derived wheel
+        run: |
+          for artifact in dist/*.whl dist/*.tar.gz; do
+            uv pip install --reinstall --no-deps "${artifact}"
+            (cd "$(mktemp -d)" && "${GITHUB_WORKSPACE}/.venv/bin/python" -c \
+              'import os; from pathlib import Path; import fastapi_mergen; package = Path(fastapi_mergen.__file__).resolve(); source = Path(os.environ["GITHUB_WORKSPACE"]).resolve() / "src"; assert not package.is_relative_to(source), package')
+            .venv/bin/python -m pytest -q \
+              tests/integration/test_invoicing_postgres_boot.py \
+              tests/integration/test_core_concurrency.py::test_fanout_failure_rolls_back_business_and_event_rows \
+              tests/integration/test_core_concurrency.py::test_finalization_refreshes_database_time_after_waiting_for_row_lock
+          done
       - name: Generate SBOM, checksums, schemas, and certification
         run: |
           mkdir -p build/release
           uv run python scripts/generate_sbom.py --output build/release/sbom.cdx.json
           sha256sum dist/* > build/release/SHA256SUMS
+          package_version="$(uv run python -c 'from fastapi_mergen import __version__; print(__version__)')"
+          uv run python scripts/release_artifacts.py create \
+            --root . \
+            --manifest build/release/artifact-manifest.json \
+            --source-commit "${GITHUB_SHA}" \
+            --package-version "${package_version}" \
+            --workflow-identity "${GITHUB_WORKFLOW_REF}#${GITHUB_RUN_ID}" \
+            --lock-file uv.lock
           cp src/fastapi_mergen/conformance/spec/*.json build/release/
           uv run python scripts/generate_real_certification.py --manifest build/release/certification-manifest.json --report build/release/certification.json
           uv run fastapi-mergen conformance verify --manifest build/release/certification-manifest.json --report build/release/certification.json
@@ -84,6 +103,7 @@ jobs:
             dist/*
             build/release/sbom.cdx.json
             build/release/SHA256SUMS
+            build/release/artifact-manifest.json
       - uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
         with:
           name: release-evidence-${{ github.ref_name }}

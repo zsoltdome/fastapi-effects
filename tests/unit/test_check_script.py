@@ -44,4 +44,16 @@ def test_release_workflow_uses_automatic_candidate_phase() -> None:
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
 
     assert "scripts/check.py" in workflow
+    assert "scripts/check.py --skip-artifact-build" in workflow
     assert "audit_release_candidate.py --phase auto" in workflow
+    assert "database journeys from the exact wheel and sdist-derived wheel" in workflow
+    assert "uv pip install --reinstall --no-deps" in workflow
+
+
+def test_publish_promotes_the_verified_artifact_without_rebuilding() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "publish.yml").read_text(encoding="utf-8")
+
+    assert "gh run download" in workflow
+    assert "release_artifacts.py verify" in workflow
+    assert "packages-dir: approved/dist/" in workflow
+    assert "build_and_test_artifacts.py" not in workflow

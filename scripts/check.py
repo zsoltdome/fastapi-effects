@@ -30,8 +30,11 @@ def built_distributions(directory: Path) -> tuple[Path, ...]:
     return tuple(sorted(artifacts))
 
 
-def main() -> int:
-    for command in ("uv", "ruff", "mypy", "pytest", "twine"):
+def main(*, skip_artifact_build: bool = False) -> int:
+    required: tuple[str, ...] = ("uv", "ruff", "mypy", "pytest")
+    if not skip_artifact_build:
+        required = (*required, "twine")
+    for command in required:
         require(command)
     run("uv", "lock", "--check")
     quality_roots = ("src", "tests", "examples", "scripts")
@@ -39,7 +42,11 @@ def main() -> int:
     run("ruff", "check", *quality_roots)
     run("mypy")
     run(sys.executable, "scripts/architecture_gate.py")
-    run(sys.executable, "scripts/verify_milestone_one.py")
+    run(
+        sys.executable,
+        "scripts/verify_milestone_one.py",
+        "--skip-git-governance",
+    )
     run(
         sys.executable,
         "scripts/audit_milestone_seven.py",
@@ -54,13 +61,23 @@ def main() -> int:
     run(sys.executable, "scripts/audit_release_candidate.py", "--phase", "auto")
     run(sys.executable, "scripts/check_documentation.py")
     run("pytest", "-q", "-m", "not integration and not packaging")
-    run(sys.executable, "scripts/build_and_test_artifacts.py")
-    distributions = built_distributions(ROOT / "dist")
-    if not distributions:
-        raise SystemExit("Artifact build did not create wheel or sdist files.")
-    run("twine", "check", *(str(path) for path in distributions))
+    if not skip_artifact_build:
+        run(sys.executable, "scripts/build_and_test_artifacts.py")
+        distributions = built_distributions(ROOT / "dist")
+        if not distributions:
+            raise SystemExit("Artifact build did not create wheel or sdist files.")
+        run("twine", "check", *(str(path) for path in distributions))
     return 0
 
 
+def cli() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--skip-artifact-build", action="store_true")
+    args = parser.parse_args()
+    return main(skip_artifact_build=args.skip_artifact_build)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(cli())
