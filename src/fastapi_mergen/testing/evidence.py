@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
-import subprocess
+
+# Fixed Git command only; no untrusted executable or shell selection.
+import subprocess  # nosec B404
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -46,7 +48,8 @@ def _implementation_commit() -> str:
     for parent in Path(__file__).resolve().parents:
         if not (parent / ".git").exists():
             continue
-        completed = subprocess.run(
+        # The argv is fixed and the working directory only walks resolved parents.
+        completed = subprocess.run(  # nosec B603
             ("git", "rev-parse", "HEAD"),
             cwd=parent,
             check=False,

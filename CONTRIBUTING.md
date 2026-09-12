@@ -22,7 +22,14 @@ package build, artifact inspection, and repository-contract validation.
   `Add provisional public API`.
 - Keep one coherent change per commit.
 - Do not bypass tests for security-sensitive code.
-- This implementation history uses only `mergen-institute` as author and committer.
+- Preserve the real author and committer recorded by the contributor, bot, or merge
+  workflow. Never rewrite an external contribution to impersonate the institute.
+
+The recovery-baseline provenance check is an archival maintainer audit, not a
+contributor requirement. Normal development and CI invoke the structural gate with
+`--skip-git-governance`. Source archives without `.git` can run all code, test,
+documentation, and artifact checks; they cannot establish Git-history provenance and
+must not claim to do so.
 
 ## Architecture changes
 
@@ -39,3 +46,7 @@ Boundary Contract and conformance mapping in the same pull request.
 - built wheel and source checkout behave equivalently;
 - no queue, MCP, workflow, ordering, cancellation, or inbound-idempotency feature is
   introduced before its gated milestone.
+
+Maintainers review correctness, tests, compatibility, security boundaries, and public
+documentation. Small changes may use one maintainer review; release, migration,
+authorization, tenant-isolation, or cryptographic changes require a second maintainer.
