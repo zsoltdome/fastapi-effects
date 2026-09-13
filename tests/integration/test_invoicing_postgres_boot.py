@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from examples.invoicing.app.auth import DEMO_AUTHORIZATION, DEMO_TENANT_ID
 from examples.invoicing.app.db import get_async_session
@@ -7,14 +9,14 @@ from examples.invoicing.app.main import app
 from examples.invoicing.app.mergen_config import mergen
 from examples.invoicing.app.models import Base, InvoiceRender
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from fastapi_mergen.postgres.relay import PollingRelay
+from fastapi_mergen.postgres.leasing import LeaseRepository
 from fastapi_mergen.postgres.roles import RuntimeRoles
 from fastapi_mergen.postgres.schema import install_core_schema
 from fastapi_mergen.sqlalchemy.models import DeliveryRow
-from tests.integration.postgres import ProvisionedDatabase
+from tests.integration.postgres import ObservedDatabaseClock, ProvisionedDatabase
 
 pytestmark = pytest.mark.integration
 
@@ -69,6 +71,7 @@ async def test_authenticated_invoice_reaches_tenant_bound_handler(
                     text(f"GRANT SELECT, INSERT, UPDATE ON {table} TO {test_database.app_role}")
                 )
 
+        relay_sessions = async_sessionmaker(relay_engine, expire_on_commit=False)
         async with (
             app.router.lifespan_context(app),
             AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client,
@@ -85,14 +88,27 @@ async def test_authenticated_invoice_reaches_tenant_bound_handler(
                     "x-tenant-id": str(DEMO_TENANT_ID),
                 },
             )
-        assert response.status_code == 201, response.text
-        invoice_id = response.json()["id"]
+            assert response.status_code == 201, response.text
+            invoice_id = response.json()["id"]
 
-        relay = PollingRelay(
-            sessions=async_sessionmaker(relay_engine, expire_on_commit=False),
-            sink=mergen.handler_executor(),
-        )
-        assert await relay.run_once() == 1
+            # Exercise the at-least-once crash gap: the consumer transaction
+            # commits, relay finalization is lost, and the same business effect
+            # completes safely on the replacement attempt.
+            leases = LeaseRepository(database_clock=ObservedDatabaseClock())
+            async with relay_sessions() as session:
+                first = (await leases.claim(session, now=datetime.now(UTC)))[0]
+            await mergen.handler_executor().execute(first)
+            assert first.delivery.lease_expires_at is not None
+            retry_at = first.delivery.lease_expires_at
+            async with relay_sessions() as session:
+                assert await leases.reconcile_expired(session, now=retry_at) == 1
+            async with relay_sessions() as session:
+                second = (await leases.claim(session, now=retry_at))[0]
+            assert second.delivery.delivery_id == first.delivery.delivery_id
+            assert second.attempt.attempt_id != first.attempt.attempt_id
+            await mergen.handler_executor().execute(second)
+            async with relay_sessions() as session:
+                await leases.succeed(session, second, now=retry_at)
 
         app_sessions = async_sessionmaker(app_engine, expire_on_commit=False)
         async with app_sessions() as session, session.begin():
@@ -103,8 +119,11 @@ async def test_authenticated_invoice_reaches_tenant_bound_handler(
             render = await session.scalar(
                 select(InvoiceRender).where(InvoiceRender.invoice_id == invoice_id)
             )
+            render_count = await session.scalar(select(func.count()).select_from(InvoiceRender))
             delivery_state = await session.scalar(select(DeliveryRow.state))
         assert render is not None
+        assert render.delivery_id == first.delivery.delivery_id
+        assert render_count == 1
         assert delivery_state == "succeeded"
     finally:
         await relay_engine.dispose()

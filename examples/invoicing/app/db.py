@@ -1,4 +1,4 @@
-"""Lazy async-session dependency for the reference application."""
+"""Process-lifetime application pool for the reference application."""
 
 from __future__ import annotations
 
@@ -7,7 +7,12 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from fastapi_mergen import Principal
 
@@ -19,36 +24,55 @@ def _database_url() -> str:
     return url
 
 
-async def get_async_session() -> AsyncIterator[AsyncSession]:
-    """Create a disposable session only when an HTTP operation is invoked.
+_engine: AsyncEngine | None = None
+_sessions: async_sessionmaker[AsyncSession] | None = None
 
-    The lazy design lets documentation and OpenAPI generation boot without requiring
-    the PostgreSQL driver or a live database. It is intentionally simple for M1.
-    """
-    engine = create_async_engine(_database_url(), pool_pre_ping=True)
-    factory = async_sessionmaker(engine, expire_on_commit=False)
-    try:
-        async with factory() as session:
-            yield session
-    finally:
+
+def start_database() -> None:
+    """Create one application-role pool for this app or relay process."""
+
+    global _engine, _sessions
+    if _engine is not None:
+        return
+    _engine = create_async_engine(_database_url(), pool_pre_ping=True)
+    _sessions = async_sessionmaker(_engine, expire_on_commit=False)
+
+
+async def stop_database() -> None:
+    """Dispose the process pool during application or relay shutdown."""
+
+    global _engine, _sessions
+    engine = _engine
+    _engine = None
+    _sessions = None
+    if engine is not None:
         await engine.dispose()
+
+
+def _session_factory() -> async_sessionmaker[AsyncSession]:
+    if _sessions is None:
+        raise RuntimeError("The invoicing database pool has not been started.")
+    return _sessions
+
+
+async def get_async_session() -> AsyncIterator[AsyncSession]:
+    """Open one request session from the process-lifetime app-role pool."""
+
+    async with _session_factory()() as session:
+        yield session
 
 
 @asynccontextmanager
 async def get_handler_session(principal: Principal) -> AsyncIterator[AsyncSession]:
     """Open a new application-role transaction bound to the delivery tenant."""
-    engine = create_async_engine(_database_url(), pool_pre_ping=True)
-    factory = async_sessionmaker(engine, expire_on_commit=False)
-    try:
-        async with factory() as session, session.begin():
-            await session.execute(
-                text("SELECT set_config('mergen.tenant_id', :tenant_id, true)"),
-                {"tenant_id": str(principal.tenant_id)},
-            )
-            await session.execute(
-                text("SELECT set_config('mergen.subject_id', :subject_id, true)"),
-                {"subject_id": principal.subject_id},
-            )
-            yield session
-    finally:
-        await engine.dispose()
+
+    async with _session_factory()() as session, session.begin():
+        await session.execute(
+            text("SELECT set_config('mergen.tenant_id', :tenant_id, true)"),
+            {"tenant_id": str(principal.tenant_id)},
+        )
+        await session.execute(
+            text("SELECT set_config('mergen.subject_id', :subject_id, true)"),
+            {"subject_id": principal.subject_id},
+        )
+        yield session

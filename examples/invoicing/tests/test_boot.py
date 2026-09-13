@@ -24,7 +24,13 @@ def test_openapi_boots_without_database_or_optional_extras() -> None:
 
 
 @pytest.mark.asyncio
-async def test_lifespan_freezes_routes_and_health_works() -> None:
+async def test_lifespan_freezes_routes_and_health_works(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "MERGEN_EXAMPLE_DATABASE_URL",
+        "postgresql+asyncpg://unused:unused@127.0.0.1:1/unused",
+    )
     async with (
         app.router.lifespan_context(app),
         AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client,

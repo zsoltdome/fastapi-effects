@@ -10,14 +10,19 @@ from fastapi import FastAPI
 from fastapi_mergen import __version__
 
 from .api import router
+from .db import start_database, stop_database
 from .mergen_config import mergen
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     del app
-    mergen.freeze()
-    yield
+    start_database()
+    try:
+        mergen.freeze()
+        yield
+    finally:
+        await stop_database()
 
 
 app = FastAPI(

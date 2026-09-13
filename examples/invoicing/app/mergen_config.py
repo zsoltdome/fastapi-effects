@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from fastapi_mergen import AuthorizationMode, EffectContext, Mergen, Principal, RetryPolicy
 from fastapi_mergen.postgres import PostgresStore
@@ -37,12 +38,25 @@ async def render_invoice_pdf(context: EffectContext[InvoiceCreated]) -> None:
         )
         if invoice is None:
             raise RuntimeError("Invoice is unavailable to its tenant-bound handler.")
-        session.add(
-            InvoiceRender(
+        await session.execute(
+            pg_insert(InvoiceRender)
+            .values(
                 tenant_id=context.principal.tenant_id,
                 invoice_id=payload.invoice_id,
+                delivery_id=context.delivery_id,
+            )
+            .on_conflict_do_nothing(
+                index_elements=(InvoiceRender.tenant_id, InvoiceRender.invoice_id)
             )
         )
+        existing = await session.scalar(
+            select(InvoiceRender).where(
+                InvoiceRender.tenant_id == context.principal.tenant_id,
+                InvoiceRender.invoice_id == payload.invoice_id,
+            )
+        )
+        if existing is None:
+            raise RuntimeError("An equivalent invoice render could not be verified.")
 
 
 mergen = Mergen(
