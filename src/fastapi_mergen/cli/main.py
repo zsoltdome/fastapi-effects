@@ -32,6 +32,16 @@ def build_parser() -> argparse.ArgumentParser:
     schema_check = schema_commands.add_parser("check", help="Check schema compatibility")
     schema_check.add_argument("--dsn", help="PostgreSQL DSN (never included in output)")
     schema_check.add_argument("--expected-role")
+    schema_upgrade = schema_commands.add_parser(
+        "upgrade",
+        help="Upgrade using migrations bundled in the installed package",
+    )
+    schema_upgrade.add_argument("--dsn", help="Migration-owner PostgreSQL DSN")
+    schema_upgrade.add_argument(
+        "--no-create-runtime-roles",
+        action="store_true",
+        help="Use runtime roles already bootstrapped by an administrator",
+    )
 
     relay = commands.add_parser("relay", help="Operate the delivery relay")
     relay_commands = relay.add_subparsers(dest="relay_command")
@@ -86,6 +96,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("schema check requires --dsn or MERGEN_DATABASE_DSN")
             return 2
         return run_doctor(dsn, expected_role=args.expected_role)
+    if args.command == "schema" and args.schema_command == "upgrade":
+        from fastapi_mergen.cli.migrations import run_upgrade
+
+        dsn = args.dsn or os.getenv("MERGEN_DATABASE_DSN")
+        if not dsn:
+            print("schema upgrade requires --dsn or MERGEN_DATABASE_DSN")
+            return 2
+        return run_upgrade(
+            dsn,
+            create_runtime_roles=not args.no_create_runtime_roles,
+        )
     if args.command == "relay" and args.relay_command == "run":
         from fastapi_mergen.cli.relay import run_relay
 

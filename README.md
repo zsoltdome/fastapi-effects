@@ -7,17 +7,27 @@ in async FastAPI and PostgreSQL systems.
 
 > **One commit. Every effect keeps its tenant and authority provenance.**
 
-The cumulative runtime now records effect intent in the application transaction,
-fans it out into immutable delivery specifications, and executes leased work through
-fresh tenant-bound application sessions. The preserved Boundary Contract suite tests
-the production PostgreSQL path as well as its deterministic reference oracle.
+Write application state and effect intent through the same SQLAlchemy transaction;
+after commit, a fenced PostgreSQL relay executes immutable delivery snapshots through
+fresh tenant-bound application sessions.
+
+```python
+async with uow:
+    uow.session.add(invoice)
+    await uow.emit(
+        Event(type="invoice.created", version=1, data={"invoice_id": str(invoice.id)}),
+        dedupe_namespace="invoice-create",
+        dedupe_key=str(invoice.id),
+    )
+```
+
+Delivery is at least once. Consumers that need one business result must deduplicate in
+the same transaction as that result. Automatic retries retain the delivery/message ID;
+manual replay creates a new linked delivery ID.
+
+Start with the [installed-wheel PostgreSQL quickstart](docs/tutorials/quickstart.md).
 
 ## Capability status
-
-The recoverable baseline at commit `6b8d3626445bd577cc6c5af80f3b84e30e2c7712`
-contains the Milestone 1 API foundation and the Milestone 7 assurance suite. The
-Milestone 2–6 runtime sources were unavailable; runtime work after that commit is a
-new, reviewable implementation and is not reconstructed history.
 
 | Capability | Status in `0.11.0a1` |
 |---|---|
@@ -33,6 +43,10 @@ new, reviewable implementation and is not reconstructed history.
 | Transactional inbound command idempotency | Implemented alpha |
 | API/schema compatibility, recovery, telemetry, and release evidence | Implemented locally |
 | Two external deployments, independent review, RC observation | Required; not complete |
+
+The source-recovery and milestone chronology is retained in
+[`docs/planning/original-feasibility-plan.md`](docs/planning/original-feasibility-plan.md)
+and the audit history; it is not release evidence for the current artifact.
 
 ## What this alpha provides
 

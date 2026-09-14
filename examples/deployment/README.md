@@ -1,16 +1,37 @@
-# Deployment reference
+# Persistent local deployment reference
 
-This reference starts PostgreSQL only; application, migration, and relay processes are
-deliberately separate so their credentials cannot be accidentally shared in one image.
+This reference keeps four authorities separate: the local PostgreSQL administrator,
+`mergen_migration`, `mergen_app`, and `mergen_relay`. It is a topology teaching aid,
+not a high-availability design.
 
-1. Copy `.env.example` to an untracked secret source and replace every placeholder.
-2. Start `docker compose up -d postgres` and wait for health.
-3. As the migration owner, run Alembic to head and `fastapi-mergen schema check`.
-4. Start the FastAPI app with only `mergen_app` credentials.
-5. Start the polling relay with only `mergen_relay` credentials.
-6. Run doctor separately against app and relay credentials, then applicable conformance.
+```console
+cp examples/deployment/.env.example examples/deployment/.env
+# replace every password
+docker compose --env-file examples/deployment/.env \
+  -f examples/deployment/compose.yml up -d postgres
+set -a; . examples/deployment/.env; set +a
+```
 
-Pin the PostgreSQL image by digest in production, place it on a private network, use TLS
-for non-loopback connections, source credentials from a secret manager, set CPU/memory
-and connection limits, and configure tested backup/PITR before traffic. The compose file
-is a topology teaching aid, not a high-availability database design.
+Create the login roles with the administrator, run the package's bundled migrations
+with only the migration credential, then create the example-owned business tables:
+
+```console
+docker compose --env-file examples/deployment/.env \
+  -f examples/deployment/compose.yml exec -T postgres \
+  psql -U postgres -d mergen \
+  -v migration_password="$MERGEN_MIGRATION_PASSWORD" \
+  -v application_password="$MERGEN_APPLICATION_PASSWORD" \
+  -v relay_password="$MERGEN_RELAY_PASSWORD" \
+  < examples/deployment/bootstrap.sql
+MERGEN_DATABASE_DSN="$MERGEN_EXAMPLE_MIGRATION_DATABASE_URL" \
+  fastapi-mergen schema upgrade --no-create-runtime-roles
+python -m examples.invoicing.bootstrap
+```
+
+Run the FastAPI process with `MERGEN_EXAMPLE_DATABASE_URL` and the relay with both
+`MERGEN_EXAMPLE_RELAY_DATABASE_URL` (control plane) and
+`MERGEN_EXAMPLE_DATABASE_URL` (tenant-bound handlers). The relay factory is
+`examples.invoicing.relay:create_relay`.
+
+Pin the PostgreSQL image by digest in production, use TLS off-host, source credentials
+from a secret manager, set pool/resource limits, and test backup/PITR before traffic.

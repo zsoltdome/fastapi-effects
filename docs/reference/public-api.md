@@ -29,7 +29,8 @@ summaries, and reprs are not machine contracts and must not be used for branchin
 
 The exports in these namespace `__all__` values are stable and import-tested:
 
-- `fastapi_mergen.postgres`: store and explicit schema compatibility gate;
+- `fastapi_mergen.postgres`: store, explicit schema compatibility/install gates,
+  runtime roles, and polling relay/sink composition;
 - `fastapi_mergen.sqlalchemy`: UoW and extension types;
 - `fastapi_mergen.idempotency`: command-boundary values and request preparation;
 - `fastapi_mergen.delegation`: claims, key lifecycle, signing, verification;
@@ -37,6 +38,11 @@ The exports in these namespace `__all__` values are stable and import-tested:
 - `fastapi_mergen.observability`: bounded event/sink protocol;
 - `fastapi_mergen.conformance` and `fastapi_mergen.testing`: contract and adapter
   certification APIs.
+
+The supported PostgreSQL composition symbols are `PostgresStore`, `PollingRelay`,
+`RelayConfig`, `DeliverySink`, `SinkDisposition`, `ClaimedDelivery`, `RuntimeRoles`,
+`install_core_schema`, `check_core_schema`, `check_schema_revisions`, `MIGRATION_HEAD`,
+and `SCHEMA_REVISION_REGISTRY`.
 
 Integration implementation modules such as `webhooks.*`, `executors.taskiq.*`,
 `delegation.fastapi`, and `integrations.fastmcp` are supported through their documented
@@ -55,7 +61,7 @@ public ORM API.
 
 ## CLI and environment
 
-Stable command paths are `doctor`, `schema check`, `relay run`, `webhooks
+Stable command paths are `doctor`, `schema check`, `schema upgrade`, `relay run`, `webhooks
 validate-endpoint`, `commands prune`, and `conformance` (`run`, `manifest`, `verify`,
 `spec`). Existing options keep their meaning for the v1 line. New options and commands
 may be added compatibly.

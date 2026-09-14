@@ -12,6 +12,12 @@ does not cancel already committed delivery intent.
 
 The production endpoint policy requires HTTPS on port 443, rejects credentials
 and fragments, normalizes IDNA hostnames, and re-resolves DNS for every attempt.
+Unicode path and query text is UTF-8 percent-encoded once into an ASCII URI; valid
+existing percent escapes and reserved delimiters retain their spelling, while malformed
+escapes, lone surrogates, control characters, spaces, and fragments are rejected.
+Create/update validation returns a configuration error. The attempt path converts an
+invalid older snapshot or remote redirect target into terminal
+`webhook.endpoint_invalid` for that delivery, without logging the URL.
 Every answer must be global unicast. The connection is then made to one approved
 IP while TLS certificate verification, SNI, and the HTTP Host header retain the
 original hostname. Production rejects supplied TLS contexts that disable certificate

@@ -23,18 +23,25 @@ async def receive(
     webhook_timestamp: Annotated[str, Header(alias="webhook-timestamp")],
     webhook_signature: Annotated[str, Header(alias="webhook-signature")],
 ) -> dict[str, object]:
-    configured = os.getenv("WEBHOOK_SIGNING_SECRET")
+    configured = os.getenv("WEBHOOK_SIGNING_SECRETS") or os.getenv("WEBHOOK_SIGNING_SECRET")
     if not configured:
         raise HTTPException(status_code=503, detail="Receiver secret is not configured.")
+    configured_secrets = tuple(item.strip() for item in configured.split(",") if item.strip())
+    if not configured_secrets:
+        raise HTTPException(status_code=503, detail="Receiver secret is not configured.")
     body = await request.body()
-    verified = verify_webhook(
-        secret=decode_public_secret(configured),
-        body=body,
-        headers={
-            "webhook-id": webhook_id,
-            "webhook-timestamp": webhook_timestamp,
-            "webhook-signature": webhook_signature,
-        },
+    headers = {
+        "webhook-id": webhook_id,
+        "webhook-timestamp": webhook_timestamp,
+        "webhook-signature": webhook_signature,
+    }
+    verified = any(
+        verify_webhook(
+            secret=decode_public_secret(secret),
+            body=body,
+            headers=headers,
+        )
+        for secret in configured_secrets
     )
     if not verified:
         raise HTTPException(status_code=400, detail="Signature verification failed.")
