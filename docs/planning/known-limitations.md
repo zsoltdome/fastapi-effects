@@ -13,4 +13,5 @@
 - Feature implementation modules remain provisional as listed in the public API inventory.
 - Taskiq handoff retention is intentionally not automated in v1.
 - No external design-partner deployment, independent security review, RC observation, or
-  trusted publication has been recorded. Version `1.0.0rc1` and `1.0.0` are blocked.
+  trusted publication has been recorded. Every supported `1.x` or later RC and final
+  version is evaluated semantically and fails closed when its bound evidence is absent.

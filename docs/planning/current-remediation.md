@@ -7,6 +7,39 @@
 ZIP and evidence files are governed as unavailable in
 [`docs/audits/2026-09-07/evidence-status.json`](../audits/2026-09-07/evidence-status.json).
 
+## 2026-09-13 audit correction status
+
+The later adversarial audit invalidated only the affected edges of earlier findings;
+historical evidence remains retained but is not treated as proof of the new boundaries.
+
+- **A01 — IMPLEMENTED:** Unicode IRI path/query input is converted once to an ASCII
+  URI while existing escapes are retained. Bad durable endpoints and redirects are
+  terminal per-delivery errors. Direct and concurrent-relay regressions are local.
+- **A02 — IMPLEMENTED:** reconcile, claim, finalization, Taskiq control work, and relay
+  shutdown have separate cooperative budgets. SIGTERM and SIGINT are exercised in a
+  subprocess. Live database cleanup/ambiguous-commit rehearsals remain required.
+- **A03 — IMPLEMENTED:** reviewed invalidated-connection and SQLSTATE classification
+  replaces the narrow exception tuple; programming/schema defects still escape.
+  Persistent-storage restart rehearsals pass locally on PostgreSQL 16 and 18; live
+  backend termination/restart across every boundary remains required.
+- **A04 — IMPLEMENTED:** PostgreSQL `clock_timestamp()` is sampled after finalization
+  locks and drives recorded transition time. Real lock-delay and application-clock-skew
+  tests pass locally on PostgreSQL 16 and 18, but must be rerun from the candidate artifact.
+- **A05 — IMPLEMENTED:** semantic PEP 440 phase selection covers later RC/stable
+  releases and fails closed on unsupported forms or explicit-phase mismatch.
+- **A06 — IMPLEMENTED:** one manifest-bound wheel/sdist set is uploaded by the evidence
+  workflow and downloaded/verified by publication without rebuilding. Hosted
+  environment and trusted-publisher settings still require account-level verification.
+- **A07/A08 — IMPLEMENTED:** contributor CI no longer enforces institute impersonation;
+  the invoicing consumer is transactionally idempotent and uses process-lifetime,
+  role-separated pools.
+- **A09/A10 — IMPLEMENTED:** the quickstart is an installed-wheel persistent journey,
+  the packaged schema-upgrade command and supported PostgreSQL composition surface are
+  documented, and the sdist intentionally includes downstream test/document resources.
+
+These entries remain below `HOSTED_VERIFIED`; no external account, protected
+environment, publication, or partner evidence is inferred from local source changes.
+
 ## Locally verified at the source commit above
 
 - [x] F01 stale Taskiq handoff admission is fenced against the current parent attempt.
