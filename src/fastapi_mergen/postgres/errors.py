@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import errno
+import socket
+
 from sqlalchemy.exc import DBAPIError, InterfaceError, OperationalError
 
 _TRANSIENT_SQLSTATES = frozenset(
@@ -36,6 +39,34 @@ def is_transient_database_error(error: BaseException) -> bool:
     return isinstance(error, (OperationalError, InterfaceError))
 
 
+def is_transient_database_connection_error(error: BaseException) -> bool:
+    """Classify raw failures only at a database-owned connection boundary.
+
+    SQLAlchemy may expose connector failures before it can wrap them in a
+    ``DBAPIError``.  Callers must not use this broader classifier around
+    arbitrary handler, filesystem, or network work.
+    """
+
+    if is_transient_database_error(error):
+        return True
+    if isinstance(error, (ConnectionRefusedError, ConnectionResetError, ConnectionAbortedError)):
+        return True
+    if isinstance(error, socket.gaierror):
+        return error.errno == socket.EAI_AGAIN
+    if isinstance(error, OSError):
+        return error.errno in {
+            errno.ECONNABORTED,
+            errno.ECONNREFUSED,
+            errno.ECONNRESET,
+            errno.ENETDOWN,
+            errno.ENETUNREACH,
+            errno.EHOSTDOWN,
+            errno.EHOSTUNREACH,
+            errno.ETIMEDOUT,
+        }
+    return False
+
+
 def _sqlstate(error: BaseException | None) -> str | None:
     for name in ("sqlstate", "pgcode"):
         value = getattr(error, name, None)
@@ -44,4 +75,4 @@ def _sqlstate(error: BaseException | None) -> str | None:
     return None
 
 
-__all__ = ["is_transient_database_error"]
+__all__ = ["is_transient_database_connection_error", "is_transient_database_error"]

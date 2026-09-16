@@ -31,6 +31,10 @@ require_modules(
 AESGCM = cast(Any, importlib.import_module("cryptography.hazmat.primitives.ciphers.aead").AESGCM)
 
 
+class NoEligibleSigningKeyError(Exception):
+    """Internal delivery-local outcome for an immutable secret-set snapshot."""
+
+
 @dataclass(frozen=True, slots=True)
 class MasterKey:
     key_id: str
@@ -272,7 +276,7 @@ class WebhookSecretService:
             )
         ).all()
         if not rows:
-            raise MergenConfigurationError("Webhook delivery has no eligible signing key.")
+            raise NoEligibleSigningKeyError
         result: list[SigningSecret] = []
         for row in rows:
             key = await self._provider.key_for(row.key_id)
@@ -365,6 +369,7 @@ __all__ = [
     "CreatedWebhookSecret",
     "MasterKey",
     "MasterKeyProvider",
+    "NoEligibleSigningKeyError",
     "SigningSecret",
     "StaticMasterKeyProvider",
     "WebhookSecretService",

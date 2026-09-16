@@ -39,8 +39,11 @@ delivery deadline.
 
 - Inspect dead deliveries and their bounded failure codes; receiver response
   content is deliberately unavailable.
-- Fix the receiver, then use manual replay. Replay creates a new delivery and
-  `webhook-id` linked to the terminal original.
+- For receiver/transport failures, fix the receiver and consider manual replay. Replay
+  creates a new delivery and `webhook-id` linked to the terminal original.
+- For `webhook.no_eligible_signing_key`, create and distribute a new secret set and
+  update the subscription for future publications. Ordinary replay retains the old
+  unusable secret-set snapshot and remains unsignable; it is not a recovery mechanism.
 - Persistent failures increment a streak. Threshold crossing auto-pauses future
   snapshotting and emits one audit record; committed deliveries remain active.
 - Treat receiver success followed by relay crash as ambiguous. The retry uses the

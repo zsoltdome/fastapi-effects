@@ -75,10 +75,12 @@ delivery in one short transaction. A stale-token mismatch changes no current del
 state and produces a `LeaseLost` result and metric.
 
 Lease loss during either success or failure finalization is a per-delivery race. The
-relay records it without cancelling sibling deliveries, and transient SQLAlchemy
-connection failures leave committed leases for normal expiry/reconciliation while the
-supervisor continues polling. Mergen configuration/invariant errors and explicit
-shutdown cancellation still propagate.
+relay records it without cancelling sibling deliveries. Reviewed SQLAlchemy failures
+and raw refusal/reset/timeout or temporary-DNS errors at database-owned connection
+boundaries leave committed leases for normal expiry/reconciliation while the supervisor
+continues polling. Authentication, permission, schema, integrity, invalid-DSN,
+certificate, permanent-DNS, Mergen configuration/invariant errors, and explicit shutdown
+cancellation still propagate.
 
 ## Lease expiry and reconciliation
 

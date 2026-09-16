@@ -374,6 +374,36 @@ async def test_relay_supervisor_resumes_polling_after_transient_database_failure
 
 
 @pytest.mark.asyncio
+async def test_relay_supervisor_resumes_after_raw_connection_refusal() -> None:
+    class FlakyLeases(_Leases):
+        def __init__(self) -> None:
+            super().__init__(())
+            self.calls = 0
+            self.resumed = asyncio.Event()
+
+        async def reconcile_expired(self, session: object, **kwargs: object) -> int:
+            del session, kwargs
+            self.calls += 1
+            if self.calls == 1:
+                raise ConnectionRefusedError("controlled database refusal")
+            self.resumed.set()
+            return 0
+
+    leases = FlakyLeases()
+    relay = PollingRelay(
+        sessions=_Sessions(),  # type: ignore[arg-type]
+        sink=object(),  # type: ignore[arg-type]
+        leases=leases,  # type: ignore[arg-type]
+        config=RelayConfig(poll_interval_seconds=0.001),
+    )
+    task = asyncio.create_task(relay.run())
+    await asyncio.wait_for(leases.resumed.wait(), timeout=0.1)
+    relay.request_stop()
+    await asyncio.wait_for(task, timeout=0.1)
+    assert leases.calls >= 2
+
+
+@pytest.mark.asyncio
 async def test_relay_supervisor_handles_generic_invalidated_dbapi_error() -> None:
     class FlakyLeases(_Leases):
         def __init__(self) -> None:

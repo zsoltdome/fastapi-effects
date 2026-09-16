@@ -26,7 +26,10 @@ from fastapi_mergen.errors import (
 )
 from fastapi_mergen.observability.events import RuntimeEvent, RuntimeEventKind, TraceLineage
 from fastapi_mergen.observability.protocols import EventSink, NoOpEventSink, record_safely
-from fastapi_mergen.postgres.errors import is_transient_database_error
+from fastapi_mergen.postgres.errors import (
+    is_transient_database_connection_error,
+    is_transient_database_error,
+)
 from fastapi_mergen.postgres.leasing import ClaimedDelivery, LeaseRepository
 
 _T = TypeVar("_T")
@@ -180,7 +183,7 @@ class PollingRelay:
             except TimeoutError:
                 self._record_control_failure("database.finalization_timeout", claim=claim)
             except Exception as exc:
-                if not is_transient_database_error(exc):
+                if not is_transient_database_connection_error(exc):
                     raise
                 self._record_control_failure("database.transient", claim=claim)
 
@@ -196,7 +199,7 @@ class PollingRelay:
         except TimeoutError:
             self._record_control_failure("database.finalization_timeout", claim=claim)
         except Exception as exc:
-            if not is_transient_database_error(exc):
+            if not is_transient_database_connection_error(exc):
                 raise
             self._record_control_failure("database.transient", claim=claim)
 
@@ -277,7 +280,7 @@ class PollingRelay:
         except Exception as exc:
             # A supervisor loop survives reviewed transient outages;
             # committed leases remain recoverable after expiry.
-            if not is_transient_database_error(exc):
+            if not is_transient_database_connection_error(exc):
                 raise
             self._record_control_failure("database.transient")
 

@@ -26,7 +26,7 @@ from fastapi_mergen.webhooks.classification import (
     classify_response,
 )
 from fastapi_mergen.webhooks.operations import WebhookHealthObserver
-from fastapi_mergen.webhooks.secrets import WebhookSecretService
+from fastapi_mergen.webhooks.secrets import NoEligibleSigningKeyError, WebhookSecretService
 from fastapi_mergen.webhooks.serializer import (
     serialize_webhook_envelope,
     webhook_message_id,
@@ -128,12 +128,18 @@ class WebhookDeliverySink:
         secret_set_id = _required_uuid(destination, "secret_set_id")
         now = self.clock.now()
         async with self.sessions() as session:
-            signing_secrets = await self.secrets.eligible_for_signing(
-                session,
-                tenant_id=claim.delivery.tenant_id,
-                secret_set_id=secret_set_id,
-                now=now,
-            )
+            try:
+                signing_secrets = await self.secrets.eligible_for_signing(
+                    session,
+                    tenant_id=claim.delivery.tenant_id,
+                    secret_set_id=secret_set_id,
+                    now=now,
+                )
+            except NoEligibleSigningKeyError as exc:
+                raise PermanentDeliveryError(
+                    code="webhook.no_eligible_signing_key",
+                    summary="Webhook delivery has no eligible signing key.",
+                ) from exc
         body = serialize_webhook_envelope(
             delivery_id=claim.delivery.delivery_id,
             event=claim.event,

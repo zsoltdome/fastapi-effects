@@ -78,6 +78,13 @@ change is explicit and audited. The original terminal delivery is never edited b
 to pending. A replay starts a fresh elapsed-time budget from the new delivery's
 creation time without changing the original delivery's budget or history.
 
+Ordinary replay also copies the original webhook route and secret-set snapshot. If all
+keys eligible under that snapshot are revoked or expired, replay remains unsignable.
+Pausing/reactivating a subscription, rotating another active set, or updating the
+subscription for future events does not retarget historical work. Any future explicit
+re-key/retarget operation requires its own authorization, audit, and immutable-lineage
+design; it is not part of ordinary replay.
+
 Webhook replay and webhook retention take the same tenant-scoped transaction advisory
 lock. If replay wins, pruning observes and preserves the original lineage root; if
 retention commits first, a later replay fails cleanly because the terminal source no
