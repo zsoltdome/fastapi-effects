@@ -15,3 +15,10 @@ The supported core path is async FastAPI, SQLAlchemy 2.x `AsyncSession`, Postgre
 The UoW refuses an already active transaction. Publication is atomic locally;
 delivery is at least once. Automatic retries retain the delivery ID, while replay
 creates a linked new delivery ID.
+
+`verify_webhook()` authenticates the exact body bytes and, by default, accepts an
+attempt timestamp no more than 300 seconds old or 300 seconds in the future. Receivers
+may pass an aware `now`, `maximum_age`, and `maximum_future_skew` for deterministic
+tests or a documented deployment policy. Invalid application configuration raises
+`MergenConfigurationError`; malformed external headers return `False`. Freshness does
+not replace durable message-ID deduplication.
