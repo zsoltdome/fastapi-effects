@@ -136,3 +136,38 @@ to the normal identity and subject rules. The exception preserves provenance rat
 than rewriting published history. Governance evaluates commits reachable from
 controlled local branches; fetched remote bot or contributor refs are outside that
 authorship assertion and do not weaken checks on `main`.
+
+## 9. Release evidence authority and artifact isolation
+
+The tag workflow discovers required workflows first, validates repository/source
+repository, source SHA, workflow path, `push` event, and source branch, then selects the
+highest trusted workflow run number and rerun attempt. Only that attempt's jobs may
+satisfy the required matrix. A newer failed, queued, running, cancelled, or incomplete
+attempt cannot fall back to an older green run. GitHub API errors, malformed pages, or
+missing attempt metadata are unavailable evidence and fail the gate.
+
+Wheel and sdist verification use separate clean virtual environments, invoke each
+environment's interpreter directly from a neutral directory, strip `PYTHONPATH` and
+`PYTHONHOME`, and assert package origin under that environment. The sdist is first built
+to a derived wheel whose digest is recorded. The initial PEP 517 build, the sdist-derived
+build, and runtime/test dependency installation are constrained by an exact export of the
+checked lock, including the locked build backend. Both the constraints digest and lock
+digest are carried into each per-artifact certification manifest. Each environment runs
+the selected database journeys and complete real-service certification, including
+same-process and Taskiq worker-process origin checks.
+
+Release-manifest schema v2 requires the constraints export, runtime result, and both
+artifact-specific certification manifests and reports. It parses wheel `METADATA` and
+the sdist's root `PKG-INFO`, requiring their project/version to match the promotion
+target before binding their bytes. Each certification manifest's package version must
+match the same target. The evidence files are semantically validated, then
+hashed with the SBOM and checksums together with source SHA, lock digest, workflow run ID,
+and workflow attempt.
+
+Publication selects that authoritative attempt first, resolves exactly one
+attempt-specific Actions artifact, downloads it by immutable artifact ID, verifies the
+artifact archive digest, and verifies the enclosed release manifest; it never rebuilds.
+Immediately before the trusted-publisher action it repeats workflow and artifact
+selection and requires the run ID, attempt, artifact ID, and digest to remain unchanged.
+GitHub selection and PyPI upload cannot be one atomic transaction, so repository and
+environment authorization remain required around the small post-recheck boundary.

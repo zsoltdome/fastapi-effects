@@ -3,15 +3,29 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from taskiq_redis import RedisStreamBroker
 
+import fastapi_mergen
 from fastapi_mergen.core.principal import Principal
 from fastapi_mergen.executors.taskiq.adapter import register_taskiq_bridge
 from fastapi_mergen.executors.taskiq.store import TaskiqHandoffStore
 from fastapi_mergen.executors.taskiq.worker import TaskiqWorkerBridge
 from fastapi_mergen.postgres.leasing import ClaimedDelivery
+
+
+def _verify_package_origin() -> None:
+    expected = os.getenv("MERGEN_EXPECTED_PACKAGE_PREFIX")
+    if expected is None:
+        return
+    package_path = Path(fastapi_mergen.__file__).resolve()
+    if not package_path.is_relative_to(Path(expected).resolve()):
+        raise RuntimeError("Taskiq worker imported outside the certified artifact environment.")
+
+
+_verify_package_origin()
 
 
 def _required_environment(name: str) -> str:

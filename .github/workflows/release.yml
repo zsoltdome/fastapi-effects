@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   checks: read
+  actions: read
   id-token: write
   attestations: write
 
@@ -51,51 +52,52 @@ jobs:
         with:
           version: "0.12.4"
           enable-cache: true
-      - run: uv sync --group security --all-extras
+      - run: uv sync --locked --group security --all-extras
       - name: Verify hosted compatibility, security, and conformance checks
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: uv run python scripts/verify_hosted_release_checks.py
+        run: uv run --no-sync python scripts/verify_hosted_release_checks.py
       - name: Run mandatory quality and package gates
-        run: uv run python scripts/check.py --skip-artifact-build
+        run: uv run --no-sync python scripts/check.py --skip-artifact-build
       - name: Run mandatory integration gates
-        run: uv run pytest -q -m integration
+        run: uv run --no-sync pytest -q -m integration
       - name: Run security gates
         run: |
-          uv run pip-audit
-          uv run bandit -q -c bandit.yaml -r src
-          uv run python scripts/security_scan.py
+          uv run --no-sync pip-audit
+          uv run --no-sync bandit -q -c bandit.yaml -r src
+          uv run --no-sync python scripts/security_scan.py
       - name: Verify candidate gate
-        run: uv run python scripts/audit_release_candidate.py --phase auto
-      - name: Build and smoke artifacts
-        run: uv run python scripts/build_and_test_artifacts.py
-      - name: Run database journeys from the exact wheel and sdist-derived wheel
-        run: |
-          for artifact in dist/*.whl dist/*.tar.gz; do
-            uv pip install --reinstall --no-deps "${artifact}"
-            (cd "$(mktemp -d)" && "${GITHUB_WORKSPACE}/.venv/bin/python" -c \
-              'import os; from pathlib import Path; import fastapi_mergen; package = Path(fastapi_mergen.__file__).resolve(); source = Path(os.environ["GITHUB_WORKSPACE"]).resolve() / "src"; assert not package.is_relative_to(source), package')
-            .venv/bin/python -m pytest -q \
-              tests/integration/test_invoicing_postgres_boot.py \
-              tests/integration/test_core_concurrency.py::test_fanout_failure_rolls_back_business_and_event_rows \
-              tests/integration/test_core_concurrency.py::test_finalization_refreshes_database_time_after_waiting_for_row_lock
-          done
-      - name: Generate SBOM, checksums, schemas, and certification
+        run: uv run --no-sync python scripts/audit_release_candidate.py --phase auto
+      - name: Build, smoke, and run database journeys from the exact wheel and sdist-derived wheel in isolated environments
+        run: >-
+          uv run --no-sync python scripts/build_and_test_artifacts.py
+          --runtime-certification
+          --runtime-test tests/integration/test_invoicing_postgres_boot.py
+          --runtime-test tests/integration/test_webhook_receiver_inbox.py
+          --runtime-test tests/integration/test_core_concurrency.py::test_fanout_failure_rolls_back_business_and_event_rows
+          --runtime-test tests/integration/test_core_concurrency.py::test_finalization_refreshes_database_time_after_waiting_for_row_lock
+      - name: Generate SBOM, checksums, schemas, and evidence manifest
         run: |
           mkdir -p build/release
-          uv run python scripts/generate_sbom.py --output build/release/sbom.cdx.json
+          uv run --no-sync python scripts/generate_sbom.py --output build/release/sbom.cdx.json
           sha256sum dist/* > build/release/SHA256SUMS
-          package_version="$(uv run python -c 'from fastapi_mergen import __version__; print(__version__)')"
-          uv run python scripts/release_artifacts.py create \
+          cp src/fastapi_mergen/conformance/spec/*.json build/release/
+          package_version="$(uv run --no-sync python -c 'from fastapi_mergen import __version__; print(__version__)')"
+          uv run --no-sync python scripts/release_artifacts.py create \
             --root . \
             --manifest build/release/artifact-manifest.json \
             --source-commit "${GITHUB_SHA}" \
             --package-version "${package_version}" \
-            --workflow-identity "${GITHUB_WORKFLOW_REF}#${GITHUB_RUN_ID}" \
-            --lock-file uv.lock
-          cp src/fastapi_mergen/conformance/spec/*.json build/release/
-          uv run python scripts/generate_real_certification.py --manifest build/release/certification-manifest.json --report build/release/certification.json
-          uv run fastapi-mergen conformance verify --manifest build/release/certification-manifest.json --report build/release/certification.json
+            --workflow-identity "${GITHUB_WORKFLOW_REF}#${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" \
+            --lock-file uv.lock \
+            --evidence-file build/release/artifact-lock-constraints.txt \
+            --evidence-file build/release/artifact-runtime-results.json \
+            --evidence-file build/release/wheel-certification-manifest.json \
+            --evidence-file build/release/wheel-certification.json \
+            --evidence-file build/release/sdist-certification-manifest.json \
+            --evidence-file build/release/sdist-certification.json \
+            --evidence-file build/release/sbom.cdx.json \
+            --evidence-file build/release/SHA256SUMS
       - name: Attest distributions and SBOM
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
@@ -105,8 +107,9 @@ jobs:
             build/release/SHA256SUMS
             build/release/artifact-manifest.json
       - uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+        id: release-artifact
         with:
-          name: release-evidence-${{ github.ref_name }}
+          name: release-evidence-${{ github.ref_name }}-attempt-${{ github.run_attempt }}
           path: |
             dist/*
             build/release/*

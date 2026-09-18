@@ -35,23 +35,44 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          runs="$(gh api --method GET \
+          runs_file="$(mktemp)"
+          gh api --paginate --slurp --method GET \
             "repos/${GITHUB_REPOSITORY}/actions/workflows/release.yml/runs" \
-            -f event=push -f status=success -f head_sha="${GITHUB_SHA}" -f per_page=100)"
-          run_id="$(jq -r --arg sha "${GITHUB_SHA}" --arg tag "${RELEASE_TAG}" \
-            '[.workflow_runs[] | select(.head_sha == $sha and .head_branch == $tag and .conclusion == "success")] | if length == 1 then .[0].id else empty end' \
-            <<<"${runs}")"
-          test -n "${run_id}"
-          echo "run_id=${run_id}" >> "${GITHUB_OUTPUT}"
-      - name: Download the exact approved release artifact
+            -f event=push -f head_sha="${GITHUB_SHA}" -f per_page=100 > "${runs_file}"
+          python scripts/select_release_evidence.py \
+            --input "${runs_file}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --source-commit "${GITHUB_SHA}" \
+            --tag "${RELEASE_TAG}" \
+            --github-output "${GITHUB_OUTPUT}"
+      - name: Resolve the immutable artifact for the selected attempt
+        id: artifact
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: >-
-          gh run download "${{ steps.evidence.outputs.run_id }}"
-          --repo "${GITHUB_REPOSITORY}"
-          --name "release-evidence-${RELEASE_TAG}"
-          --dir approved
+        run: |
+          artifacts_file="$(mktemp)"
+          gh api --paginate --slurp --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${{ steps.evidence.outputs.run_id }}/artifacts" \
+            -f per_page=100 > "${artifacts_file}"
+          python scripts/select_release_artifact.py \
+            --input "${artifacts_file}" \
+            --name "release-evidence-${RELEASE_TAG}-attempt-${{ steps.evidence.outputs.run_attempt }}" \
+            --run-id "${{ steps.evidence.outputs.run_id }}" \
+            --source-commit "${GITHUB_SHA}" \
+            --github-output "${GITHUB_OUTPUT}"
+      - name: Download the exact artifact ID and verify its archive digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          archive="$(mktemp)"
+          gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts/${{ steps.artifact.outputs.artifact_id }}/zip" \
+            > "${archive}"
+          printf '%s  %s\n' "${{ steps.artifact.outputs.artifact_digest }}" "${archive}" \
+            | sha256sum --check --strict
+          mkdir approved
+          unzip -q "${archive}" -d approved
       - name: Verify promoted artifact identity
         run: |
           package_version="$(python -c 'exec(open("src/fastapi_mergen/_version.py").read()); print(__version__)')"
@@ -60,8 +81,45 @@ jobs:
             --manifest approved/build/release/artifact-manifest.json \
             --source-commit "${GITHUB_SHA}" \
             --package-version "${package_version}" \
-            --workflow-identity "${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${{ github.event.release.tag_name }}#${{ steps.evidence.outputs.run_id }}" \
-            --lock-file uv.lock
+            --workflow-identity "${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${{ github.event.release.tag_name }}#${{ steps.evidence.outputs.run_id }}.${{ steps.evidence.outputs.run_attempt }}" \
+            --lock-file uv.lock \
+            --evidence-file build/release/artifact-lock-constraints.txt \
+            --evidence-file build/release/artifact-runtime-results.json \
+            --evidence-file build/release/wheel-certification-manifest.json \
+            --evidence-file build/release/wheel-certification.json \
+            --evidence-file build/release/sdist-certification-manifest.json \
+            --evidence-file build/release/sdist-certification.json \
+            --evidence-file build/release/sbom.cdx.json \
+            --evidence-file build/release/SHA256SUMS
+      - name: Reconfirm workflow attempt and artifact authority immediately before publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          runs_file="$(mktemp)"
+          artifacts_file="$(mktemp)"
+          gh api --paginate --slurp --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/release.yml/runs" \
+            -f event=push -f head_sha="${GITHUB_SHA}" -f per_page=100 > "${runs_file}"
+          python scripts/select_release_evidence.py \
+            --input "${runs_file}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --source-commit "${GITHUB_SHA}" \
+            --tag "${RELEASE_TAG}" \
+            --expected-run-id "${{ steps.evidence.outputs.run_id }}" \
+            --expected-run-attempt "${{ steps.evidence.outputs.run_attempt }}" \
+            --github-output /dev/null
+          gh api --paginate --slurp --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${{ steps.evidence.outputs.run_id }}/artifacts" \
+            -f per_page=100 > "${artifacts_file}"
+          python scripts/select_release_artifact.py \
+            --input "${artifacts_file}" \
+            --name "release-evidence-${RELEASE_TAG}-attempt-${{ steps.evidence.outputs.run_attempt }}" \
+            --run-id "${{ steps.evidence.outputs.run_id }}" \
+            --source-commit "${GITHUB_SHA}" \
+            --expected-artifact-id "${{ steps.artifact.outputs.artifact_id }}" \
+            --expected-digest "${{ steps.artifact.outputs.artifact_digest }}" \
+            --github-output /dev/null
       - name: Publish with trusted identity
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:

@@ -59,6 +59,7 @@ class PostgresCompleteBoundaryDriver(PostgresBoundaryDriver):
         relay_engine: AsyncEngine,
         roles: RuntimeRoles,
         redis_url: str | None = None,
+        evidence_metadata: dict[str, JsonValue] | None = None,
     ) -> PostgresCompleteBoundaryDriver:
         driver = cls(
             migration_engine=migration_engine,
@@ -68,6 +69,8 @@ class PostgresCompleteBoundaryDriver(PostgresBoundaryDriver):
         )
         await driver._prepare_business_table()
         driver._manifest_metadata = await postgres_evidence_metadata(migration_engine)
+        if evidence_metadata is not None:
+            driver._manifest_metadata.update(evidence_metadata)
         driver._commands = await PostgresIdempotencyBoundaryDriver.create(
             migration_engine=migration_engine,
             app_engine=app_engine,
