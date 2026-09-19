@@ -85,7 +85,7 @@ The first implementation does not rely on global SQLAlchemy event listeners.
 
 There are exactly three required roles:
 
-- `mergen_migration_owner` owns schema objects and is never a runtime credential;
+- `mergen_migration` owns schema objects and is never a runtime credential;
 - `mergen_app` is RLS-restricted to one tenant and is used by request/handler application sessions;
 - `mergen_relay` can process all tenants only inside the `fastapi_mergen` schema and has no access to application business tables.
 
@@ -999,7 +999,7 @@ The conformance and security suites cover:
 
 | Role | Owns objects | RLS scope | Grants |
 |---|---:|---|---|
-| `mergen_migration_owner` | Yes | Administrative | DDL and migration only; never runtime |
+| `mergen_migration` | Yes | Administrative | DDL and migration only; never runtime |
 | `mergen_app` | No | One bound tenant | Required application/Mergen request operations |
 | `mergen_relay` | No | All tenants on Mergen tables only | Claim/read event/delivery, insert/update attempts, update delivery state; no app tables, no delete |
 

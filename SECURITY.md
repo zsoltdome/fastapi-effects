@@ -31,7 +31,7 @@ production DSNs in a report.
 
 ## Security model summary
 
-- `mergen_migration_owner` owns objects and is never a runtime credential.
+- `mergen_migration` owns objects by default and is never a runtime credential.
 - `mergen_app` is restricted by forced RLS to one transaction-bound tenant.
 - `mergen_relay` operates across tenants only on Mergen-owned control-plane tables.
 - Relay connections never enter application handler code.

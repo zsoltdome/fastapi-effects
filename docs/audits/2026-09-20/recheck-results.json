@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-20T18:16:17+02:00",
+  "release_evidence_authority": false,
+  "package_version": "0.11.0a1",
+  "source": {
+    "base_commit": "06d63b701daab26bf00909a5c7150c0ed097ef3c",
+    "state": "uncommitted_remediation_worktree",
+    "todo_path": "sup/todo_0920.md",
+    "todo_sha256": "40ee40ab7326914551130722bf4031b64624648cfc77d2b4f78213581b5d98d0",
+    "limitation": "The base commit predates these changes; results are local diagnostics and are not bound to a candidate commit or protected workflow."
+  },
+  "infrastructure": {
+    "python": "3.13.15",
+    "postgresql": [
+      "16-alpine",
+      "18-alpine"
+    ],
+    "redis": "7-alpine",
+    "lock_sha256": "3c7938ee422cab01ca8a1330228107d788280db2a3f840a0023dc1f489222eb4"
+  },
+  "finding_status": {
+    "F01": "implemented_and_locally_regressed",
+    "F02": "implemented_and_locally_regressed; controlled live outage injection remains open",
+    "F03": "implemented; durable inbox passed on PostgreSQL 16 and 18",
+    "F04": "implemented_and_locally_regressed; hosted rehearsal remains open",
+    "E01": "implemented; exact wheel and sdist-derived certification passed locally",
+    "E02": "partially_executed; declared Python/dependency/hosted matrix remains open",
+    "E03": "open_owner_and_hosted_surface_verification",
+    "E04": "implemented_and_locally_regressed"
+  },
+  "commands": [
+    {
+      "command": "uv run --no-sync python scripts/check.py --skip-artifact-build",
+      "result": "pass",
+      "detail": "Lock validation, Ruff format/lint, mypy over 179 source files, architecture/milestone/release/documentation gates, and 404 non-integration/non-packaging tests passed; 57 tests were deselected by marker."
+    },
+    {
+      "command": "uv sync --locked --group security --all-extras && uv run --no-sync pip-audit && uv run --no-sync bandit -q -c bandit.yaml -r src && uv run --no-sync python scripts/security_scan.py",
+      "result": "pass",
+      "detail": "Locked dependency audit found no known vulnerabilities; the unpublished local package was explicitly unauditable on PyPI. Bandit and the offline secret/forbidden-license scan passed."
+    },
+    {
+      "command": "MERGEN_TEST_ADMIN_DSN=<postgresql-16> MERGEN_TEST_REDIS_URL=<redis-7> uv run --no-sync pytest -q -m integration",
+      "result": "pass",
+      "detail": "49 passed, 383 deselected; no skipped integration tests."
+    },
+    {
+      "command": "MERGEN_TEST_ADMIN_DSN=<postgresql-18> MERGEN_TEST_REDIS_URL=<redis-7> uv run --no-sync pytest -q -m integration",
+      "result": "pass",
+      "detail": "49 passed, 383 deselected; no skipped integration tests."
+    },
+    {
+      "command": "MERGEN_TEST_ADMIN_DSN=<postgresql-18> MERGEN_TEST_REDIS_URL=<redis-7> uv run --no-sync python scripts/build_and_test_artifacts.py --runtime-certification <four selected database journeys>",
+      "result": "pass",
+      "detail": "The locked PEP 517 backend built both candidates. Clean wheel and sdist-derived environments each passed six selected tests, package-origin checks, and complete-profile real-service certification with lock-constrained runtime dependencies."
+    },
+    {
+      "command": "uv run --no-sync python scripts/release_artifacts.py create/verify <local artifact evidence>",
+      "result": "pass",
+      "detail": "Semantic runtime-evidence validation and release-manifest digest verification passed; this synthetic local workflow identity has no release authority."
+    }
+  ],
+  "open_gates": [
+    "specified two-tenant signing-key revocation, expired-retiring-key, wrong-tenant, and terminal-finalization recovery scenario",
+    "controlled connector outage/restart and ambiguous-completion injection",
+    "protected hosted workflow and publisher rehearsal",
+    "full declared Python and dependency compatibility matrix",
+    "history, rights, reporting-route, repository-protection, and trusted-publisher owner review",
+    "committed candidate identity and protected release artifact",
+    "external deployment, independent review, RC observation, and final approval"
+  ]
+}

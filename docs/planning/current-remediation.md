@@ -40,11 +40,12 @@ historical evidence remains retained but is not treated as proof of the new boun
 These entries remain below `HOSTED_VERIFIED`; no external account, protected
 environment, publication, or partner evidence is inferred from local source changes.
 
-## Locally verified at the source commit above
+## Historical local verification at the source commit above
 
 - [x] F01 stale Taskiq handoff admission is fenced against the current parent attempt.
-- [x] F02 expected success/failure lease loss is isolated per delivery; transient DB
-  connection failure does not stop the supervisor.
+- [x] F02 expected success/failure lease loss is isolated per delivery; the reviewed
+  SQLAlchemy failure set was locally exercised. This historical entry did not cover raw
+  connector exceptions before SQLAlchemy wrapping.
 - [x] F03 one aggregate attempt budget covers dependency, transport, broker, execution,
   and cleanup waits; address and redirect counts are bounded.
 - [x] F04 maximum elapsed time is defined and enforced as a latest-finish deadline.
@@ -88,6 +89,11 @@ environment, publication, or partner evidence is inferred from local source chan
   content-hashed, and all seven required documentation journeys have local evidence.
 
 ## Still open
+
+The 2026-09-20 recheck is tracked separately under
+[`docs/audits/2026-09-20/README.md`](../audits/2026-09-20/README.md). Its source fixes
+and regressions do not inherit the historical `LOCAL_VERIFIED` label until run against
+the recorded candidate and required live/hosted profiles.
 
 - [ ] Promote the committed source identity to a versioned candidate, build it through
   the protected workflow, and rerun the database-backed quickstart, relay, webhook

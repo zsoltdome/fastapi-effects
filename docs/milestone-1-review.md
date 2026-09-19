@@ -216,7 +216,7 @@ feature work.
 Milestone 2 must preserve the following decisions unless a superseding ADR is accepted:
 
 1. PostgreSQL RLS is the only MDP isolation mode.
-2. `mergen_migration_owner`, `mergen_app`, and `mergen_relay` are separate roles.
+2. `mergen_migration`, `mergen_app`, and `mergen_relay` are separate roles.
 3. Handlers never receive the relay control connection.
 4. The Mergen UoW owns the outer transaction and rejects pre-existing transactions.
 5. Business changes, event, and route-derived deliveries commit atomically.

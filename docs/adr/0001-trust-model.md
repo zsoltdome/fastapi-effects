@@ -14,7 +14,7 @@ end-user database authentication.
 
 Use exactly three required roles:
 
-1. `mergen_migration_owner` owns schema objects and never runs in application/relay
+1. `mergen_migration` owns schema objects and never runs in application/relay
    processes;
 2. `mergen_app` owns nothing, has no bypass privileges, and is constrained by forced
    RLS to the transaction-bound tenant;
