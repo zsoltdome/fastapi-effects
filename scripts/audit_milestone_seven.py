@@ -317,6 +317,21 @@ def check_workflow_pins() -> str:
                 failures.append(f"{workflow.name}:{line_number}:{line.strip()}")
     if failures:
         raise AssertionError(f"GitHub Actions are not SHA-pinned: {failures}")
+    conformance = (ROOT / ".github" / "workflows" / "conformance.yml").read_text(encoding="utf-8")
+    required_artifact_certification = (
+        "scripts/build_and_test_artifacts.py",
+        "--runtime-certification",
+        "--runtime-test tests/conformance/test_real_complete.py",
+        "build/release/wheel-certification-manifest.json",
+        "build/release/wheel-certification.json",
+        "build/release/sdist-certification-manifest.json",
+        "build/release/sdist-certification.json",
+    )
+    missing = [token for token in required_artifact_certification if token not in conformance]
+    if missing:
+        raise AssertionError(f"real-runtime workflow omits artifact bindings: {missing}")
+    if "python scripts/generate_real_certification.py" in conformance:
+        raise AssertionError("real-runtime workflow invokes artifact certification from source")
     return f"{action_count} GitHub Action references are SHA-pinned"
 
 
