@@ -46,6 +46,7 @@ REQUIRED_PATHS = {
     "scripts/check.py",
     "scripts/architecture_gate.py",
     "scripts/build_and_test_artifacts.py",
+    "scripts/install_postgresql_client.sh",
     "scripts/wait_for_postgres.py",
     "docs/concepts/boundary-contract.md",
     "docs/concepts/guarantees.md",
@@ -327,8 +328,7 @@ def check_ci_and_postgres_harness() -> None:
             "--junitxml=junit.xml",
             'postgres: "16"',
             'postgres: "18"',
-            '"postgresql-client-${{ matrix.postgres }}"',
-            'client_dir="/usr/lib/postgresql/${{ matrix.postgres }}/bin"',
+            'bash scripts/install_postgresql_client.sh "${{ matrix.postgres }}"',
             "uv sync --locked --group dev",
             "uv sync --locked --group test",
             "uv run --no-sync python -m pytest -q examples",
@@ -338,8 +338,7 @@ def check_ci_and_postgres_harness() -> None:
         ".github/workflows/compatibility.yml",
         (
             'python: ["3.11", "3.12", "3.13", "3.14"]',
-            '"postgresql-client-${{ matrix.postgres }}"',
-            'client_dir="/usr/lib/postgresql/${{ matrix.postgres }}/bin"',
+            'bash scripts/install_postgresql_client.sh "${{ matrix.postgres }}"',
             "uv sync --locked --group dev --all-extras",
             "uv sync --locked --group test --all-extras",
         ),
@@ -347,6 +346,16 @@ def check_ci_and_postgres_harness() -> None:
     require_phrases(
         ".github/workflows/publish.yml",
         ("release:", "id-token: write", "pypa/gh-action-pypi-publish@"),
+    )
+    require_phrases(
+        "scripts/install_postgresql_client.sh",
+        (
+            "https://www.postgresql.org/media/keys/ACCC4CF8.asc",
+            "B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8",
+            "https://apt.postgresql.org/pub/repos/apt",
+            'CLIENT_PACKAGE="postgresql-client-${POSTGRES_VERSION}"',
+            'printf \'%s\\n\' "${CLIENT_DIR}" >> "${GITHUB_PATH:',
+        ),
     )
     compose = read("compose.yaml")
     for phrase in ("postgres16:", "postgres18:", "profiles: [pg16]", "profiles: [pg18]", "tmpfs:"):

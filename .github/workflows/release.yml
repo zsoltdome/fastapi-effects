@@ -53,13 +53,7 @@ jobs:
           version: "0.12.4"
           enable-cache: true
       - name: Select PostgreSQL 18 client
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends postgresql-client-18
-          client_dir="/usr/lib/postgresql/18/bin"
-          test -x "${client_dir}/pg_dump"
-          test -x "${client_dir}/psql"
-          echo "${client_dir}" >> "${GITHUB_PATH}"
+        run: bash scripts/install_postgresql_client.sh 18
       - run: uv sync --locked --group security --group docs --all-extras
       - name: Verify hosted compatibility, security, and conformance checks
         env:

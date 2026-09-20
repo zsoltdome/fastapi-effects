@@ -164,14 +164,7 @@ jobs:
           version: "0.12.4"
           enable-cache: true
       - name: Select matching PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends \
-            "postgresql-client-${{ matrix.postgres }}"
-          client_dir="/usr/lib/postgresql/${{ matrix.postgres }}/bin"
-          test -x "${client_dir}/pg_dump"
-          test -x "${client_dir}/psql"
-          echo "${client_dir}" >> "${GITHUB_PATH}"
+        run: bash scripts/install_postgresql_client.sh "${{ matrix.postgres }}"
       - name: Install integration environment
         run: uv sync --locked --group test
       - name: Run PostgreSQL tests

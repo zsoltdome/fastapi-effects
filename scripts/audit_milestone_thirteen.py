@@ -45,6 +45,7 @@ REQUIRED = (
     "scripts/chaos_harness.py",
     "scripts/generate_sbom.py",
     "scripts/generate_real_certification.py",
+    "scripts/install_postgresql_client.sh",
     "scripts/release_artifacts.py",
     "scripts/select_release_artifact.py",
     "scripts/verify_hosted_release_checks.py",
@@ -78,8 +79,7 @@ def main() -> int:
                 "verify_hosted_release_checks.py",
                 "pytest -q -m integration",
                 "pip-audit",
-                "postgresql-client-18",
-                'client_dir="/usr/lib/postgresql/18/bin"',
+                "bash scripts/install_postgresql_client.sh 18",
             ),
         ),
         (
@@ -100,8 +100,7 @@ def main() -> int:
             (
                 "write_compatibility_evidence.py",
                 "FASTAPI_EFFECTS_TEST_REDIS_URL",
-                '"postgresql-client-${{ matrix.postgres }}"',
-                'client_dir="/usr/lib/postgresql/${{ matrix.postgres }}/bin"',
+                'bash scripts/install_postgresql_client.sh "${{ matrix.postgres }}"',
             ),
         ),
     ):
