@@ -327,14 +327,19 @@ def check_ci_and_postgres_harness() -> None:
             "--junitxml=junit.xml",
             'postgres: "16"',
             'postgres: "18"',
+            '"postgresql-client-${{ matrix.postgres }}"',
+            'client_dir="/usr/lib/postgresql/${{ matrix.postgres }}/bin"',
             "uv sync --locked --group dev",
             "uv sync --locked --group test",
+            "uv run --no-sync python -m pytest -q examples",
         ),
     )
     require_phrases(
         ".github/workflows/compatibility.yml",
         (
             'python: ["3.11", "3.12", "3.13", "3.14"]',
+            '"postgresql-client-${{ matrix.postgres }}"',
+            'client_dir="/usr/lib/postgresql/${{ matrix.postgres }}/bin"',
             "uv sync --locked --group dev --all-extras",
             "uv sync --locked --group test --all-extras",
         ),

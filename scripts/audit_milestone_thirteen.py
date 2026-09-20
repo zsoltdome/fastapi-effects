@@ -78,6 +78,8 @@ def main() -> int:
                 "verify_hosted_release_checks.py",
                 "pytest -q -m integration",
                 "pip-audit",
+                "postgresql-client-18",
+                'client_dir="/usr/lib/postgresql/18/bin"',
             ),
         ),
         (
@@ -95,7 +97,12 @@ def main() -> int:
         (
             "compatibility",
             compatibility_workflow,
-            ("write_compatibility_evidence.py", "FASTAPI_EFFECTS_TEST_REDIS_URL"),
+            (
+                "write_compatibility_evidence.py",
+                "FASTAPI_EFFECTS_TEST_REDIS_URL",
+                '"postgresql-client-${{ matrix.postgres }}"',
+                'client_dir="/usr/lib/postgresql/${{ matrix.postgres }}/bin"',
+            ),
         ),
     ):
         absent = [token for token in required_tokens if token not in content]
