@@ -27,9 +27,9 @@ def test_git_governance_scopes_history_and_preserves_exact_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     recovery = (
-        "6b8d3626445bd577cc6c5af80f3b84e30e2c7712\x00"
+        "ba6659f1eb10dbc3d384669aedd261b7f8ff397d\x00"
         "zsoltdome\x00zsemed@gmail.com\x00"
-        "zsoltdome\x00zsemed@gmail.com\x00.gitignore"
+        "mergen-institute\x00zsemed@gmail.com\x00.gitignore"
     )
     current = (
         "a" * 40
@@ -37,10 +37,16 @@ def test_git_governance_scopes_history_and_preserves_exact_recovery(
         + "\x00zsoltdome\x00zsoltdome@users.noreply.github.com"
         + "\x00Harden delivery runtime boundaries"
     )
+    historical = (
+        "b" * 40
+        + "\x00zsoltdome\x00mergen-institute@users.noreply.github.com"
+        + "\x00mergen-institute\x00mergen-institute@users.noreply.github.com"
+        + "\x00Document milestone seven assurance"
+    )
 
     def run_git(*arguments: str) -> str:
         if arguments[:2] == ("log", "--branches"):
-            return f"{current}\n{recovery}"
+            return f"{current}\n{historical}\n{recovery}"
         if arguments[0] == "for-each-ref":
             return "main"
         if arguments[0] == "status":

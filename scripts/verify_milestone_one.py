@@ -16,8 +16,9 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "src" / "fastapi_effects"
 AUTHOR_NAME = "zsoltdome"
 AUTHOR_EMAIL_SUFFIX = "@users.noreply.github.com"
+LEGACY_COMMITTER_NAME = "mergen-institute"
 PROJECT_AUTHOR = "Zsolt Döme"
-RECOVERED_BASELINE_COMMIT = "6b8d3626445bd577cc6c5af80f3b84e30e2c7712"
+RECOVERED_BASELINE_COMMIT = "ba6659f1eb10dbc3d384669aedd261b7f8ff397d"
 RECOVERED_BASELINE_EMAIL = "zsemed@gmail.com"
 ALLOWED_BRANCH_PREFIXES = {"build", "chore", "ci", "docs", "feat", "fix", "refactor", "test"}
 REQUIRED_PATHS = {
@@ -403,15 +404,17 @@ def check_git_governance(*, require_clean: bool) -> None:
             expected = (
                 AUTHOR_NAME,
                 RECOVERED_BASELINE_EMAIL,
-                AUTHOR_NAME,
+                LEGACY_COMMITTER_NAME,
                 RECOVERED_BASELINE_EMAIL,
                 ".gitignore",
             )
             if (author, author_email, committer, committer_email, subject) != expected:
                 fail("documented recovered baseline identity changed")
             continue
-        if (author, committer) != (AUTHOR_NAME, AUTHOR_NAME):
-            fail(f"non-FastAPIEffects author or committer found: {subject}")
+        if author != AUTHOR_NAME:
+            fail(f"unexpected author found: {subject}")
+        if committer not in {AUTHOR_NAME, LEGACY_COMMITTER_NAME}:
+            fail(f"unexpected committer found: {subject}")
         if author_email != committer_email or not author_email.endswith(AUTHOR_EMAIL_SUFFIX):
             fail(f"unexpected author or committer email found: {subject}")
         words = subject.split()

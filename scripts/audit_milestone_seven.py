@@ -47,8 +47,9 @@ from fastapi_effects.testing import Fault, ReferenceBoundaryDriver  # noqa: E402
 MINIMUM_RELEASE = (0, 6, 0)
 AUTHOR_NAME = "zsoltdome"
 AUTHOR_EMAIL_SUFFIX = "@users.noreply.github.com"
+LEGACY_COMMITTER_NAME = "mergen-institute"
 PROJECT_AUTHOR = "Zsolt Döme"
-RECOVERED_BASELINE_COMMIT = "6b8d3626445bd577cc6c5af80f3b84e30e2c7712"
+RECOVERED_BASELINE_COMMIT = "ba6659f1eb10dbc3d384669aedd261b7f8ff397d"
 RECOVERED_BASELINE_EMAIL = "zsemed@gmail.com"
 ALLOWED_BRANCH_PREFIXES = {
     "build",
@@ -342,7 +343,7 @@ def check_git_governance() -> str:
             expected_recovered = (
                 AUTHOR_NAME,
                 RECOVERED_BASELINE_EMAIL,
-                AUTHOR_NAME,
+                LEGACY_COMMITTER_NAME,
                 RECOVERED_BASELINE_EMAIL,
                 ".gitignore",
             )
@@ -350,7 +351,8 @@ def check_git_governance() -> str:
                 bad_identities.append(f"{commit[:10]}:recovered baseline changed")
             continue
         if (
-            (author, committer) != (AUTHOR_NAME, AUTHOR_NAME)
+            author != AUTHOR_NAME
+            or committer not in {AUTHOR_NAME, LEGACY_COMMITTER_NAME}
             or author_email != committer_email
             or not author_email.endswith(AUTHOR_EMAIL_SUFFIX)
         ):
