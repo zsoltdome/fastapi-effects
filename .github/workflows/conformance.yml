@@ -53,7 +53,7 @@ jobs:
             --manifest build/conformance/manifest.json \
             --report build/conformance/report.json
       - name: Upload conformance evidence
-        uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: boundary-conformance-${{ github.sha }}
           path: build/conformance
@@ -122,7 +122,7 @@ jobs:
           --manifest build/conformance-real/manifest.json
           --report build/conformance-real/report.json
       - name: Upload cumulative evidence
-        uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: boundary-real-pg${{ matrix.postgres }}-${{ github.sha }}
           path: build/conformance-real

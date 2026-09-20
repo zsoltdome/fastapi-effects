@@ -41,7 +41,7 @@ jobs:
           enable-cache: true
       - run: uv sync --locked --group test --all-extras
       - run: uv run --no-sync python scripts/benchmark.py --tenants 4 --events-per-tenant 10 --output build/benchmark-pg${{ matrix.postgres }}.json
-      - uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: benchmark-pg${{ matrix.postgres }}-${{ github.sha }}
           path: build/*.json

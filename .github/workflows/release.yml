@@ -52,6 +52,14 @@ jobs:
         with:
           version: "0.12.4"
           enable-cache: true
+      - name: Select PostgreSQL 18 client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client-18
+          client_dir="/usr/lib/postgresql/18/bin"
+          test -x "${client_dir}/pg_dump"
+          test -x "${client_dir}/psql"
+          echo "${client_dir}" >> "${GITHUB_PATH}"
       - run: uv sync --locked --group security --group docs --all-extras
       - name: Verify hosted compatibility, security, and conformance checks
         env:
@@ -106,7 +114,7 @@ jobs:
             build/release/sbom.cdx.json
             build/release/SHA256SUMS
             build/release/artifact-manifest.json
-      - uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         id: release-artifact
         with:
           name: release-evidence-${{ github.ref_name }}-attempt-${{ github.run_attempt }}

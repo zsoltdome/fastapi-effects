@@ -40,7 +40,7 @@ jobs:
           --selection "non-integration tests and package smoke"
           --output build/compatibility/compat-python-${{ matrix.python }}.json
       - name: Upload compatibility evidence
-        uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: compat-python-${{ matrix.python }}-${{ github.sha }}
           path: build/compatibility
@@ -92,6 +92,15 @@ jobs:
         with:
           version: "0.12.4"
           enable-cache: true
+      - name: Select matching PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            "postgresql-client-${{ matrix.postgres }}"
+          client_dir="/usr/lib/postgresql/${{ matrix.postgres }}/bin"
+          test -x "${client_dir}/pg_dump"
+          test -x "${client_dir}/psql"
+          echo "${client_dir}" >> "${GITHUB_PATH}"
       - run: uv sync --locked --group test --all-extras
       - run: uv run --no-sync pytest -q -m integration --durations=20
       - name: Bind compatibility evidence
@@ -101,7 +110,7 @@ jobs:
           --selection "all PostgreSQL integration tests"
           --output build/compatibility/compat-pg${{ matrix.postgres }}-py${{ matrix.python_id }}.json
       - name: Upload compatibility evidence
-        uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: compat-pg${{ matrix.postgres }}-py${{ matrix.python_id }}-${{ github.sha }}
           path: build/compatibility
@@ -165,7 +174,7 @@ jobs:
           --selection "${{ matrix.resolution }} dependency import boundary"
           --output build/compatibility/${{ matrix.evidence-id }}.json
       - name: Upload compatibility evidence
-        uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.evidence-id }}-${{ github.sha }}
           path: build/compatibility
