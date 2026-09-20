@@ -7,7 +7,7 @@ This document fixes terms used by source, tests, documentation, and product clai
 | Boundary | Guarantee | Explicit non-guarantee | Conformance IDs |
 |---|---|---|---|
 | Application rows + event + original deliveries | Atomic local commit | No atomicity with remote systems | `C-ATOMIC-COMMIT`, `C-ATOMIC-ROLLBACK` |
-| Rolled-back application transaction | No committed event or original delivery | No attempt to compensate an effect fired outside Mergen | `C-ATOMIC-ROLLBACK` |
+| Rolled-back application transaction | No committed event or original delivery | No attempt to compensate an effect fired outside FastAPI Effects | `C-ATOMIC-ROLLBACK` |
 | Delivery execution | At least once | No generic exactly-once execution | `C-CRASH-AFTER-EFFECT` |
 | Consumer-visible outcome | Effectively once only with durable consumer deduplication | Sender cannot prove remote effect after an ambiguous crash | `C-CONSUMER-DEDUPE` |
 | Fan-out | Independent status and retry history per destination | No all-destinations distributed transaction | `C-FANOUT-INDEPENDENT` |

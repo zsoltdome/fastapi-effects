@@ -14,49 +14,81 @@ concurrency:
 
 jobs:
   quality:
-    name: Python ${{ matrix.python }}
+    name: Static quality / Python 3.13
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        python: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: ${{ matrix.python }}
+          python-version: "3.13"
       - name: Set up uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "0.12.4"
           enable-cache: true
       - name: Install quality environment
-        run: uv sync --group dev
+        run: uv sync --locked --group dev
       - name: Check dependency lock
         run: uv lock --check
       - name: Check formatting
-        run: uv run ruff format --check src tests examples scripts
+        run: uv run --no-sync ruff format --check src tests examples scripts
       - name: Lint source
-        run: uv run ruff check src tests examples scripts
+        run: uv run --no-sync ruff check src tests examples scripts
       - name: Check types
-        run: uv run mypy
+        run: uv run --no-sync mypy
       - name: Check architecture
-        run: uv run python scripts/architecture_gate.py
+        run: uv run --no-sync python scripts/architecture_gate.py
       - name: Check milestone structure
         run: |
-          uv run python scripts/verify_milestone_one.py --skip-git-governance
-          uv run python scripts/audit_milestone_seven.py --skip-git-governance
-          uv run python scripts/audit_milestone_eight.py
-          uv run python scripts/audit_milestone_nine.py
-          uv run python scripts/audit_milestone_ten.py
-          uv run python scripts/audit_milestone_eleven.py
-          uv run python scripts/audit_milestone_twelve.py
-          uv run python scripts/audit_milestone_thirteen.py
-      - name: Run non-integration tests
-        run: uv run pytest -q -m "not integration and not packaging"
+          uv run --no-sync python scripts/verify_milestone_one.py --skip-git-governance
+          uv run --no-sync python scripts/audit_milestone_seven.py --skip-git-governance
+          uv run --no-sync python scripts/audit_milestone_eight.py
+          uv run --no-sync python scripts/audit_milestone_nine.py
+          uv run --no-sync python scripts/audit_milestone_ten.py
+          uv run --no-sync python scripts/audit_milestone_eleven.py
+          uv run --no-sync python scripts/audit_milestone_twelve.py
+          uv run --no-sync python scripts/audit_milestone_thirteen.py
+
+  test-coverage:
+    name: Tests and branch coverage / Python 3.13
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+          enable-cache: true
+      - name: Install test environment
+        run: uv sync --locked --group test
+      - name: Run canonical coverage suite
+        run: >-
+          uv run --no-sync pytest
+          -q
+          -m "not integration and not packaging"
+          --cov=fastapi_effects
+          --cov-report=term-missing
+          --cov-report=xml:coverage.xml
+          --junitxml=junit.xml
+          --durations=20
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
+        with:
+          name: test-reports-${{ github.sha }}
+          path: |
+            coverage.xml
+            junit.xml
+          if-no-files-found: error
 
   minimum-dependencies:
     name: Minimum direct dependencies
@@ -78,10 +110,10 @@ jobs:
         run: uv sync --group dev --resolution lowest-direct
       - name: Run minimum dependency gate
         run: |
-          uv run ruff format --check src tests examples scripts
-          uv run ruff check src tests examples scripts
-          uv run mypy
-          uv run pytest -q -m "not integration and not packaging"
+          uv run --no-sync ruff format --check src tests examples scripts
+          uv run --no-sync ruff check src tests examples scripts
+          uv run --no-sync mypy
+          uv run --no-sync pytest -q -m "not integration and not packaging" --durations=20
 
   integration:
     name: PostgreSQL ${{ matrix.postgres }} / Python ${{ matrix.python }}
@@ -117,8 +149,8 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      MERGEN_TEST_ADMIN_DSN: postgresql://postgres:postgres@127.0.0.1:55432/postgres
-      MERGEN_TEST_REDIS_URL: redis://127.0.0.1:56379/0
+      FASTAPI_EFFECTS_TEST_ADMIN_DSN: postgresql://postgres:postgres@127.0.0.1:55432/postgres
+      FASTAPI_EFFECTS_TEST_REDIS_URL: redis://127.0.0.1:56379/0
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -132,9 +164,9 @@ jobs:
           version: "0.12.4"
           enable-cache: true
       - name: Install integration environment
-        run: uv sync --group test
+        run: uv sync --locked --group test
       - name: Run PostgreSQL tests
-        run: uv run pytest -q -m integration
+        run: uv run --no-sync pytest -q -m integration --durations=20
 
   documentation:
     name: Documentation and examples
@@ -149,7 +181,7 @@ jobs:
         with:
           version: "0.12.4"
           enable-cache: true
-      - run: uv sync --group dev --group docs --all-extras
-      - run: uv run python scripts/check_documentation.py
-      - run: uv run pytest -q examples
-      - run: uv run mkdocs build --strict
+      - run: uv sync --locked --group dev --group docs --all-extras
+      - run: uv run --no-sync python scripts/check_documentation.py
+      - run: uv run --no-sync pytest -q examples
+      - run: uv run --no-sync mkdocs build --strict

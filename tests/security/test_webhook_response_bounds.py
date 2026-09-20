@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
-from fastapi_mergen.errors import PermanentDeliveryError, RetryableDeliveryError
-from fastapi_mergen.webhooks.http11 import ResponseLimits, parse_response
+from fastapi_effects.errors import PermanentDeliveryError, RetryableDeliveryError
+from fastapi_effects.webhooks.http11 import ResponseLimits, parse_response
 
 pytestmark = pytest.mark.security
 

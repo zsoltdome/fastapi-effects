@@ -18,33 +18,33 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from fastapi_mergen import Principal
-from fastapi_mergen.conformance import (
+from fastapi_effects import Principal
+from fastapi_effects.conformance import (
     CertificationProfile,
     ConformanceRunner,
     RunnerConfiguration,
 )
-from fastapi_mergen.conformance.protocols import BoundaryDriver
-from fastapi_mergen.errors import MergenConfigurationError
-from fastapi_mergen.observability.events import RuntimeEvent, RuntimeEventKind
-from fastapi_mergen.observability.postgres import observe_backlog
-from fastapi_mergen.postgres.diagnostics import inspect_runtime_database
-from fastapi_mergen.postgres.revisions import check_schema_revisions
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
-from fastapi_mergen.postgres.webhook_schema import install_webhook_schema
-from fastapi_mergen.testing.delegation_driver import RealDelegationBoundaryDriver
-from fastapi_mergen.testing.idempotency_driver import PostgresIdempotencyBoundaryDriver
-from fastapi_mergen.testing.postgres_driver import PostgresBoundaryDriver
-from fastapi_mergen.testing.taskiq_driver import PostgresTaskiqBoundaryDriver
-from fastapi_mergen.testing.webhook_driver import PostgresWebhookBoundaryDriver
-from fastapi_mergen.webhooks.operations import RetentionResult, WebhookOperations
-from fastapi_mergen.webhooks.secrets import (
+from fastapi_effects.conformance.protocols import BoundaryDriver
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
+from fastapi_effects.observability.events import RuntimeEvent, RuntimeEventKind
+from fastapi_effects.observability.postgres import observe_backlog
+from fastapi_effects.postgres.diagnostics import inspect_runtime_database
+from fastapi_effects.postgres.revisions import check_schema_revisions
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
+from fastapi_effects.postgres.webhook_schema import install_webhook_schema
+from fastapi_effects.testing.delegation_driver import RealDelegationBoundaryDriver
+from fastapi_effects.testing.idempotency_driver import PostgresIdempotencyBoundaryDriver
+from fastapi_effects.testing.postgres_driver import PostgresBoundaryDriver
+from fastapi_effects.testing.taskiq_driver import PostgresTaskiqBoundaryDriver
+from fastapi_effects.testing.webhook_driver import PostgresWebhookBoundaryDriver
+from fastapi_effects.webhooks.operations import RetentionResult, WebhookOperations
+from fastapi_effects.webhooks.secrets import (
     MasterKey,
     StaticMasterKeyProvider,
     WebhookSecretService,
 )
-from fastapi_mergen.webhooks.subscriptions import SubscriptionRepository
+from fastapi_effects.webhooks.subscriptions import SubscriptionRepository
 from tests.integration.postgres import ProvisionedDatabase, provision_test_database
 from tests.migrations.test_revision_matrix import MIGRATION_HEAD, _run_revision, _seed_revision
 
@@ -155,7 +155,7 @@ async def _seed_retention_tenant(
             {
                 "tenant": tenant_id,
                 "event": event_id,
-                "canonical": b"fastapi-mergen:canonical-json:v1\n{}",
+                "canonical": b"fastapi_effects:canonical-json:v1\n{}",
                 "digest": bytes(32),
                 "principal": (
                     '{"tenant_id":"' + str(tenant_id) + '","subject_id":"retention","scopes":[]}'
@@ -190,7 +190,7 @@ async def _seed_retention_tenant(
         if event_rows:
             await connection.execute(
                 text(
-                    "INSERT INTO fastapi_mergen.events "
+                    "INSERT INTO fastapi_effects.events "
                     "(tenant_id,event_id,event_type,event_version,canonical_version,payload,"
                     "payload_canonical,payload_sha256,principal,occurred_at,created_at) VALUES "
                     "(:tenant,:event,'retention.probe',1,1,CAST('{}' AS jsonb),:canonical,"
@@ -200,7 +200,7 @@ async def _seed_retention_tenant(
             )
             await connection.execute(
                 text(
-                    "INSERT INTO fastapi_mergen.deliveries "
+                    "INSERT INTO fastapi_effects.deliveries "
                     "(tenant_id,delivery_id,event_id,route_key,route_version,destination_kind,"
                     "destination_key,route_snapshot,route_snapshot_bytes,state,attempts_started,"
                     "next_attempt_at,created_at,updated_at) VALUES "
@@ -212,7 +212,7 @@ async def _seed_retention_tenant(
         if attempt_rows:
             await connection.execute(
                 text(
-                    "INSERT INTO fastapi_mergen.attempts "
+                    "INSERT INTO fastapi_effects.attempts "
                     "(tenant_id,attempt_id,delivery_id,attempt_number,lease_token,outcome,"
                     "started_at,finished_at) VALUES "
                     "(:tenant,:attempt,:delivery,1,:lease,'succeeded',:old,:old)"
@@ -223,7 +223,7 @@ async def _seed_retention_tenant(
             secret_set = uuid4()
             await connection.execute(
                 text(
-                    "INSERT INTO fastapi_mergen.webhook_secret_sets "
+                    "INSERT INTO fastapi_effects.webhook_secret_sets "
                     "(tenant_id,secret_set_id,revision,created_by,created_at,updated_at) "
                     "VALUES (:tenant,:secret_set,2,'retention',:old,:old)"
                 ),
@@ -235,7 +235,7 @@ async def _seed_retention_tenant(
             ):
                 await connection.execute(
                     text(
-                        "INSERT INTO fastapi_mergen.webhook_secret_versions "
+                        "INSERT INTO fastapi_effects.webhook_secret_versions "
                         "(tenant_id,secret_set_id,secret_version,key_id,nonce,ciphertext,state,"
                         "created_at,revoked_at) VALUES "
                         "(:tenant,:secret_set,:version,'retention-key',:nonce,:ciphertext,"
@@ -263,11 +263,11 @@ async def _attempt_cross_tenant_retention(
 ) -> None:
     async with session.begin():
         await session.execute(
-            text("SELECT set_config('mergen.tenant_id', :tenant, true)"),
+            text("SELECT set_config('fastapi_effects.tenant_id', :tenant, true)"),
             {"tenant": str(context_tenant)},
         )
         await session.execute(
-            text("SELECT * FROM fastapi_mergen.prune_webhook_history(:tenant, :cutoff, 1)"),
+            text("SELECT * FROM fastapi_effects.prune_webhook_history(:tenant, :cutoff, 1)"),
             {"tenant": requested_tenant, "cutoff": cutoff},
         )
 
@@ -286,7 +286,7 @@ async def test_logical_backup_restore_preserves_all_runtime_identity(
         application=test_database.app_role,
         relay=test_database.relay_role,
     )
-    archive = tmp_path / "mergen.sql"
+    archive = tmp_path / "fastapi_effects.sql"
     try:
         async with source_engine.begin() as connection:
             await connection.run_sync(_run_revision, MIGRATION_HEAD, source_roles)
@@ -297,7 +297,7 @@ async def test_logical_backup_restore_preserves_all_runtime_identity(
             "--data-only",
             "--inserts",
             "--no-owner",
-            "--schema=fastapi_mergen",
+            "--schema=fastapi_effects",
             f"--file={archive}",
             _admin_database_dsn(test_database.admin_dsn, test_database.database),
         )
@@ -325,14 +325,14 @@ async def test_logical_backup_restore_preserves_all_runtime_identity(
                     await connection.run_sync(_run_revision, MIGRATION_HEAD, restored_roles)
                     await connection.execute(
                         text(
-                            "TRUNCATE fastapi_mergen.schema_revision, "
-                            "fastapi_mergen.events, fastapi_mergen.deliveries, "
-                            "fastapi_mergen.attempts, fastapi_mergen.webhook_secret_sets, "
-                            "fastapi_mergen.webhook_subscriptions, "
-                            "fastapi_mergen.webhook_secret_versions, "
-                            "fastapi_mergen.webhook_subscription_versions, "
-                            "fastapi_mergen.webhook_audit, fastapi_mergen.taskiq_handoffs, "
-                            "fastapi_mergen.commands CASCADE"
+                            "TRUNCATE fastapi_effects.schema_revision, "
+                            "fastapi_effects.events, fastapi_effects.deliveries, "
+                            "fastapi_effects.attempts, fastapi_effects.webhook_secret_sets, "
+                            "fastapi_effects.webhook_subscriptions, "
+                            "fastapi_effects.webhook_secret_versions, "
+                            "fastapi_effects.webhook_subscription_versions, "
+                            "fastapi_effects.webhook_audit, fastapi_effects.taskiq_handoffs, "
+                            "fastapi_effects.commands CASCADE"
                         )
                     )
                 await _run_postgres_tool(
@@ -364,7 +364,7 @@ async def test_logical_backup_restore_preserves_all_runtime_identity(
                         "deliveries",
                         "events",
                     ):
-                        await connection.execute(text(f"DELETE FROM fastapi_mergen.{table}"))
+                        await connection.execute(text(f"DELETE FROM fastapi_effects.{table}"))
                 await _certify_restored_database(
                     migration_engine=restored_engine,
                     application_engine=restored_application,
@@ -433,7 +433,7 @@ async def test_webhook_retention_is_bounded_resumable_tenant_safe_and_observable
         )
 
         async with application_sessions() as session, session.begin():
-            with pytest.raises(MergenConfigurationError, match="idle session"):
+            with pytest.raises(FastAPIEffectsConfigurationError, match="idle session"):
                 await operations.retain(
                     session,
                     principal=principal,
@@ -487,7 +487,7 @@ async def test_webhook_retention_is_bounded_resumable_tenant_safe_and_observable
                     int(
                         await connection.scalar(
                             text(
-                                f"SELECT count(*) FROM fastapi_mergen.{table} "
+                                f"SELECT count(*) FROM fastapi_effects.{table} "
                                 "WHERE tenant_id = :tenant"
                             ),
                             {"tenant": tenant_id},
@@ -499,7 +499,7 @@ async def test_webhook_retention_is_bounded_resumable_tenant_safe_and_observable
                     int(
                         await connection.scalar(
                             text(
-                                f"SELECT count(*) FROM fastapi_mergen.{table} "
+                                f"SELECT count(*) FROM fastapi_effects.{table} "
                                 "WHERE tenant_id = :tenant"
                             ),
                             {"tenant": other_tenant_id},
@@ -513,7 +513,7 @@ async def test_webhook_retention_is_bounded_resumable_tenant_safe_and_observable
                 (
                     await connection.scalars(
                         text(
-                            "SELECT state FROM fastapi_mergen.webhook_secret_versions "
+                            "SELECT state FROM fastapi_effects.webhook_secret_versions "
                             "WHERE tenant_id = :tenant ORDER BY secret_version"
                         ),
                         {"tenant": tenant_id},

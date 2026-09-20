@@ -1,8 +1,8 @@
 # 2026-09-20 remediation recheck
 
-This record tracks the actionable findings in `sup/todo_0920.md` without promoting a
-dirty working tree to committed, hosted, external, or released evidence. The reviewed
-document has SHA-256
+This clean record tracks the actionable findings from the internal review checklist
+without promoting a dirty working tree to committed, hosted, external, or released
+evidence. The reviewed checklist has SHA-256
 `40ee40ab7326914551130722bf4031b64624648cfc77d2b4f78213581b5d98d0`; remediation
 started from repository commit `06d63b701daab26bf00909a5c7150c0ed097ef3c`.
 

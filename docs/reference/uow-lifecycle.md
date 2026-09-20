@@ -44,7 +44,7 @@ session provider closes/discards unusable connection
 ```
 
 A commit error is not reported as success. The caller must treat transaction outcome
-as failed/unknown according to SQLAlchemy/driver behavior; Mergen does not invoke a
+as failed/unknown according to SQLAlchemy/driver behavior; FastAPI Effects does not invoke a
 sink to compensate.
 
 ## Cancellation
@@ -66,12 +66,12 @@ UoW commit or rollback completes
 UoW resets its own context/session metadata
 host session dependency finalizer raises
 finalizer error propagates according to FastAPI dependency semantics
-Mergen does not retain a bound principal
+FastAPI Effects does not retain a bound principal
 ```
 
 ## Nesting and savepoints
 
-A Mergen UoW requires no active outer session transaction and rejects a nested Mergen
+A FastAPI Effects UoW requires no active outer session transaction and rejects a nested FastAPI Effects
 UoW. Application `begin_nested()` savepoints are allowed only after tenant binding;
 they do not redefine ownership of the outer transaction or permit emission after UoW
 exit.

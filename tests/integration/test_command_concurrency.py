@@ -16,19 +16,19 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from fastapi_mergen.core.event import Event
-from fastapi_mergen.core.principal import Principal
-from fastapi_mergen.errors import CommandConflict, DedupeConflict, MergenConfigurationError
-from fastapi_mergen.idempotency.command import CommandContext
-from fastapi_mergen.idempotency.fingerprint import RequestFingerprint
-from fastapi_mergen.idempotency.models import CommandIdentity, CommandRow
-from fastapi_mergen.idempotency.responses import CapturedResponse
-from fastapi_mergen.idempotency.store import CommandStore
-from fastapi_mergen.postgres.command_schema import install_command_schema
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
-from fastapi_mergen.postgres.store import PostgresStore
-from fastapi_mergen.sqlalchemy.models import SCHEMA, EventRow
+from fastapi_effects.core.event import Event
+from fastapi_effects.core.principal import Principal
+from fastapi_effects.errors import CommandConflict, DedupeConflict, FastAPIEffectsConfigurationError
+from fastapi_effects.idempotency.command import CommandContext
+from fastapi_effects.idempotency.fingerprint import RequestFingerprint
+from fastapi_effects.idempotency.models import CommandIdentity, CommandRow
+from fastapi_effects.idempotency.responses import CapturedResponse
+from fastapi_effects.idempotency.store import CommandStore
+from fastapi_effects.postgres.command_schema import install_command_schema
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
+from fastapi_effects.postgres.store import PostgresStore
+from fastapi_effects.sqlalchemy.models import SCHEMA, EventRow
 from tests.integration.postgres import ObservedDatabaseClock, ProvisionedDatabase
 
 pytestmark = pytest.mark.integration
@@ -279,7 +279,7 @@ async def test_missing_completion_rolls_back_claim(
             )
 
     try:
-        with pytest.raises(MergenConfigurationError, match="requires complete"):
+        with pytest.raises(FastAPIEffectsConfigurationError, match="requires complete"):
             await omit_completion()
         async with sessions() as session, session.begin():
             await _bind(session, principal)
@@ -400,10 +400,10 @@ async def _setup(
 
 async def _bind(session: AsyncSession, principal: Principal) -> None:
     await session.execute(
-        text("SELECT set_config('mergen.tenant_id', :tenant, true)"),
+        text("SELECT set_config('fastapi_effects.tenant_id', :tenant, true)"),
         {"tenant": str(principal.tenant_id)},
     )
     await session.execute(
-        text("SELECT set_config('mergen.subject_id', :subject, true)"),
+        text("SELECT set_config('fastapi_effects.subject_id', :subject, true)"),
         {"subject": principal.subject_id},
     )

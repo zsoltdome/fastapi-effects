@@ -17,9 +17,9 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from fastapi_mergen import __version__  # noqa: E402
-from fastapi_mergen.conformance import CertificationProfile  # noqa: E402
-from fastapi_mergen.sqlalchemy.models import (  # noqa: E402
+from fastapi_effects import __version__  # noqa: E402
+from fastapi_effects.conformance import CertificationProfile  # noqa: E402
+from fastapi_effects.sqlalchemy.models import (  # noqa: E402
     AttemptRow,
     DeliveryRow,
     EventRow,
@@ -28,16 +28,16 @@ from fastapi_mergen.sqlalchemy.models import (  # noqa: E402
 
 MINIMUM_RELEASE = (0, 7, 0)
 REQUIRED_PATHS = (
-    "src/fastapi_mergen/sqlalchemy/canonical.py",
-    "src/fastapi_mergen/sqlalchemy/models.py",
-    "src/fastapi_mergen/sqlalchemy/repository.py",
-    "src/fastapi_mergen/sqlalchemy/uow.py",
-    "src/fastapi_mergen/postgres/migrations/versions/0001_core_runtime.py",
-    "src/fastapi_mergen/postgres/diagnostics.py",
-    "src/fastapi_mergen/postgres/leasing.py",
-    "src/fastapi_mergen/postgres/relay.py",
-    "src/fastapi_mergen/handlers/executor.py",
-    "src/fastapi_mergen/testing/postgres_driver.py",
+    "src/fastapi_effects/sqlalchemy/canonical.py",
+    "src/fastapi_effects/sqlalchemy/models.py",
+    "src/fastapi_effects/sqlalchemy/repository.py",
+    "src/fastapi_effects/sqlalchemy/uow.py",
+    "src/fastapi_effects/postgres/migrations/versions/0001_core_runtime.py",
+    "src/fastapi_effects/postgres/diagnostics.py",
+    "src/fastapi_effects/postgres/leasing.py",
+    "src/fastapi_effects/postgres/relay.py",
+    "src/fastapi_effects/handlers/executor.py",
+    "src/fastapi_effects/testing/postgres_driver.py",
     "tests/conformance/test_real_core_runtime.py",
     "tests/integration/test_core_migration.py",
     "tests/integration/test_invoicing_postgres_boot.py",
@@ -61,7 +61,7 @@ def _static_audit() -> list[str]:
 
     with (ROOT / "pyproject.toml").open("rb") as stream:
         project = tomllib.load(stream)["project"]
-    if project["name"] != "fastapi-mergen" or project["authors"] != [{"name": "mergen-institute"}]:
+    if project["name"] != "fastapi-effects" or project["authors"] != [{"name": "Zsolt Döme"}]:
         raise AssertionError("distribution identity changed")
     if not any(str(item).startswith("asyncpg") for item in project["dependencies"]):
         raise AssertionError("asyncpg is not a runtime dependency")
@@ -75,10 +75,10 @@ def _static_audit() -> list[str]:
     )
     tables = {f"{table.schema}.{table.name}" for table in mapped_tables}
     expected_tables = {
-        "fastapi_mergen.schema_revision",
-        "fastapi_mergen.events",
-        "fastapi_mergen.deliveries",
-        "fastapi_mergen.attempts",
+        "fastapi_effects.schema_revision",
+        "fastapi_effects.events",
+        "fastapi_effects.deliveries",
+        "fastapi_effects.attempts",
     }
     if tables != expected_tables:
         raise AssertionError(f"unexpected core table set: {sorted(tables)}")
@@ -87,7 +87,7 @@ def _static_audit() -> list[str]:
     runtime_roots = ("postgres", "sqlalchemy", "handlers")
     offenders: list[str] = []
     for root in runtime_roots:
-        for path in (SRC / "fastapi_mergen" / root).rglob("*.py"):
+        for path in (SRC / "fastapi_effects" / root).rglob("*.py"):
             if "raise MilestoneNotImplementedError" in path.read_text(encoding="utf-8"):
                 offenders.append(str(path.relative_to(ROOT)))
     if offenders:
@@ -106,7 +106,7 @@ def _static_audit() -> list[str]:
 
 def _live_audit(dsn: str) -> None:
     environment = os.environ.copy()
-    environment["MERGEN_TEST_ADMIN_DSN"] = dsn
+    environment["FASTAPI_EFFECTS_TEST_ADMIN_DSN"] = dsn
     subprocess.run(
         (
             sys.executable,

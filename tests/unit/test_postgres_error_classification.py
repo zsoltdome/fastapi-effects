@@ -6,7 +6,7 @@ import socket
 import pytest
 from sqlalchemy.exc import DBAPIError, OperationalError, ProgrammingError
 
-from fastapi_mergen.postgres.errors import (
+from fastapi_effects.postgres.errors import (
     is_transient_database_connection_error,
     is_transient_database_error,
 )

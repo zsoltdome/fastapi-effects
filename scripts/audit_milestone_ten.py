@@ -7,16 +7,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = (
     "docs/adr/ADR-011-taskiq-handoff.md",
-    "src/fastapi_mergen/executors/protocols.py",
-    "src/fastapi_mergen/executors/taskiq/models.py",
-    "src/fastapi_mergen/executors/taskiq/store.py",
-    "src/fastapi_mergen/executors/taskiq/envelope.py",
-    "src/fastapi_mergen/executors/taskiq/adapter.py",
-    "src/fastapi_mergen/executors/taskiq/worker.py",
-    "src/fastapi_mergen/executors/taskiq/recovery.py",
-    "src/fastapi_mergen/postgres/migrations/versions/0003_taskiq.py",
-    "src/fastapi_mergen/testing/taskiq_driver.py",
-    "src/fastapi_mergen/testing/taskiq_worker_fixture.py",
+    "src/fastapi_effects/executors/protocols.py",
+    "src/fastapi_effects/executors/taskiq/models.py",
+    "src/fastapi_effects/executors/taskiq/store.py",
+    "src/fastapi_effects/executors/taskiq/envelope.py",
+    "src/fastapi_effects/executors/taskiq/adapter.py",
+    "src/fastapi_effects/executors/taskiq/worker.py",
+    "src/fastapi_effects/executors/taskiq/recovery.py",
+    "src/fastapi_effects/postgres/migrations/versions/0003_taskiq.py",
+    "src/fastapi_effects/testing/taskiq_driver.py",
+    "src/fastapi_effects/testing/taskiq_worker_fixture.py",
     "tests/conformance/test_real_taskiq.py",
     "tests/conformance/test_real_complete.py",
     "tests/integration/test_taskiq_worker_claim.py",
@@ -26,8 +26,8 @@ REQUIRED = (
 
 def main() -> int:
     missing = [item for item in REQUIRED if not (ROOT / item).is_file()]
-    adapter = (ROOT / "src/fastapi_mergen/executors/taskiq/adapter.py").read_text()
-    certification = (ROOT / "src/fastapi_mergen/testing/taskiq_driver.py").read_text()
+    adapter = (ROOT / "src/fastapi_effects/executors/taskiq/adapter.py").read_text()
+    certification = (ROOT / "src/fastapi_effects/testing/taskiq_driver.py").read_text()
     forbidden = [item for item in ("SimpleRetryMiddleware", "wait_result(") if item in adapter]
     missing_boundaries = [
         item

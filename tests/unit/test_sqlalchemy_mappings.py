@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import ForeignKeyConstraint
 
-from fastapi_mergen.sqlalchemy.models import SCHEMA, Base
+from fastapi_effects.sqlalchemy.models import SCHEMA, Base
 
 
 def test_runtime_metadata_uses_authoritative_schema_and_tenant_foreign_keys() -> None:

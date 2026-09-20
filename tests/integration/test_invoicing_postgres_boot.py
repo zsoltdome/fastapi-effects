@@ -5,17 +5,17 @@ from datetime import UTC, datetime
 import pytest
 from examples.invoicing.app.auth import DEMO_AUTHORIZATION, DEMO_TENANT_ID
 from examples.invoicing.app.db import get_async_session
+from examples.invoicing.app.fastapi_effects_config import fastapi_effects
 from examples.invoicing.app.main import app
-from examples.invoicing.app.mergen_config import mergen
 from examples.invoicing.app.models import Base, InvoiceRender
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from fastapi_mergen.postgres.leasing import LeaseRepository
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
-from fastapi_mergen.sqlalchemy.models import DeliveryRow
+from fastapi_effects.postgres.leasing import LeaseRepository
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
+from fastapi_effects.sqlalchemy.models import DeliveryRow
 from tests.integration.postgres import ObservedDatabaseClock, ProvisionedDatabase
 
 pytestmark = pytest.mark.integration
@@ -26,7 +26,7 @@ async def test_reference_app_boots_with_disposable_postgres(
     test_database: ProvisionedDatabase,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("MERGEN_EXAMPLE_DATABASE_URL", test_database.app_sqlalchemy_dsn)
+    monkeypatch.setenv("FASTAPI_EFFECTS_EXAMPLE_DATABASE_URL", test_database.app_sqlalchemy_dsn)
     async with app.router.lifespan_context(app):
         session_generator = get_async_session()
         session = await anext(session_generator)
@@ -42,7 +42,7 @@ async def test_authenticated_invoice_reaches_tenant_bound_handler(
     test_database: ProvisionedDatabase,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("MERGEN_EXAMPLE_DATABASE_URL", test_database.app_sqlalchemy_dsn)
+    monkeypatch.setenv("FASTAPI_EFFECTS_EXAMPLE_DATABASE_URL", test_database.app_sqlalchemy_dsn)
     migration_engine = create_async_engine(test_database.migration_sqlalchemy_dsn)
     app_engine = create_async_engine(test_database.app_sqlalchemy_dsn)
     relay_engine = create_async_engine(test_database.relay_sqlalchemy_dsn)
@@ -62,9 +62,10 @@ async def test_authenticated_invoice_reaches_tenant_bound_handler(
                     text(
                         f"CREATE POLICY {table}_tenant ON {table} "
                         f"FOR ALL TO {test_database.app_role} "
-                        "USING (tenant_id = nullif(current_setting('mergen.tenant_id', true), "
+                        "USING (tenant_id = nullif(current_setting("
+                        "'fastapi_effects.tenant_id', true), "
                         "'')::uuid) WITH CHECK (tenant_id = "
-                        "nullif(current_setting('mergen.tenant_id', true), '')::uuid)"
+                        "nullif(current_setting('fastapi_effects.tenant_id', true), '')::uuid)"
                     )
                 )
                 await connection.execute(
@@ -97,7 +98,7 @@ async def test_authenticated_invoice_reaches_tenant_bound_handler(
             leases = LeaseRepository(database_clock=ObservedDatabaseClock())
             async with relay_sessions() as session:
                 first = (await leases.claim(session, now=datetime.now(UTC)))[0]
-            await mergen.handler_executor().execute(first)
+            await fastapi_effects.handler_executor().execute(first)
             assert first.delivery.lease_expires_at is not None
             retry_at = first.delivery.lease_expires_at
             async with relay_sessions() as session:
@@ -106,14 +107,14 @@ async def test_authenticated_invoice_reaches_tenant_bound_handler(
                 second = (await leases.claim(session, now=retry_at))[0]
             assert second.delivery.delivery_id == first.delivery.delivery_id
             assert second.attempt.attempt_id != first.attempt.attempt_id
-            await mergen.handler_executor().execute(second)
+            await fastapi_effects.handler_executor().execute(second)
             async with relay_sessions() as session:
                 await leases.succeed(session, second, now=retry_at)
 
         app_sessions = async_sessionmaker(app_engine, expire_on_commit=False)
         async with app_sessions() as session, session.begin():
             await session.execute(
-                text("SELECT set_config('mergen.tenant_id', :tenant, true)"),
+                text("SELECT set_config('fastapi_effects.tenant_id', :tenant, true)"),
                 {"tenant": str(DEMO_TENANT_ID)},
             )
             render = await session.scalar(

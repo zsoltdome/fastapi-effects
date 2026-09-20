@@ -1,14 +1,16 @@
-# FastAPI-Mergen documentation
+# FastAPI Effects documentation
 
-FastAPI-Mergen defines a transaction boundary and executable assurance contract for
+FastAPI Effects defines a transaction boundary and executable assurance contract for
 **tenant-safe effects** in FastAPI systems.
 
-> **One commit. Every effect keeps its tenant and authority provenance.**
+> **Durable, tenant-aware side effects for FastAPI and PostgreSQL.**
 
 Version `0.11.0a1` is the production-hardening alpha. The repository now includes the
 real PostgreSQL runtime, webhooks, Taskiq handoffs, command idempotency, target-bound
 delegation/FastMCP, and their executable conformance profiles. v1 promotion remains
 blocked on external partner, independent review, and RC observation evidence.
+
+FastAPI Effects is authored by Zsolt Döme and distributed under the MIT License.
 
 ## Read in this order
 

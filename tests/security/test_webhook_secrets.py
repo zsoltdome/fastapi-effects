@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from fastapi_mergen.webhooks.secrets import CreatedWebhookSecret, MasterKey, SigningSecret
+from fastapi_effects.webhooks.secrets import CreatedWebhookSecret, MasterKey, SigningSecret
 
 
 def test_secret_values_are_absent_from_repr() -> None:

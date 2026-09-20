@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
-from fastapi_mergen.core.principal import Principal, PrincipalEnvelope
-from fastapi_mergen.errors import MergenConfigurationError
+from fastapi_effects.core.principal import Principal, PrincipalEnvelope
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
 
 
 def test_principal_envelope_round_trip_and_repr_minimize_credentials() -> None:
@@ -33,5 +33,5 @@ def test_principal_envelope_round_trip_and_repr_minimize_credentials() -> None:
 def test_principal_envelope_rejects_credential_like_extras() -> None:
     value = Principal(tenant_id=uuid4(), subject_id="user:42").to_envelope().to_dict()
     value["authorization"] = "Bearer secret"
-    with pytest.raises(MergenConfigurationError, match="unsupported fields"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="unsupported fields"):
         PrincipalEnvelope.from_dict(value)

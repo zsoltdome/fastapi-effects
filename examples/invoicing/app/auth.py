@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, Request, status
 
-from fastapi_mergen import Principal
+from fastapi_effects import Principal
 
 DEMO_AUTHORIZATION = "Bearer milestone-one-demo"
 DEMO_TENANT_ID = UUID("11111111-1111-4111-8111-111111111111")

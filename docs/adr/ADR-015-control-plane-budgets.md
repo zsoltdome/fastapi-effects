@@ -30,7 +30,7 @@ the production default always samples PostgreSQL.
 ## Operational boundary
 
 Async cancellation is cooperative. Pool, connect, statement, and lock timeouts should
-also be configured in SQLAlchemy/asyncpg/PostgreSQL below the Mergen operation budget.
+also be configured in SQLAlchemy/asyncpg/PostgreSQL below the FastAPI Effects operation budget.
 CPU-bound or cancellation-suppressing application code cannot be hard-preempted by the
 library; after the advertised supervisor grace, process termination belongs to the
 service manager. At-least-once recovery and consumer deduplication remain required.

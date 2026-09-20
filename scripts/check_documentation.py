@@ -309,12 +309,12 @@ def main() -> int:
     for path in sorted((ROOT / "examples").rglob("*.py")):
         compile(path.read_text(encoding="utf-8"), str(path), "exec")
     commands = (
-        (sys.executable, "-m", "fastapi_mergen", "--version"),
-        (sys.executable, "-m", "fastapi_mergen", "conformance", "spec"),
+        (sys.executable, "-m", "fastapi_effects", "--version"),
+        (sys.executable, "-m", "fastapi_effects", "conformance", "spec"),
         (
             sys.executable,
             "-m",
-            "fastapi_mergen",
+            "fastapi_effects",
             "webhooks",
             "validate-endpoint",
             "https://example.com/hooks",

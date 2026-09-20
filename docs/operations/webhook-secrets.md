@@ -4,10 +4,10 @@ Webhook signing material is generated in process and encrypted with AES-GCM
 before it reaches PostgreSQL. The authenticated encryption associated data binds
 the ciphertext to its tenant, secret-set identity, and version. A host-supplied
 master-key provider is the only source of encryption keys; master keys never
-come from the Mergen database.
+come from the FastAPI Effects database.
 
 Creation and rotation return a `whsec_...` value exactly once. Store it in the
-receiver's secret manager immediately. Mergen intentionally has no plaintext
+receiver's secret manager immediately. FastAPI Effects intentionally has no plaintext
 recovery API. Database backups contain key identifiers, nonces, and ciphertext,
 so restoring a backup also requires the corresponding external master keys.
 

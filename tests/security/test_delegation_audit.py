@@ -5,11 +5,11 @@ from uuid import uuid4
 
 import pytest
 
-from fastapi_mergen import Principal
-from fastapi_mergen.delegation.audit import DelegationAuditEvent
-from fastapi_mergen.delegation.keys import InMemoryKeyRing, SigningKey
-from fastapi_mergen.delegation.signing import DelegationIssuer, DelegationVerifier
-from fastapi_mergen.errors import AuthorizationDenied
+from fastapi_effects import Principal
+from fastapi_effects.delegation.audit import DelegationAuditEvent
+from fastapi_effects.delegation.keys import InMemoryKeyRing, SigningKey
+from fastapi_effects.delegation.signing import DelegationIssuer, DelegationVerifier
+from fastapi_effects.errors import AuthorizationDenied
 
 
 class FixedClock:

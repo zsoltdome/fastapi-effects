@@ -1,7 +1,7 @@
-# FastAPI-Mergen — Detailed Technical TODO for Milestones 1–3
+# FastAPI Effects — Detailed Technical TODO for Milestones 1–3
 
 **Date:** 2026-08-24  
-**Companion plan:** `fastapi_mergen_plan_9x9_FINAL_2026-08-24.md`  
+**Companion plan:** `fastapi_effects_plan_9x9_FINAL_2026-08-24.md`
 **Planning assumption:** solo, part-time, approximately 10 hours/week  
 **Scope:** Milestone 1 repository/specification; Milestone 2 core engine; Milestone 3 webhook MDP
 
@@ -56,24 +56,24 @@ Create the canonical repository tree, a collision-free import package, and the m
 
 **Context**
 
-The packaging strategy is intentionally one distribution (`fastapi-mergen`) with one import root (`fastapi_mergen`). Starting with the final namespace and `src` layout prevents accidental imports from the working tree and avoids a later namespace migration.
+The packaging strategy is intentionally one distribution (`fastapi-effects`) with one import root (`fastapi_effects`). Starting with the final namespace and `src` layout prevents accidental imports from the working tree and avoids a later namespace migration.
 
 **Affected files**
 
 - `pyproject.toml`
-- `src/fastapi_mergen/__init__.py`
-- `src/fastapi_mergen/api.py`
-- `src/fastapi_mergen/errors.py`
-- `src/fastapi_mergen/py.typed`
+- `src/fastapi_effects/__init__.py`
+- `src/fastapi_effects/api.py`
+- `src/fastapi_effects/errors.py`
+- `src/fastapi_effects/py.typed`
 - `tests/__init__.py`
 - `.gitignore`
 - `LICENSE`
 
 **Definition of Done**
 
-- [ ] `python -c "import fastapi_mergen"` succeeds only after editable or wheel installation, not merely because the repository root is on `sys.path`.
-- [ ] The built wheel contains `fastapi_mergen/py.typed` and no accidental top-level `mergen` package.
-- [ ] `fastapi_mergen.__all__` contains only the intentionally public placeholder symbols.
+- [ ] `python -c "import fastapi_effects"` succeeds only after editable or wheel installation, not merely because the repository root is on `sys.path`.
+- [ ] The built wheel contains `fastapi_effects/py.typed` and no accidental top-level `fastapi_effects` package.
+- [ ] `fastapi_effects.__all__` contains only the intentionally public placeholder symbols.
 - [ ] Repository paths match the audited plan and contain no premature queue, MCP, workflow, or idempotency package.
 
 ### - [ ] M1.02 — Define package metadata, extras, and version ownership
@@ -87,21 +87,21 @@ Make distribution metadata, dependency groups, console entry point, and version 
 
 **Context**
 
-The base package must import without webhook or observability dependencies. Optional features belong behind extras, and the console script must use `fastapi-mergen` rather than the occupied generic `mergen` name.
+The base package must import without webhook or observability dependencies. Optional features belong behind extras, and the console script must use `fastapi-effects` rather than the occupied generic `fastapi_effects` name.
 
 **Affected files**
 
 - `pyproject.toml`
-- `src/fastapi_mergen/_version.py` or selected SCM-version configuration
-- `src/fastapi_mergen/cli/__init__.py`
-- `src/fastapi_mergen/cli/main.py`
+- `src/fastapi_effects/_version.py` or selected SCM-version configuration
+- `src/fastapi_effects/cli/__init__.py`
+- `src/fastapi_effects/cli/main.py`
 - `tests/packaging/test_metadata.py`
 
 **Definition of Done**
 
-- [ ] Project name is `fastapi-mergen`; import root is `fastapi_mergen`; console entry point is `fastapi-mergen`.
+- [ ] Project name is `fastapi-effects`; import root is `fastapi_effects`; console entry point is `fastapi-effects`.
 - [ ] Base, `webhooks`, `otel`, development, documentation, and test dependencies are separated without circular extras.
-- [ ] Version is exposed as `fastapi_mergen.__version__` from one authoritative source.
+- [ ] Version is exposed as `fastapi_effects.__version__` from one authoritative source.
 - [ ] Metadata includes supported Python versions, licence, typed-package classifier/marker, project URLs, and an explicit pre-alpha status.
 
 ### - [ ] M1.03 — Establish linting, formatting, typing, and test conventions
@@ -202,7 +202,7 @@ Define trusted actors, hostile inputs, protected assets, failure modes, and secu
 
 **Context**
 
-RLS protects against classes of application mistakes, not full compromise of an application credential. Likewise, the relay is cross-tenant on Mergen tables but must not become a business-data superuser. These limits must be visible and testable.
+RLS protects against classes of application mistakes, not full compromise of an application credential. Likewise, the relay is cross-tenant on FastAPI Effects tables but must not become a business-data superuser. These limits must be visible and testable.
 
 **Affected files**
 
@@ -230,7 +230,7 @@ Freeze transaction ownership, tenant binding, nesting, savepoint, commit/rollbac
 
 **Context**
 
-The security-critical first implementation must not depend on hidden global SQLAlchemy listeners. Requiring an outermost Mergen UoW narrows the integration surface and gives `emit()` a provable transaction boundary.
+The security-critical first implementation must not depend on hidden global SQLAlchemy listeners. Requiring an outermost FastAPI Effects UoW narrows the integration surface and gives `emit()` a provable transaction boundary.
 
 **Affected files**
 
@@ -242,7 +242,7 @@ The security-critical first implementation must not depend on hidden global SQLA
 
 - [ ] ADR states that UoW entry fails when the supplied session already has a transaction.
 - [ ] Tenant `SET LOCAL` occurs before application SQL and cleanup occurs in `finally`.
-- [ ] Nested Mergen UoWs are rejected; application savepoints after binding are permitted and documented.
+- [ ] Nested FastAPI Effects UoWs are rejected; application savepoints after binding are permitted and documented.
 - [ ] The ADR includes sequence diagrams for success, application exception, commit failure, cancellation, and dependency-finalizer failure.
 
 ### - [ ] M1.08 — Approve event/delivery/attempt identity, dedupe, and replay ADR
@@ -337,14 +337,14 @@ Exercise the proposed API in type-checked example code before committing to inte
 
 **Context**
 
-The spike should reveal whether `Mergen`, route declarations, `MergenUnitOfWork`, `Event`, `EffectContext`, authorization modes, and retry profiles compose naturally without exposing repository or SQL details.
+The spike should reveal whether `FastAPIEffects`, route declarations, `FastAPIEffectsUnitOfWork`, `Event`, `EffectContext`, authorization modes, and retry profiles compose naturally without exposing repository or SQL details.
 
 **Affected files**
 
-- `src/fastapi_mergen/api.py`
-- `src/fastapi_mergen/core/protocols.py`
+- `src/fastapi_effects/api.py`
+- `src/fastapi_effects/core/protocols.py`
 - `examples/invoicing/app/api.py`
-- `examples/invoicing/app/mergen_config.py`
+- `examples/invoicing/app/fastapi_effects_config.py`
 - `tests/unit/test_public_api_spike.py`
 - `docs/reference/public-api-spike.md`
 
@@ -403,7 +403,7 @@ The example is the contract consumer. It should demonstrate tenant-authenticated
 - `examples/invoicing/app/models.py`
 - `examples/invoicing/app/schemas.py`
 - `examples/invoicing/app/auth.py`
-- `examples/invoicing/app/mergen_config.py`
+- `examples/invoicing/app/fastapi_effects_config.py`
 - `examples/invoicing/tests/test_boot.py`
 - `docs/adr/README.md`
 - `docs/milestone-1-review.md`
@@ -454,10 +454,10 @@ A narrow public surface lets storage and execution internals change while preser
 
 **Affected files**
 
-- `src/fastapi_mergen/core/protocols.py`
-- `src/fastapi_mergen/errors.py`
-- `src/fastapi_mergen/api.py`
-- `src/fastapi_mergen/__init__.py`
+- `src/fastapi_effects/core/protocols.py`
+- `src/fastapi_effects/errors.py`
+- `src/fastapi_effects/api.py`
+- `src/fastapi_effects/__init__.py`
 - `tests/unit/test_public_contracts.py`
 
 **Definition of Done**
@@ -482,8 +482,8 @@ Principal data will be snapshotted into events and restored during delayed execu
 
 **Affected files**
 
-- `src/fastapi_mergen/core/principal.py`
-- `src/fastapi_mergen/core/policy.py`
+- `src/fastapi_effects/core/principal.py`
+- `src/fastapi_effects/core/policy.py`
 - `tests/unit/core/test_principal.py`
 - `docs/reference/principal.md`
 
@@ -510,8 +510,8 @@ The context variable is process-local convenience, not durable authority. It mus
 
 **Affected files**
 
-- `src/fastapi_mergen/core/context.py`
-- `src/fastapi_mergen/testing/context.py`
+- `src/fastapi_effects/core/context.py`
+- `src/fastapi_effects/testing/context.py`
 - `tests/unit/core/test_context.py`
 - `tests/conformance/test_context_lifecycle.py`
 
@@ -537,8 +537,8 @@ Arbitrary ORM serialization is forbidden. Event DTOs need positive schema versio
 
 **Affected files**
 
-- `src/fastapi_mergen/core/event.py`
-- `src/fastapi_mergen/sqlalchemy/canonical.py`
+- `src/fastapi_effects/core/event.py`
+- `src/fastapi_effects/sqlalchemy/canonical.py`
 - `tests/unit/core/test_event.py`
 - `tests/unit/sqlalchemy/test_canonical.py`
 - `tests/fixtures/canonical_vectors.json`
@@ -566,8 +566,8 @@ A delivery cannot depend on a mutable named profile alone. The route snapshot st
 
 **Affected files**
 
-- `src/fastapi_mergen/core/retry.py`
-- `src/fastapi_mergen/core/policy.py`
+- `src/fastapi_effects/core/retry.py`
+- `src/fastapi_effects/core/policy.py`
 - `tests/unit/core/test_retry_policy.py`
 - `tests/unit/core/test_authorization_policy.py`
 
@@ -593,9 +593,9 @@ Routes must never be resolved from mutable function names at retry time. The reg
 
 **Affected files**
 
-- `src/fastapi_mergen/core/routing.py`
-- `src/fastapi_mergen/handlers/registry.py`
-- `src/fastapi_mergen/api.py`
+- `src/fastapi_effects/core/routing.py`
+- `src/fastapi_effects/handlers/registry.py`
+- `src/fastapi_effects/api.py`
 - `tests/unit/core/test_routing.py`
 - `tests/integration/test_startup_registry.py`
 
@@ -622,8 +622,8 @@ ORM models are a mapping layer, not the source of truth for invariants. Composit
 
 **Affected files**
 
-- `src/fastapi_mergen/sqlalchemy/models.py`
-- `src/fastapi_mergen/sqlalchemy/types.py`
+- `src/fastapi_effects/sqlalchemy/models.py`
+- `src/fastapi_effects/sqlalchemy/types.py`
 - `tests/unit/sqlalchemy/test_models.py`
 - `tests/integration/test_database_constraints.py`
 
@@ -642,7 +642,7 @@ ORM models are a mapping layer, not the source of truth for invariants. Composit
 
 **Goal**
 
-Install and remove the Mergen schema, tables, indexes, functions, and schema revision metadata deterministically.
+Install and remove the FastAPI Effects schema, tables, indexes, functions, and schema revision metadata deterministically.
 
 **Context**
 
@@ -650,10 +650,10 @@ The package must never auto-migrate at runtime. Migrations need a stable naming 
 
 **Affected files**
 
-- `src/fastapi_mergen/postgres/migrations/env.py`
-- `src/fastapi_mergen/postgres/migrations/script.py.mako`
-- `src/fastapi_mergen/postgres/migrations/versions/0001_core_schema.py`
-- `src/fastapi_mergen/postgres/migrations/versions/0002_schema_metadata.py`
+- `src/fastapi_effects/postgres/migrations/env.py`
+- `src/fastapi_effects/postgres/migrations/script.py.mako`
+- `src/fastapi_effects/postgres/migrations/versions/0001_core_schema.py`
+- `src/fastapi_effects/postgres/migrations/versions/0002_schema_metadata.py`
 - `tests/integration/test_migrations.py`
 
 **Definition of Done**
@@ -675,12 +675,12 @@ Provision the fixed least-privilege database role model and make unsafe ownershi
 
 **Context**
 
-The relay needs cross-tenant access to Mergen control-plane rows but must not read application business tables. Runtime roles must not own tables or bypass RLS.
+The relay needs cross-tenant access to FastAPI Effects control-plane rows but must not read application business tables. Runtime roles must not own tables or bypass RLS.
 
 **Affected files**
 
-- `src/fastapi_mergen/postgres/roles.py`
-- `src/fastapi_mergen/postgres/migrations/versions/0003_roles_and_grants.py`
+- `src/fastapi_effects/postgres/roles.py`
+- `src/fastapi_effects/postgres/migrations/versions/0003_roles_and_grants.py`
 - `tests/security/test_role_grants.py`
 - `docs/operations/roles-and-rls.md`
 
@@ -688,7 +688,7 @@ The relay needs cross-tenant access to Mergen control-plane rows but must not re
 
 - [ ] Migration-owner, app, and relay roles can be parameterized without interpolating unsafe identifiers.
 - [ ] Runtime roles are granted only required schema/table/sequence/function privileges.
-- [ ] Relay role has no grants on configured application schemas and no delete privilege on Mergen history.
+- [ ] Relay role has no grants on configured application schemas and no delete privilege on FastAPI Effects history.
 - [ ] Ownership remains with the migration role; runtime-role ownership tests fail intentionally misconfigured databases.
 - [ ] Role creation can be disabled for managed platforms while emitting exact required SQL/grant documentation.
 
@@ -699,7 +699,7 @@ The relay needs cross-tenant access to Mergen control-plane rows but must not re
 
 **Goal**
 
-Enforce tenant isolation on every Mergen tenant table for request/handler sessions while preserving narrowly scoped relay access.
+Enforce tenant isolation on every FastAPI Effects tenant table for request/handler sessions while preserving narrowly scoped relay access.
 
 **Context**
 
@@ -707,8 +707,8 @@ Policies require both `USING` and `WITH CHECK`, forced RLS, non-owner runtime ro
 
 **Affected files**
 
-- `src/fastapi_mergen/postgres/rls.py`
-- `src/fastapi_mergen/postgres/migrations/versions/0004_rls.py`
+- `src/fastapi_effects/postgres/rls.py`
+- `src/fastapi_effects/postgres/migrations/versions/0004_rls.py`
 - `tests/security/test_rls_read_write.py`
 - `tests/security/test_rls_misconfiguration.py`
 
@@ -717,10 +717,10 @@ Policies require both `USING` and `WITH CHECK`, forced RLS, non-owner runtime ro
 - [ ] Current-tenant helper returns null/fails closed when no valid transaction-local tenant is bound.
 - [ ] Every tenant table has RLS enabled and forced.
 - [ ] App policies apply both `USING` and `WITH CHECK`; direct cross-tenant select/insert/update/delete probes fail.
-- [ ] Relay policies apply only to Mergen-owned tables and permit exactly the operations needed by the relay.
+- [ ] Relay policies apply only to FastAPI Effects-owned tables and permit exactly the operations needed by the relay.
 - [ ] Table-owner, superuser, and `BYPASSRLS` configurations are covered by explicit negative diagnostic tests.
 
-### - [ ] M2.11 — Implement the explicit SQLAlchemy `MergenUnitOfWork`
+### - [ ] M2.11 — Implement the explicit SQLAlchemy `FastAPIEffectsUnitOfWork`
 
 **Estimate:** 6 h  
 **Depends on:** M2.02–M2.10
@@ -731,19 +731,19 @@ Own the outer transaction, bind tenant context before SQL, expose an active emis
 
 **Context**
 
-The UoW is the core correctness boundary. It must reject ambiguous pre-existing transactions and nested Mergen UoWs rather than attempting to infer transaction ownership.
+The UoW is the core correctness boundary. It must reject ambiguous pre-existing transactions and nested FastAPI Effects UoWs rather than attempting to infer transaction ownership.
 
 **Affected files**
 
-- `src/fastapi_mergen/sqlalchemy/uow.py`
-- `src/fastapi_mergen/sqlalchemy/session_state.py`
+- `src/fastapi_effects/sqlalchemy/uow.py`
+- `src/fastapi_effects/sqlalchemy/session_state.py`
 - `tests/unit/sqlalchemy/test_uow.py`
 - `tests/integration/test_uow_transactions.py`
 - `tests/conformance/test_atomicity.py`
 
 **Definition of Done**
 
-- [ ] Entry rejects an already active transaction and a nested Mergen UoW with actionable errors.
+- [ ] Entry rejects an already active transaction and a nested FastAPI Effects UoW with actionable errors.
 - [ ] Transaction begins explicitly and `set_config(..., true)` executes before application statements.
 - [ ] Success commits once; application exception, cancellation, emit failure, and commit failure roll back correctly.
 - [ ] Principal context and session metadata reset in `finally`, including failed cleanup paths.
@@ -760,12 +760,12 @@ Provide a supported request integration that resolves the principal before the U
 
 **Context**
 
-Mergen is auth-agnostic. The application adapter is responsible for authentication and tenant membership, while Mergen validates the returned principal and lifecycle.
+FastAPI Effects is auth-agnostic. The application adapter is responsible for authentication and tenant membership, while FastAPI Effects validates the returned principal and lifecycle.
 
 **Affected files**
 
-- `src/fastapi_mergen/api.py`
-- `src/fastapi_mergen/integrations/fastapi.py`
+- `src/fastapi_effects/api.py`
+- `src/fastapi_effects/integrations/fastapi.py`
 - `tests/integration/test_fastapi_dependency.py`
 - `tests/security/test_conflicting_tenant_sources.py`
 - `examples/invoicing/app/auth.py`
@@ -793,9 +793,9 @@ Emission validates the event, resolves routes, creates immutable snapshots, and 
 
 **Affected files**
 
-- `src/fastapi_mergen/sqlalchemy/uow.py`
-- `src/fastapi_mergen/sqlalchemy/repository.py`
-- `src/fastapi_mergen/core/delivery.py`
+- `src/fastapi_effects/sqlalchemy/uow.py`
+- `src/fastapi_effects/sqlalchemy/repository.py`
+- `src/fastapi_effects/core/delivery.py`
 - `tests/integration/test_emit_atomic.py`
 - `tests/conformance/test_atomicity.py`
 
@@ -822,8 +822,8 @@ Dedupe uses tenant, namespace, and key. A later compatible call must return the 
 
 **Affected files**
 
-- `src/fastapi_mergen/sqlalchemy/repository.py`
-- `src/fastapi_mergen/sqlalchemy/canonical.py`
+- `src/fastapi_effects/sqlalchemy/repository.py`
+- `src/fastapi_effects/sqlalchemy/canonical.py`
 - `tests/integration/test_dedupe.py`
 - `tests/chaos/test_dedupe_race.py`
 
@@ -850,8 +850,8 @@ Repository methods should expose domain results and explicit transaction expecta
 
 **Affected files**
 
-- `src/fastapi_mergen/sqlalchemy/repository.py`
-- `src/fastapi_mergen/core/protocols.py`
+- `src/fastapi_effects/sqlalchemy/repository.py`
+- `src/fastapi_effects/core/protocols.py`
 - `tests/unit/sqlalchemy/test_repository_contract.py`
 - `tests/integration/test_repository_roles.py`
 
@@ -877,8 +877,8 @@ Locks must not be held during handler work. Claiming increments attempts started
 
 **Affected files**
 
-- `src/fastapi_mergen/postgres/leasing.py`
-- `src/fastapi_mergen/sqlalchemy/repository.py`
+- `src/fastapi_effects/postgres/leasing.py`
+- `src/fastapi_effects/sqlalchemy/repository.py`
 - `tests/integration/test_claiming.py`
 - `tests/chaos/test_concurrent_claimers.py`
 
@@ -905,8 +905,8 @@ The worker first selects a bounded tenant set by oldest due work, rotates the st
 
 **Affected files**
 
-- `src/fastapi_mergen/postgres/leasing.py`
-- `src/fastapi_mergen/postgres/relay.py`
+- `src/fastapi_effects/postgres/leasing.py`
+- `src/fastapi_effects/postgres/relay.py`
 - `tests/integration/test_tenant_fairness.py`
 
 **Definition of Done**
@@ -931,8 +931,8 @@ A stale process may finish after another worker has reclaimed the delivery. Ever
 
 **Affected files**
 
-- `src/fastapi_mergen/postgres/leasing.py`
-- `src/fastapi_mergen/sqlalchemy/repository.py`
+- `src/fastapi_effects/postgres/leasing.py`
+- `src/fastapi_effects/sqlalchemy/repository.py`
 - `tests/integration/test_finalize.py`
 - `tests/chaos/test_stale_finalize.py`
 
@@ -959,8 +959,8 @@ Renewal is a token-checked compare-and-set operation. Expired deliveries can be 
 
 **Affected files**
 
-- `src/fastapi_mergen/postgres/leasing.py`
-- `src/fastapi_mergen/postgres/relay.py`
+- `src/fastapi_effects/postgres/leasing.py`
+- `src/fastapi_effects/postgres/relay.py`
 - `tests/integration/test_lease_renewal.py`
 - `tests/chaos/test_expired_lease_reclaim.py`
 
@@ -987,8 +987,8 @@ Retry timing uses full jitter with injected test randomness, but persisted dates
 
 **Affected files**
 
-- `src/fastapi_mergen/core/retry.py`
-- `src/fastapi_mergen/postgres/leasing.py`
+- `src/fastapi_effects/core/retry.py`
+- `src/fastapi_effects/postgres/leasing.py`
 - `tests/unit/core/test_backoff.py`
 - `tests/integration/test_retry_deadline.py`
 
@@ -1015,9 +1015,9 @@ The supervisor coordinates tenant selection, claims, sink execution, lease heart
 
 **Affected files**
 
-- `src/fastapi_mergen/postgres/relay.py`
-- `src/fastapi_mergen/cli/relay.py`
-- `src/fastapi_mergen/observability/relay.py`
+- `src/fastapi_effects/postgres/relay.py`
+- `src/fastapi_effects/cli/relay.py`
+- `src/fastapi_effects/observability/relay.py`
 - `tests/integration/test_relay_loop.py`
 - `tests/chaos/test_relay_shutdown.py`
 
@@ -1044,16 +1044,16 @@ The relay control-plane session must never be injected into handler code. Handle
 
 **Affected files**
 
-- `src/fastapi_mergen/handlers/registry.py`
-- `src/fastapi_mergen/handlers/executor.py`
-- `src/fastapi_mergen/handlers/dependencies.py`
+- `src/fastapi_effects/handlers/registry.py`
+- `src/fastapi_effects/handlers/executor.py`
+- `src/fastapi_effects/handlers/dependencies.py`
 - `tests/integration/test_handler_execution.py`
 - `tests/conformance/test_handler_lifecycle.py`
 
 **Definition of Done**
 
 - [ ] Handler lookup uses snapshotted route key/version and fails terminally when unsupported.
-- [ ] Execution binds principal context and opens a fresh `mergen_app` transaction before application SQL.
+- [ ] Execution binds principal context and opens a fresh `fastapi_effects_app` transaction before application SQL.
 - [ ] Relay session/connection is not exposed through `EffectContext` or dependency providers.
 - [ ] Yielded dependencies finalize on success, exception, timeout, and cancellation.
 - [ ] Sequential/concurrent tenant tests show distinct sessions and no dependency cache leakage.
@@ -1073,9 +1073,9 @@ Snapshot and revalidate modes cannot expand origin authority. Service policy is 
 
 **Affected files**
 
-- `src/fastapi_mergen/core/policy.py`
-- `src/fastapi_mergen/handlers/executor.py`
-- `src/fastapi_mergen/core/principal.py`
+- `src/fastapi_effects/core/policy.py`
+- `src/fastapi_effects/handlers/executor.py`
+- `src/fastapi_effects/core/principal.py`
 - `tests/conformance/test_authority.py`
 - `docs/concepts/authorization.md`
 
@@ -1102,9 +1102,9 @@ Observability is part of delivery correctness: operators need claim, duration, r
 
 **Affected files**
 
-- `src/fastapi_mergen/observability/logging.py`
-- `src/fastapi_mergen/observability/metrics.py`
-- `src/fastapi_mergen/observability/tracing.py`
+- `src/fastapi_effects/observability/logging.py`
+- `src/fastapi_effects/observability/metrics.py`
+- `src/fastapi_effects/observability/tracing.py`
 - `tests/security/test_observability_redaction.py`
 
 **Definition of Done**
@@ -1114,7 +1114,7 @@ Observability is part of delivery correctness: operators need claim, duration, r
 - [ ] Metrics cover due age, claims, outcomes, retries, dead rows, lease loss, renewals, and active work with bounded labels.
 - [ ] Trace context is propagated when valid and ignored safely when malformed.
 
-### - [ ] M2.25 — Implement `fastapi-mergen doctor` and schema compatibility checks
+### - [ ] M2.25 — Implement `fastapi-effects doctor` and schema compatibility checks
 
 **Estimate:** 5 h  
 **Depends on:** M2.08–M2.10, M2.24
@@ -1129,9 +1129,9 @@ Many RLS failures are configuration failures rather than code failures. Diagnost
 
 **Affected files**
 
-- `src/fastapi_mergen/postgres/diagnostics.py`
-- `src/fastapi_mergen/cli/main.py`
-- `src/fastapi_mergen/cli/doctor.py`
+- `src/fastapi_effects/postgres/diagnostics.py`
+- `src/fastapi_effects/cli/main.py`
+- `src/fastapi_effects/cli/doctor.py`
 - `tests/integration/test_doctor.py`
 - `tests/security/test_doctor_misconfigurations.py`
 
@@ -1158,8 +1158,8 @@ The conformance suite is part of the product wedge and will later test external 
 
 **Affected files**
 
-- `src/fastapi_mergen/conformance/`
-- `src/fastapi_mergen/testing/`
+- `src/fastapi_effects/conformance/`
+- `src/fastapi_effects/testing/`
 - `tests/conformance/test_atomicity.py`
 - `tests/conformance/test_isolation.py`
 - `tests/conformance/test_authority.py`
@@ -1243,9 +1243,9 @@ A subscription controls future route materialization; it is not a cancellation s
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/models.py`
-- `src/fastapi_mergen/webhooks/subscriptions.py`
-- `src/fastapi_mergen/webhooks/secrets.py`
+- `src/fastapi_effects/webhooks/models.py`
+- `src/fastapi_effects/webhooks/subscriptions.py`
+- `src/fastapi_effects/webhooks/secrets.py`
 - `docs/adr/0006-webhook-subscriptions-and-secrets.md`
 - `tests/unit/webhooks/test_models.py`
 
@@ -1272,9 +1272,9 @@ Request-role users need tenant-limited CRUD; relay needs read access to active s
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/models.py`
-- `src/fastapi_mergen/postgres/migrations/versions/0005_webhook_schema.py`
-- `src/fastapi_mergen/postgres/migrations/versions/0006_webhook_rls.py`
+- `src/fastapi_effects/webhooks/models.py`
+- `src/fastapi_effects/postgres/migrations/versions/0005_webhook_schema.py`
+- `src/fastapi_effects/postgres/migrations/versions/0006_webhook_rls.py`
 - `tests/integration/webhooks/test_migrations.py`
 - `tests/security/webhooks/test_webhook_rls.py`
 
@@ -1301,8 +1301,8 @@ Wildcard/filter DSLs are out of scope. Subscription queries execute inside the o
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/subscriptions.py`
-- `src/fastapi_mergen/sqlalchemy/repository.py`
+- `src/fastapi_effects/webhooks/subscriptions.py`
+- `src/fastapi_effects/sqlalchemy/repository.py`
 - `tests/integration/webhooks/test_subscriptions.py`
 - `tests/conformance/webhooks/test_subscription_snapshotting.py`
 
@@ -1329,8 +1329,8 @@ The built-in database store is one implementation. The master key must come from
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/secrets.py`
-- `src/fastapi_mergen/core/protocols.py`
+- `src/fastapi_effects/webhooks/secrets.py`
+- `src/fastapi_effects/core/protocols.py`
 - `tests/unit/webhooks/test_secret_protocols.py`
 - `docs/reference/secret-provider.md`
 
@@ -1357,8 +1357,8 @@ Each endpoint receives a unique secret set. Ciphertext, nonce, algorithm, and ke
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/secrets.py`
-- `src/fastapi_mergen/webhooks/crypto.py`
+- `src/fastapi_effects/webhooks/secrets.py`
+- `src/fastapi_effects/webhooks/crypto.py`
 - `tests/unit/webhooks/test_crypto.py`
 - `tests/integration/webhooks/test_secret_store.py`
 - `tests/security/webhooks/test_secret_redaction.py`
@@ -1386,8 +1386,8 @@ The destination snapshot references a stable secret-set ID. Each attempt loads c
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/secrets.py`
-- `src/fastapi_mergen/webhooks/signing.py`
+- `src/fastapi_effects/webhooks/secrets.py`
+- `src/fastapi_effects/webhooks/signing.py`
 - `tests/integration/webhooks/test_secret_rotation.py`
 - `docs/operations/webhooks.md`
 
@@ -1414,9 +1414,9 @@ The snapshot stores endpoint URL and secret-set identity, not plaintext secret. 
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/subscriptions.py`
-- `src/fastapi_mergen/sqlalchemy/uow.py`
-- `src/fastapi_mergen/sqlalchemy/repository.py`
+- `src/fastapi_effects/webhooks/subscriptions.py`
+- `src/fastapi_effects/sqlalchemy/uow.py`
+- `src/fastapi_effects/sqlalchemy/repository.py`
 - `tests/integration/webhooks/test_emit_fanout.py`
 
 **Definition of Done**
@@ -1442,8 +1442,8 @@ The exact signed bytes must be the exact transmitted bytes. Message ID maps to d
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/serializer.py`
-- `src/fastapi_mergen/webhooks/models.py`
+- `src/fastapi_effects/webhooks/serializer.py`
+- `src/fastapi_effects/webhooks/models.py`
 - `tests/unit/webhooks/test_serializer.py`
 - `tests/fixtures/webhook_envelopes/`
 
@@ -1470,7 +1470,7 @@ The library should delegate cryptographic/signature format details to the Standa
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/signing.py`
+- `src/fastapi_effects/webhooks/signing.py`
 - `tests/unit/webhooks/test_signing.py`
 - `tests/conformance/webhooks/test_standard_vectors.py`
 - `examples/webhook_receiver/verify.py`
@@ -1498,8 +1498,8 @@ Static parsing is necessary but not sufficient for SSRF. It establishes HTTPS, a
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/transport.py`
-- `src/fastapi_mergen/webhooks/url_policy.py`
+- `src/fastapi_effects/webhooks/transport.py`
+- `src/fastapi_effects/webhooks/url_policy.py`
 - `tests/unit/webhooks/test_url_policy.py`
 - `tests/security/webhooks/test_url_edge_cases.py`
 
@@ -1522,12 +1522,12 @@ Resolve every attempt, classify every A/AAAA result, and reject endpoints whose 
 
 **Context**
 
-A hostname can resolve differently between validation and connection. Mergen must validate the actual IP it will connect to and explicitly cover private, loopback, link-local, multicast, reserved, unspecified, metadata, and IPv4-mapped IPv6 cases.
+A hostname can resolve differently between validation and connection. FastAPI Effects must validate the actual IP it will connect to and explicitly cover private, loopback, link-local, multicast, reserved, unspecified, metadata, and IPv4-mapped IPv6 cases.
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/dns.py`
-- `src/fastapi_mergen/webhooks/url_policy.py`
+- `src/fastapi_effects/webhooks/dns.py`
+- `src/fastapi_effects/webhooks/url_policy.py`
 - `tests/unit/webhooks/test_ip_policy.py`
 - `tests/security/webhooks/test_dns_rebinding.py`
 
@@ -1554,8 +1554,8 @@ The transport must eliminate the validation/connect DNS time-of-check gap. It ma
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/transport.py`
-- `src/fastapi_mergen/webhooks/httpcore_transport.py`
+- `src/fastapi_effects/webhooks/transport.py`
+- `src/fastapi_effects/webhooks/httpcore_transport.py`
 - `tests/integration/webhooks/test_explicit_ip_transport.py`
 - `tests/security/webhooks/test_tls_sni_and_host.py`
 - `tests/fixtures/certs/`
@@ -1584,8 +1584,8 @@ Redirects are disabled by default. An enabled redirect is a new destination requ
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/transport.py`
-- `src/fastapi_mergen/webhooks/config.py`
+- `src/fastapi_effects/webhooks/transport.py`
+- `src/fastapi_effects/webhooks/config.py`
 - `tests/security/webhooks/test_redirects.py`
 - `tests/integration/webhooks/test_transport_limits.py`
 
@@ -1612,8 +1612,8 @@ Classification must be deterministic and configurable only through safe policy s
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/sink.py`
-- `src/fastapi_mergen/webhooks/retry.py`
+- `src/fastapi_effects/webhooks/sink.py`
+- `src/fastapi_effects/webhooks/retry.py`
 - `tests/unit/webhooks/test_classification.py`
 - `tests/integration/webhooks/test_retry_after.py`
 
@@ -1640,9 +1640,9 @@ The sink receives immutable event/delivery snapshots and the current lease conte
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/sink.py`
-- `src/fastapi_mergen/postgres/relay.py`
-- `src/fastapi_mergen/api.py`
+- `src/fastapi_effects/webhooks/sink.py`
+- `src/fastapi_effects/postgres/relay.py`
+- `src/fastapi_effects/api.py`
 - `tests/integration/webhooks/test_sink_end_to_end.py`
 
 **Definition of Done**
@@ -1668,8 +1668,8 @@ Auto-pause prevents future delivery snapshots after a threshold. It does not sil
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/subscriptions.py`
-- `src/fastapi_mergen/webhooks/sink.py`
+- `src/fastapi_effects/webhooks/subscriptions.py`
+- `src/fastapi_effects/webhooks/sink.py`
 - `tests/integration/webhooks/test_auto_pause.py`
 - `docs/operations/webhooks.md`
 
@@ -1696,9 +1696,9 @@ Operational APIs must be tenant-bound through the same app role/UoW discipline. 
 
 **Affected files**
 
-- `src/fastapi_mergen/webhooks/api.py`
-- `src/fastapi_mergen/cli/webhooks.py`
-- `src/fastapi_mergen/sqlalchemy/repository.py`
+- `src/fastapi_effects/webhooks/api.py`
+- `src/fastapi_effects/cli/webhooks.py`
+- `src/fastapi_effects/sqlalchemy/repository.py`
 - `tests/integration/webhooks/test_api.py`
 - `tests/security/webhooks/test_api_tenant_isolation.py`
 
@@ -1725,8 +1725,8 @@ Webhook URLs may themselves be sensitive and payloads often contain customer dat
 
 **Affected files**
 
-- `src/fastapi_mergen/observability/webhooks.py`
-- `src/fastapi_mergen/webhooks/audit.py`
+- `src/fastapi_effects/observability/webhooks.py`
+- `src/fastapi_effects/webhooks/audit.py`
 - `tests/security/webhooks/test_observability_redaction.py`
 - `docs/operations/webhooks.md`
 
@@ -1787,7 +1787,7 @@ This suite is the release gate for the differentiated product. It must include r
 - `tests/chaos/webhooks/`
 - `tests/fixtures/dns/`
 - `tests/fixtures/certs/`
-- `src/fastapi_mergen/conformance/webhooks.py`
+- `src/fastapi_effects/conformance/webhooks.py`
 
 **Definition of Done**
 

@@ -6,18 +6,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = (
-    "src/fastapi_mergen/webhooks/models.py",
-    "src/fastapi_mergen/webhooks/secrets.py",
-    "src/fastapi_mergen/webhooks/subscriptions.py",
-    "src/fastapi_mergen/webhooks/serializer.py",
-    "src/fastapi_mergen/webhooks/signing.py",
-    "src/fastapi_mergen/webhooks/address_policy.py",
-    "src/fastapi_mergen/webhooks/http11.py",
-    "src/fastapi_mergen/webhooks/transport.py",
-    "src/fastapi_mergen/webhooks/sink.py",
-    "src/fastapi_mergen/webhooks/operations.py",
-    "src/fastapi_mergen/postgres/migrations/versions/0002_webhooks.py",
-    "src/fastapi_mergen/testing/webhook_driver.py",
+    "src/fastapi_effects/webhooks/models.py",
+    "src/fastapi_effects/webhooks/secrets.py",
+    "src/fastapi_effects/webhooks/subscriptions.py",
+    "src/fastapi_effects/webhooks/serializer.py",
+    "src/fastapi_effects/webhooks/signing.py",
+    "src/fastapi_effects/webhooks/address_policy.py",
+    "src/fastapi_effects/webhooks/http11.py",
+    "src/fastapi_effects/webhooks/transport.py",
+    "src/fastapi_effects/webhooks/sink.py",
+    "src/fastapi_effects/webhooks/operations.py",
+    "src/fastapi_effects/postgres/migrations/versions/0002_webhooks.py",
+    "src/fastapi_effects/testing/webhook_driver.py",
     "tests/conformance/test_real_webhooks.py",
     "tests/security/test_webhook_redirects.py",
     "tests/chaos/test_webhook_crash_matrix.py",
@@ -27,8 +27,8 @@ REQUIRED = (
 
 def main() -> int:
     missing = [path for path in REQUIRED if not (ROOT / path).is_file()]
-    transport = (ROOT / "src/fastapi_mergen/webhooks/transport.py").read_text()
-    certification = (ROOT / "src/fastapi_mergen/testing/webhook_driver.py").read_text()
+    transport = (ROOT / "src/fastapi_effects/webhooks/transport.py").read_text()
+    certification = (ROOT / "src/fastapi_effects/testing/webhook_driver.py").read_text()
     forbidden = [
         name for name in ("httpx.AsyncClient", "follow_redirects=True") if name in transport
     ]

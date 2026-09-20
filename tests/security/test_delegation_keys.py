@@ -5,11 +5,11 @@ from uuid import UUID
 
 import pytest
 
-from fastapi_mergen import Principal
-from fastapi_mergen.delegation.audit import DelegationAuditEvent, DelegationAuditOutcome
-from fastapi_mergen.delegation.keys import InMemoryKeyRing, SigningKey
-from fastapi_mergen.delegation.signing import DelegationIssuer, DelegationVerifier
-from fastapi_mergen.errors import AuthorizationDenied, MergenConfigurationError
+from fastapi_effects import Principal
+from fastapi_effects.delegation.audit import DelegationAuditEvent, DelegationAuditOutcome
+from fastapi_effects.delegation.keys import InMemoryKeyRing, SigningKey
+from fastapi_effects.delegation.signing import DelegationIssuer, DelegationVerifier
+from fastapi_effects.errors import AuthorizationDenied, FastAPIEffectsConfigurationError
 
 NOW = datetime(2026, 8, 30, 12, tzinfo=UTC)
 
@@ -91,7 +91,7 @@ def test_rotation_overlap_and_immediate_revocation_are_audited() -> None:
     keys.revoke("key-v2", now=NOW)
     with pytest.raises(AuthorizationDenied):
         _verify(verifier, new_token)
-    with pytest.raises(MergenConfigurationError, match="active key"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="active key"):
         issuer.mint(
             principal=principal,
             audience="billing-api",
@@ -122,7 +122,7 @@ def test_rotation_rejects_excessive_overlap() -> None:
         (SigningKey("key-v1", b"a" * 32),),
         maximum_overlap=timedelta(minutes=5),
     )
-    with pytest.raises(MergenConfigurationError, match="overlap"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="overlap"):
         keys.rotate(
             SigningKey("key-v2", b"b" * 32),
             now=NOW,

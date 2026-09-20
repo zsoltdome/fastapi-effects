@@ -8,19 +8,19 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
-from fastapi_mergen import (
+from fastapi_effects import (
     AuthorizationMode,
     Event,
-    MergenUnitOfWork,
+    FastAPIEffectsUnitOfWork,
     Principal,
     RetryPolicy,
 )
-from fastapi_mergen.core.context import current_principal
-from fastapi_mergen.core.routing import RouteSpecification
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
-from fastapi_mergen.postgres.store import PostgresStore
-from fastapi_mergen.sqlalchemy.models import DeliveryRow, EventRow
+from fastapi_effects.core.context import current_principal
+from fastapi_effects.core.routing import RouteSpecification
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
+from fastapi_effects.postgres.store import PostgresStore
+from fastapi_effects.sqlalchemy.models import DeliveryRow, EventRow
 from tests.integration.postgres import ProvisionedDatabase, sqlalchemy_async_dsn
 
 pytestmark = [pytest.mark.integration, pytest.mark.chaos]
@@ -68,7 +68,7 @@ async def _write_effect(
     admin: AsyncEngine | None,
 ) -> tuple[UUID, int]:
     async with sessions() as session:
-        uow = MergenUnitOfWork(
+        uow = FastAPIEffectsUnitOfWork(
             session=session,
             principal=principal,
             store=PostgresStore(),
@@ -157,12 +157,12 @@ async def test_connection_loss_rolls_back_uncommitted_work_and_preserves_committ
         async with sessions() as session, session.begin():
             assert (
                 await session.scalar(
-                    text("SELECT nullif(current_setting('mergen.tenant_id', true), '')")
+                    text("SELECT nullif(current_setting('fastapi_effects.tenant_id', true), '')")
                 )
                 is None
             )
             await session.execute(
-                text("SELECT set_config('mergen.tenant_id', :tenant, true)"),
+                text("SELECT set_config('fastapi_effects.tenant_id', :tenant, true)"),
                 {"tenant": str(principal.tenant_id)},
             )
             restored_event_ids = tuple((await session.scalars(select(EventRow.event_id))).all())

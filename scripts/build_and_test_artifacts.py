@@ -43,7 +43,7 @@ def run(
         environment = os.environ.copy() if environment is None else environment
         environment.setdefault(
             "UV_CACHE_DIR",
-            str(Path(tempfile.gettempdir()) / "mergen-uv-cache"),
+            str(Path(tempfile.gettempdir()) / "fastapi_effects_uv-cache"),
         )
     subprocess.run(command, cwd=cwd, check=True, env=environment)
 
@@ -69,7 +69,7 @@ def python_in(environment: Path) -> Path:
 
 
 def console_in(environment: Path) -> Path:
-    executable = "fastapi-mergen.exe" if os.name == "nt" else "fastapi-mergen"
+    executable = "fastapi-effects.exe" if os.name == "nt" else "fastapi-effects"
     return scripts_directory(environment) / executable
 
 
@@ -96,15 +96,15 @@ def create_environment(path: Path, *, parent_dependencies: bool = False) -> Path
 
 
 def assert_uninstalled_import_fails(python: Path, empty_directory: Path) -> None:
-    code = "import importlib.util; assert importlib.util.find_spec('fastapi_mergen') is None"
+    code = "import importlib.util; assert importlib.util.find_spec('fastapi_effects') is None"
     run(str(python), "-c", code, cwd=empty_directory, clean_python=True)
 
 
 def assert_installed_package_origin(python: Path, environment: Path, directory: Path) -> None:
     expected_prefix = repr(str(environment.resolve()))
     code = (
-        "from pathlib import Path; import sys, fastapi_mergen; "
-        "package = Path(fastapi_mergen.__file__).resolve(); "
+        "from pathlib import Path; import sys, fastapi_effects; "
+        "package = Path(fastapi_effects.__file__).resolve(); "
         "prefix = Path(sys.prefix).resolve(); "
         f"assert prefix == Path({expected_prefix}).resolve(); "
         "assert package.is_relative_to(prefix), package"
@@ -139,7 +139,7 @@ def export_locked_constraints(output: Path) -> None:
 
 def requirement_for(artifact: Path, extra: str | None) -> str:
     if extra:
-        return f"fastapi-mergen[{extra}] @ {artifact.resolve().as_uri()}"
+        return f"fastapi-effects[{extra}] @ {artifact.resolve().as_uri()}"
     return str(artifact.resolve())
 
 
@@ -150,7 +150,7 @@ def smoke_install(
     system_site_packages: bool,
     no_deps: bool,
 ) -> None:
-    with tempfile.TemporaryDirectory(prefix="mergen-artifact-") as raw:
+    with tempfile.TemporaryDirectory(prefix="fastapi_effects_artifact-") as raw:
         root = Path(raw)
         environment = root / "venv"
         python = create_environment(environment, parent_dependencies=system_site_packages)
@@ -175,8 +175,8 @@ def smoke_install(
             "import importlib.util",
             "import sys",
             "from pathlib import Path",
-            "import fastapi_mergen",
-            "package_path = Path(fastapi_mergen.__file__).resolve()",
+            "import fastapi_effects",
+            "package_path = Path(fastapi_effects.__file__).resolve()",
             "prefix_path = Path(sys.prefix).resolve()",
             "assert package_path.is_relative_to(prefix_path), package_path",
             "assert package_path.with_name('py.typed').is_file()",
@@ -184,27 +184,26 @@ def smoke_install(
             "assert (spec_path / 'boundary-contract-v1.json').is_file()",
             "assert (spec_path / 'manifest-v1.schema.json').is_file()",
             "assert (spec_path / 'report-v1.schema.json').is_file()",
-            "assert not package_path.parents[1].joinpath('mergen').exists()",
-            "metadata = importlib.metadata.metadata('fastapi-mergen')",
-            "assert metadata['Name'] == 'fastapi-mergen'",
-            "assert metadata['Author'] == 'mergen-institute'",
+            "metadata = importlib.metadata.metadata('fastapi-effects')",
+            "assert metadata['Name'] == 'fastapi-effects'",
+            "assert metadata['Author'] == 'Zsolt Döme'",
         ]
         if extra == "webhooks":
-            code.append("import fastapi_mergen.webhooks")
+            code.append("import fastapi_effects.webhooks")
         elif extra == "otel":
-            code.append("import fastapi_mergen.observability")
+            code.append("import fastapi_effects.observability")
         elif extra == "taskiq":
             code.extend(
                 (
                     "import taskiq",
-                    "import fastapi_mergen.executors.taskiq.adapter",
+                    "import fastapi_effects.executors.taskiq.adapter",
                 )
             )
         elif extra == "fastmcp":
             code.extend(
                 (
                     "import fastmcp",
-                    "import fastapi_mergen.integrations.fastmcp",
+                    "import fastapi_effects.integrations.fastmcp",
                 )
             )
         elif not no_deps:
@@ -229,7 +228,7 @@ def smoke_install(
         run(
             str(python),
             "-m",
-            "fastapi_mergen",
+            "fastapi_effects",
             "--version",
             cwd=root,
             clean_python=True,
@@ -263,7 +262,7 @@ def runtime_test_install(
     """Run selected journeys with the candidate as the only importable package."""
 
     artifact = artifact.resolve()
-    with tempfile.TemporaryDirectory(prefix="mergen-artifact-runtime-") as raw:
+    with tempfile.TemporaryDirectory(prefix="fastapi_effects_artifact-runtime-") as raw:
         root = Path(raw)
         candidate = artifact.resolve()
         report: dict[str, object] = {
@@ -365,7 +364,7 @@ def runtime_test_install(
             run(
                 str(python),
                 "-m",
-                "fastapi_mergen",
+                "fastapi_effects",
                 "conformance",
                 "verify",
                 "--manifest",
@@ -405,16 +404,14 @@ def inspect_wheel(wheel: Path) -> None:
     with zipfile.ZipFile(wheel) as archive:
         names = set(archive.namelist())
     required = {
-        "fastapi_mergen/py.typed",
-        "fastapi_mergen/conformance/spec/boundary-contract-v1.json",
-        "fastapi_mergen/conformance/spec/manifest-v1.schema.json",
-        "fastapi_mergen/conformance/spec/report-v1.schema.json",
+        "fastapi_effects/py.typed",
+        "fastapi_effects/conformance/spec/boundary-contract-v1.json",
+        "fastapi_effects/conformance/spec/manifest-v1.schema.json",
+        "fastapi_effects/conformance/spec/report-v1.schema.json",
     }
     missing = required - names
     if missing:
         raise AssertionError(f"wheel is missing package data: {sorted(missing)}")
-    if any(name.startswith("mergen/") for name in names):
-        raise AssertionError("wheel contains the occupied top-level mergen package")
     if any("/.git/" in name or name.startswith(".git/") for name in names):
         raise AssertionError("wheel contains Git repository metadata")
 
@@ -423,10 +420,10 @@ def inspect_sdist(sdist: Path) -> None:
     with tarfile.open(sdist, "r:gz") as archive:
         names = set(archive.getnames())
     suffixes = (
-        "/src/fastapi_mergen/py.typed",
-        "/src/fastapi_mergen/conformance/spec/boundary-contract-v1.json",
-        "/src/fastapi_mergen/conformance/spec/manifest-v1.schema.json",
-        "/src/fastapi_mergen/conformance/spec/report-v1.schema.json",
+        "/src/fastapi_effects/py.typed",
+        "/src/fastapi_effects/conformance/spec/boundary-contract-v1.json",
+        "/src/fastapi_effects/conformance/spec/manifest-v1.schema.json",
+        "/src/fastapi_effects/conformance/spec/report-v1.schema.json",
         "/docs/tutorials/quickstart.md",
         "/examples/deployment/.env.example",
         "/tests/integration/test_invoicing_postgres_boot.py",

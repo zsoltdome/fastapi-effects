@@ -4,9 +4,9 @@
 
 | Role | Runtime | Owns objects | Tenant visibility | Required privileges |
 |---|---:|---:|---|---|
-| `mergen_migration` | No | Yes | Administrative | Schema/table/policy DDL |
-| `mergen_app` | Yes | No | One transaction-bound tenant | Application and tenant-scoped Mergen operations |
-| `mergen_relay` | Yes | No | All tenants on Mergen control tables only | Claim/read/finalize deliveries and attempts; no application tables; no delete history |
+| `fastapi_effects_migration` | No | Yes | Administrative | Schema/table/policy DDL |
+| `fastapi_effects_app` | Yes | No | One transaction-bound tenant | Application and tenant-scoped FastAPI Effects operations |
+| `fastapi_effects_relay` | Yes | No | All tenants on FastAPI Effects control tables only | Claim/read/finalize deliveries and attempts; no application tables; no delete history |
 
 Runtime roles must not be superusers, object owners, or members of a role with
 `BYPASSRLS`. The migration credential must not be deployed to application or relay
@@ -18,43 +18,43 @@ The UoW executes these settings before application SQL:
 
 ```sql
 SELECT pg_catalog.set_config(
-    'mergen.tenant_id',
+    'fastapi_effects.tenant_id',
     :tenant_id,
     true
 );
-SELECT pg_catalog.set_config('mergen.subject_id', :subject_id, true);
+SELECT pg_catalog.set_config('fastapi_effects.subject_id', :subject_id, true);
 ```
 
 `true` makes each setting local to the current transaction. Policies use
-`NULLIF(current_setting('mergen.tenant_id', true), '')::uuid`; missing context returns
+`NULLIF(current_setting('fastapi_effects.tenant_id', true), '')::uuid`; missing context returns
 `NULL` and denies all tenant rows, while malformed context fails closed.
 
 ## Policy shape
 
-Every Mergen tenant table has RLS enabled and forced:
+Every FastAPI Effects tenant table has RLS enabled and forced:
 
 ```sql
-ALTER TABLE fastapi_mergen.events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE fastapi_mergen.events FORCE ROW LEVEL SECURITY;
+ALTER TABLE fastapi_effects.events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fastapi_effects.events FORCE ROW LEVEL SECURITY;
 ```
 
 The request/handler role requires both read visibility and write validation:
 
 ```sql
 CREATE POLICY events_application_tenant
-ON fastapi_mergen.events
+ON fastapi_effects.events
 FOR ALL
-TO mergen_app
-USING (tenant_id = NULLIF(current_setting('mergen.tenant_id', true), '')::uuid)
-WITH CHECK (tenant_id = NULLIF(current_setting('mergen.tenant_id', true), '')::uuid);
+TO fastapi_effects_app
+USING (tenant_id = NULLIF(current_setting('fastapi_effects.tenant_id', true), '')::uuid)
+WITH CHECK (tenant_id = NULLIF(current_setting('fastapi_effects.tenant_id', true), '')::uuid);
 ```
 
-The relay receives separate, explicit policies only on Mergen-owned tables. It does
+The relay receives separate, explicit policies only on FastAPI Effects-owned tables. It does
 not receive a general application-schema grant.
 
 ## Ownership and search path
 
-- Objects are owned by `mergen_migration` (or the explicitly configured migration role).
+- Objects are owned by `fastapi_effects_migration` (or the explicitly configured migration role).
 - SQL and migrations are schema-qualified.
 - Security-definer functions, if admitted later, use a fixed safe `search_path` and
   have narrowly granted execution.
@@ -62,7 +62,7 @@ not receive a general application-schema grant.
   precedes trusted schemas on the search path.
 - The public schema must not be an implicit extension point for privileged SQL.
 
-## `fastapi-mergen doctor` probes
+## `fastapi-effects doctor` probes
 
 Diagnostics run as the engine's actual configured role and verify:
 

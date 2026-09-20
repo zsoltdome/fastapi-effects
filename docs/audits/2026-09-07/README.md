@@ -1,8 +1,8 @@
-# Supplied audit evidence status
+# Historical audit evidence status
 
-The four supplied Markdown sources are preserved at stable, Git-trackable paths under
-`sup/`. Their supplied-to-repository filename mapping is recorded in
-[`evidence-status.json`](evidence-status.json).
+The original planning narratives are retained as internal supplementary material, but
+they are not public documentation dependencies. This clean record captures the parts
+needed to interpret the audit and its evidence classification.
 
 The ZIP and eight evidence paths described by the audit were not present in the
 workspace received for remediation. The audit now marks them unavailable explicitly;

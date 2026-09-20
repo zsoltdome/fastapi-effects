@@ -1,9 +1,9 @@
 # Webhook operations
 
-Install `fastapi-mergen[webhooks]`, apply Alembic through `0002_webhooks`, and
+Install `fastapi-effects[webhooks]`, apply Alembic through `0002_webhooks`, and
 configure the application and relay roles described in the role runbook.
 Subscription create/update/pause/reactivate and key operations require a tenant
-principal with `webhooks:manage` (or the restricted `mergen:operator` scope).
+principal with `webhooks:manage` (or the restricted `fastapi_effects:operator` scope).
 
 Only exact event types are supported. `emit()` reads active subscription heads
 inside the business transaction and snapshots the current immutable version into

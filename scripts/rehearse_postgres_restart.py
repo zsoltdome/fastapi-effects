@@ -24,21 +24,21 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from tests.integration.postgres import provision_test_database
 
-from fastapi_mergen import (
+from fastapi_effects import (
     AuthorizationMode,
     Event,
-    MergenUnitOfWork,
+    FastAPIEffectsUnitOfWork,
     Principal,
     RetryPolicy,
 )
-from fastapi_mergen import __version__ as mergen_version
-from fastapi_mergen.core.routing import RouteSpecification
-from fastapi_mergen.postgres.diagnostics import inspect_runtime_database
-from fastapi_mergen.postgres.revisions import check_schema_revisions
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
-from fastapi_mergen.postgres.store import PostgresStore
-from fastapi_mergen.sqlalchemy.models import DeliveryRow, EventRow
+from fastapi_effects import __version__ as fastapi_effects_version
+from fastapi_effects.core.routing import RouteSpecification
+from fastapi_effects.postgres.diagnostics import inspect_runtime_database
+from fastapi_effects.postgres.revisions import check_schema_revisions
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
+from fastapi_effects.postgres.store import PostgresStore
+from fastapi_effects.sqlalchemy.models import DeliveryRow, EventRow
 
 _CONTAINER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 
@@ -159,7 +159,7 @@ async def _rehearse(
         try:
             await install_core_schema(migration, roles=roles)
             async with sessions() as session:
-                uow = MergenUnitOfWork(
+                uow = FastAPIEffectsUnitOfWork(
                     session=session,
                     principal=principal,
                     store=PostgresStore(),
@@ -195,7 +195,7 @@ async def _rehearse(
             async with sessions() as session, session.begin():
                 after_backend_pid = int(await session.scalar(text("SELECT pg_backend_pid()")))
                 await session.execute(
-                    text("SELECT set_config('mergen.tenant_id', :tenant, true)"),
+                    text("SELECT set_config('fastapi_effects.tenant_id', :tenant, true)"),
                     {"tenant": str(principal.tenant_id)},
                 )
                 event_ids = tuple((await session.scalars(select(EventRow.event_id))).all())
@@ -209,7 +209,7 @@ async def _rehearse(
                 "schema_version": 1,
                 "captured_on": datetime.now(UTC).date().isoformat(),
                 "platform": platform.system().lower() + "-" + platform.machine().lower(),
-                "fastapi_mergen": mergen_version,
+                "fastapi_effects": fastapi_effects_version,
                 "postgresql_before": before_version,
                 "postgresql_after": after_version,
                 "expected_major": expected_major,
@@ -232,10 +232,10 @@ def main() -> int:
     parser.add_argument("--expected-major", type=int, choices=(16, 18), required=True)
     parser.add_argument("--timeout-seconds", type=float, default=45.0)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--admin-dsn", default=os.getenv("MERGEN_TEST_ADMIN_DSN"))
+    parser.add_argument("--admin-dsn", default=os.getenv("FASTAPI_EFFECTS_TEST_ADMIN_DSN"))
     args = parser.parse_args()
     if not args.admin_dsn:
-        parser.error("set MERGEN_TEST_ADMIN_DSN or pass --admin-dsn")
+        parser.error("set FASTAPI_EFFECTS_TEST_ADMIN_DSN or pass --admin-dsn")
     if not _CONTAINER.fullmatch(args.container):
         parser.error("container name contains unsupported characters")
     if args.timeout_seconds <= 0 or args.timeout_seconds > 300:

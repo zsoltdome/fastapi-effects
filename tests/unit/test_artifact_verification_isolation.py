@@ -71,7 +71,7 @@ def test_runtime_harness_sanitizes_source_import_environment(
 
 
 def test_origin_check_rejects_a_sentinel_source_shadow(tmp_path: Path) -> None:
-    package = tmp_path / "fastapi_mergen"
+    package = tmp_path / "fastapi_effects"
     package.mkdir()
     (package / "__init__.py").write_text("SENTINEL = True\n", encoding="utf-8")
 
@@ -124,9 +124,11 @@ def test_taskiq_worker_rejects_subprocess_import_drift(
     tmp_path: Path,
 ) -> None:
     environment = clean_python_environment()
-    environment["MERGEN_EXPECTED_PACKAGE_PREFIX"] = str(tmp_path / "not-the-project-environment")
+    environment["FASTAPI_EFFECTS_EXPECTED_PACKAGE_PREFIX"] = str(
+        tmp_path / "not-the-project-environment"
+    )
     completed = subprocess.run(
-        [sys.executable, "-c", "import fastapi_mergen.testing.taskiq_worker_fixture"],
+        [sys.executable, "-c", "import fastapi_effects.testing.taskiq_worker_fixture"],
         cwd=tmp_path,
         env=environment,
         check=False,

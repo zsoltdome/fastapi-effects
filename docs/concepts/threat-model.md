@@ -2,7 +2,7 @@
 
 ## Scope and security objective
 
-Mergen reduces cross-tenant, transactional-side-effect, delayed-authority, and
+FastAPI Effects reduces cross-tenant, transactional-side-effect, delayed-authority, and
 outbound-delivery failures caused by application bugs and process crashes. It is not a
 sandbox against full compromise of the application process, database cluster,
 migration credential, or host operating system.
@@ -26,8 +26,8 @@ migration credential, or host operating system.
 | Application process | Trusted but fallible | Bugs expected; RLS/constraints contain classes of mistakes |
 | Migration owner/PostgreSQL | Highly trusted | DDL, ownership, policies, durability |
 | App DB credential | Trusted service credential | May bind tenant context; not end-user authentication |
-| Relay process | Least-privileged trusted control plane | Cross-tenant only on Mergen schema |
-| Handler app session | Trusted, tenant-bound | Fresh `mergen_app` transaction per attempt |
+| Relay process | Least-privileged trusted control plane | Cross-tenant only on FastAPI Effects schema |
+| Handler app session | Trusted, tenant-bound | Fresh `fastapi_effects_app` transaction per attempt |
 | Tenant payload and endpoint | Hostile | Validate content, size, identifiers, URL, network destination |
 | Remote receiver | Hostile/fallible | May time out, lie, duplicate, or respond with oversized data |
 | Observability backend | Lower trust | Receives approved identifiers and bounded metadata only |
@@ -69,7 +69,7 @@ The model considers:
 
 1. `set_config(..., true)` propagates trusted application context; it does not
    authenticate the holder of the app database credential.
-2. Mergen cannot prevent a fully compromised application process from misusing any
+2. FastAPI Effects cannot prevent a fully compromised application process from misusing any
    credential available to that process.
 3. At-least-once delivery permits duplicates after ambiguous failure.
 4. Remote receiver correctness and deduplication are outside the sender trust boundary.

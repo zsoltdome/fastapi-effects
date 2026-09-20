@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 from starlette.responses import Response, StreamingResponse
 
-from fastapi_mergen.errors import MergenConfigurationError
-from fastapi_mergen.idempotency.responses import CapturedResponse, capture_response
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
+from fastapi_effects.idempotency.responses import CapturedResponse, capture_response
 
 
 def test_safe_response_round_trips_and_marks_replay() -> None:
@@ -33,14 +33,14 @@ def test_safe_response_round_trips_and_marks_replay() -> None:
     ],
 )
 def test_unsafe_response_headers_are_rejected(headers: dict[str, str]) -> None:
-    with pytest.raises((MergenConfigurationError, ValueError)):
+    with pytest.raises((FastAPIEffectsConfigurationError, ValueError)):
         capture_response(Response(b"ok", media_type="text/plain", headers=headers))
 
 
 def test_streaming_and_oversized_responses_are_rejected() -> None:
-    with pytest.raises(MergenConfigurationError):
+    with pytest.raises(FastAPIEffectsConfigurationError):
         capture_response(StreamingResponse(iter((b"chunk",)), media_type="text/plain"))
-    with pytest.raises(MergenConfigurationError):
+    with pytest.raises(FastAPIEffectsConfigurationError):
         CapturedResponse(
             status_code=200,
             media_type="text/plain",

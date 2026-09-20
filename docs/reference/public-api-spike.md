@@ -7,11 +7,11 @@ The Milestone 1 spike has become the narrow typed surface for the M8 core runtim
 The intended public surface is limited to:
 
 ```text
-Mergen
+FastAPIEffects
 Principal
 Event
 EffectContext
-MergenUnitOfWork
+FastAPIEffectsUnitOfWork
 AuthorizationMode
 RetryPolicy
 selected public exceptions
@@ -27,17 +27,17 @@ The root remains intentionally small. Integration-specific declarations are impo
 their owned namespaces:
 
 ```python
-from fastapi_mergen.postgres import PostgresStore
-from fastapi_mergen.sqlalchemy import MergenUnitOfWork
+from fastapi_effects.postgres import PostgresStore
+from fastapi_effects.sqlalchemy import FastAPIEffectsUnitOfWork
 ```
 
 `PostgresStore` persists events and their immutable original delivery set through the
-active `MergenUnitOfWork`. Repository and ORM types remain internal.
+active `FastAPIEffectsUnitOfWork`. Repository and ORM types remain internal.
 
 ## Route declaration
 
 ```python
-mergen.route(
+fastapi_effects.route(
     event_type="invoice.created",
     route_key="invoice.render_pdf",
     version=1,
@@ -58,13 +58,13 @@ DSLs are outside the MDP.
 ## Request unit of work
 
 ```python
-get_uow = mergen.uow_dependency(get_async_session)
+get_uow = fastapi_effects.uow_dependency(get_async_session)
 
 
 @app.post("/invoices")
 async def create_invoice(
     data: InvoiceIn,
-    uow: MergenUnitOfWork = Depends(get_uow),
+    uow: FastAPIEffectsUnitOfWork = Depends(get_uow),
 ) -> InvoiceOut:
     async with uow:
         ...
@@ -82,7 +82,7 @@ subclass internal implementation classes.
 ## Rejected surface alternatives
 
 - ambient global `emit()` — hides transaction ownership;
-- `@mergen.task` — implies a queue Mergen does not own;
+- `@fastapi_effects.task` — implies a queue FastAPI Effects does not own;
 - ORM-object event serialization — unstable and may leak relationships/PII;
 - route resolution by mutable function name — unsafe for retries;
 - raw authorization-header forwarding — credential leakage/audience risk;

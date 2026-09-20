@@ -6,8 +6,8 @@ from uuid import uuid4
 
 import pytest
 
-from fastapi_mergen.executors.taskiq.envelope import TaskiqHandoffEnvelope
-from fastapi_mergen.executors.taskiq.worker import TaskiqWorkerBridge
+from fastapi_effects.executors.taskiq.envelope import TaskiqHandoffEnvelope
+from fastapi_effects.executors.taskiq.worker import TaskiqWorkerBridge
 
 
 class _SessionContext:
@@ -42,7 +42,7 @@ async def test_taskiq_control_plane_admission_is_bounded() -> None:
         handoff_id=uuid4(),
         delivery_id=uuid4(),
         attempt_id=attempt_id,
-        task_id=f"mergen-{attempt_id}",
+        task_id=f"fastapi_effects_{attempt_id}",
         handoff_token=uuid4(),
     )
     worker = TaskiqWorkerBridge(

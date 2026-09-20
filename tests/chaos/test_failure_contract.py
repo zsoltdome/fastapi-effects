@@ -7,16 +7,16 @@ from uuid import uuid4
 
 import pytest
 
-from fastapi_mergen import Principal
-from fastapi_mergen.delegation.keys import SigningKey
-from fastapi_mergen.delegation.signing import DelegationIssuer, DelegationVerifier
-from fastapi_mergen.errors import AuthorizationDenied, MergenConfigurationError
+from fastapi_effects import Principal
+from fastapi_effects.delegation.keys import SigningKey
+from fastapi_effects.delegation.signing import DelegationIssuer, DelegationVerifier
+from fastapi_effects.errors import AuthorizationDenied, FastAPIEffectsConfigurationError
 
 
 class UnavailableKeyProvider:
     def signing_key(self, now: datetime) -> SigningKey:
         del now
-        raise MergenConfigurationError("Delegation signing key provider is unavailable.")
+        raise FastAPIEffectsConfigurationError("Delegation signing key provider is unavailable.")
 
     def verification_key(self, key_id: str, now: datetime) -> SigningKey | None:
         del key_id, now
@@ -31,7 +31,7 @@ def test_key_provider_outage_denies_verification_and_stops_issuance() -> None:
         scopes=frozenset({"invoice:write"}),
     )
     issuer = DelegationIssuer(issuer="chaos", keys=provider)
-    with pytest.raises(MergenConfigurationError, match="unavailable"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="unavailable"):
         issuer.mint(
             principal=principal,
             audience="billing",

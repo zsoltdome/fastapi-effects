@@ -1,6 +1,6 @@
-# Mergen — Feasibility Check and Build Plan
+# FastAPI Effects — Feasibility Check and Build Plan
 
-**Date:** 2026-08-23 · **Status:** pre-alpha, no code written · **Working name:** Mergen (`fastapi-mergen` on PyPI, free; bare `mergen` taken by a dormant 2020 astronomy package)
+**Date:** 2026-08-23 · **Status:** pre-alpha, no code written · **Working name:** FastAPI Effects (`fastapi-effects` on PyPI, free; bare `fastapi_effects` taken by a dormant 2020 astronomy package)
 
 **Verdict: build it — but at materially different scope than originally sketched.** Two of the four pillars survived verification intact, one was overstated, and one should be downgraded from "build a library" to "ship an integration." The good news is that the correction makes the project *smaller* and its thesis *sharper*.
 
@@ -15,13 +15,13 @@
 | Build the jobs layer | Writing a ninth task queue would be suicide | **Don't build a queue. Build the outbox**, and treat "run a job" as one sink |
 | Webhook delivery is a gap | **Confirmed for embeddable Python.** No `pip install`-able outbound delivery engine exists for FastAPI. The only Python-ecosystem attempt, `django-webhook` (225★), is Django-locked and stale since 2024-08-19 | **Keep**, with a competitive caveat I originally missed (below) |
 | Build MCP exposure; fastapi-mcp's auth is thin | **Wrong target.** `fastapi-mcp` (11.9k★) is effectively **dead** — last release 2025-07-28, pinned to the `mcp` 1.x line, cannot speak the current 2026-07-28 spec. The live incumbent is **FastMCP** (27.3k★, PrefectHQ-backed, v3.4.7 on 2026-08-10), which already does `from_fastapi()` projection *and* per-caller scope-filtered tool listing | **Downgrade to an integration**, aimed at the one thing FastMCP does *not* solve (below) |
-| Mergen "sits above fastapi-users" the way fastapi-users sits above SQLAlchemy | `fastapi-users` (6.2k★, v15.0.5 on 2026-03-27) is in **maintenance mode** — maintainers state no new features will be added and are building a successor | **Reframe.** Depend on no specific auth library; accept a `Principal` from any of them. Also a risk to watch: that successor could expand into org/tenancy territory |
+| FastAPI Effects "sits above fastapi-users" the way fastapi-users sits above SQLAlchemy | `fastapi-users` (6.2k★, v15.0.5 on 2026-03-27) is in **maintenance mode** — maintainers state no new features will be added and are building a successor | **Reframe.** Depend on no specific auth library; accept a `Principal` from any of them. Also a risk to watch: that successor could expand into org/tenancy territory |
 
 ### The one finding that reshapes the pitch
 
 FastMCP's `from_fastapi()` bridges into your app via an in-process ASGI transport, but `get_http_headers()` **strips the `authorization` header by default**. The common workaround is to put a single static service token on the internal HTTP client — which means **every tenant's agent reaches your API as one shared privileged identity**. That is a textbook confused-deputy vulnerability, and it is the default outcome of the most popular way to do this today.
 
-Mergen's whole reason for existing — identity and tenant surviving a boundary crossing — is the fix. That reframes the MCP pillar from "expose your API to agents" (solved, crowded, commoditizing fast) to **"don't turn your API into a confused deputy when you do"** (unsolved, and a security story rather than a convenience story).
+FastAPI Effects's whole reason for existing — identity and tenant surviving a boundary crossing — is the fix. That reframes the MCP pillar from "expose your API to agents" (solved, crowded, commoditizing fast) to **"don't turn your API into a confused deputy when you do"** (unsolved, and a security story rather than a convenience story).
 
 ---
 
@@ -74,7 +74,7 @@ Being disciplined here is what keeps a four-pillar project from becoming an unma
 
 The obvious approach — hand a queue library your transaction — runs straight into driver friction: `procrastinate`'s only SQLAlchemy connector is **psycopg2, sync only**; `pgqueuer` has no SQLAlchemy driver at all; `taskiq`'s `kick()` accepts no connection and *structurally cannot* join your transaction without forking a broker.
 
-If the outbox is **your own table, written through the user's own async SQLAlchemy session**, transactionality is free and ORM-native, with no raw-connection gymnastics. The relay then dispatches to whatever executor the user already runs. Mergen becomes complementary to every queue instead of competing with all of them.
+If the outbox is **your own table, written through the user's own async SQLAlchemy session**, transactionality is free and ORM-native, with no raw-connection gymnastics. The relay then dispatches to whatever executor the user already runs. FastAPI Effects becomes complementary to every queue instead of competing with all of them.
 
 ---
 
@@ -103,36 +103,36 @@ If the outbox is **your own table, written through the user's own async SQLAlche
 
 ### Packages
 
-Distributions all prefixed `fastapi-mergen-*`, importing under one `mergen.*` root:
+Distributions all prefixed `fastapi-effects-*`, importing under one `fastapi_effects.*` root:
 
 | Distribution | Import | Contents | Depends on |
 |---|---|---|---|
-| `fastapi-mergen` | `mergen` | `Principal`, resolvers, contextvar, scopes, `@requires` | fastapi, pydantic |
-| `fastapi-mergen-sqlalchemy` | `mergen.sa` | RLS session, policy DDL, Alembic ops, outbox table | + sqlalchemy, alembic |
-| `fastapi-mergen-tasks` | `mergen.tasks` | task sink, executor adapters, DI in workers | + fastapi-injectable |
-| `fastapi-mergen-webhooks` | `mergen.webhooks` | subscriptions, signing, delivery, DLQ, replay | + httpx, standardwebhooks |
-| `fastapi-mergen-mcp` | `mergen.mcp` | identity forwarding, scope→tag mapping, quotas, audit | + fastmcp |
+| `fastapi-effects` | `fastapi_effects` | `Principal`, resolvers, contextvar, scopes, `@requires` | fastapi, pydantic |
+| `fastapi-effects-sqlalchemy` | `fastapi_effects.sa` | RLS session, policy DDL, Alembic ops, outbox table | + sqlalchemy, alembic |
+| `fastapi-effects-tasks` | `fastapi_effects.tasks` | task sink, executor adapters, DI in workers | + fastapi-injectable |
+| `fastapi-effects-webhooks` | `fastapi_effects.webhooks` | subscriptions, signing, delivery, DLQ, replay | + httpx, standardwebhooks |
+| `fastapi-effects-mcp` | `fastapi_effects.mcp` | identity forwarding, scope→tag mapping, quotas, audit | + fastmcp |
 
-Core must stay small enough to read in one sitting. Each package usable alone. `pip install fastapi-mergen[tasks,webhooks,mcp]` for everything.
+Core must stay small enough to read in one sitting. Each package usable alone. `pip install fastapi-effects[tasks,webhooks,mcp]` for everything.
 
 ---
 
 ## 4. API sketch
 
 ```python
-from mergen import Mergen, Principal, requires, emit
+from fastapi_effects import FastAPIEffects, Principal, requires, emit
 
-mergen = Mergen(
+fastapi_effects = FastAPIEffects(
     resolve=SubdomainResolver() | HeaderResolver("X-Org") | JWTClaimResolver("org_id"),
     principal_from=my_auth_adapter,  # bring your own auth
     isolation="rls",  # or "filter" / "schema"
 )
-app.add_middleware(mergen.middleware)
+app.add_middleware(fastapi_effects.middleware)
 
 
 @app.post("/invoices", operation_id="create_invoice", tags=["mcp"])
 @requires("invoices:write")
-async def create_invoice(data: InvoiceIn, db: AsyncSession = Depends(mergen.session)):
+async def create_invoice(data: InvoiceIn, db: AsyncSession = Depends(fastapi_effects.session)):
     inv = Invoice(**data.model_dump())  # tenant_id applied automatically
     db.add(inv)
     await emit("invoice.created", inv, sinks=["task", "webhook"])
@@ -140,14 +140,14 @@ async def create_invoice(data: InvoiceIn, db: AsyncSession = Depends(mergen.sess
 ```
 
 ```python
-@mergen.task(retries=5, backoff="exponential")
+@fastapi_effects.task(retries=5, backoff="exponential")
 async def render_pdf(invoice_id: UUID, storage: Storage = Depends(get_storage)):
     p = Principal.current()  # tenant restored, not passed by hand
     ...
 ```
 
 ```python
-mcp = mergen.mcp(app, include=lambda r: "mcp" in r.tags)
+mcp = fastapi_effects.mcp(app, include=lambda r: "mcp" in r.tags)
 # per-caller token → Principal → scopes → filtered tool list
 # → forwarded downstream as that tenant, not as a shared service account
 ```
@@ -159,7 +159,7 @@ The demo that sells it: **one `emit()`, three destinations, one transaction, eve
 ## 5. Data model
 
 ```sql
-CREATE TABLE mergen_outbox (
+CREATE TABLE fastapi_effects_outbox (
   id            bigserial PRIMARY KEY,
   tenant_id     uuid NOT NULL,
   actor_id      uuid,
@@ -173,10 +173,10 @@ CREATE TABLE mergen_outbox (
   trace_id      text,
   created_at    timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX ON mergen_outbox (status, available_at) WHERE status = 'pending';
+CREATE INDEX ON fastapi_effects_outbox (status, available_at) WHERE status = 'pending';
 ```
 
-Plus `mergen_subscription` (tenant, url, secret, event filter, active), `mergen_delivery` (attempt log: status code, duration, response snippet, next retry), and `mergen_idempotency` (tenant, key, request fingerprint, cached response, expires).
+Plus `fastapi_effects_subscription` (tenant, url, secret, event filter, active), `fastapi_effects_delivery` (attempt log: status code, duration, response snippet, next retry), and `fastapi_effects_idempotency` (tenant, key, request fingerprint, cached response, expires).
 
 Design notes: the relay uses `FOR UPDATE SKIP LOCKED` with `LISTEN/NOTIFY` for low latency; secrets are encrypted at rest with a key from app config; delivery bodies are truncated and PII-scrubbed before logging.
 
@@ -253,7 +253,7 @@ The research is unambiguous that code is not the bottleneck. Eight or nine peopl
 2. **Isolation modes at v1** — RLS only, or RLS + query-filter fallback? RLS-only is cleaner and more defensible; a filter mode widens the audience to non-Postgres users but doubles the correctness surface. *Recommendation: RLS-first, filter mode in v0.5 at the earliest.*
 3. **Sync support** — async-only halves the test matrix and matches where FastAPI is going. *Recommendation: async-only for v1.*
 4. **Is `emit()` a public API or an internal detail?** It is the single most distinctive thing in the library. *Recommendation: make it the headline.*
-5. **Does core depend on SQLAlchemy at all?** Keeping it out means Mergen can serve Litestar and Django-Ninja later. *Recommendation: keep core storage-agnostic from day one — it costs almost nothing now and is expensive to retrofit.*
+5. **Does core depend on SQLAlchemy at all?** Keeping it out means FastAPI Effects can serve Litestar and Django-Ninja later. *Recommendation: keep core storage-agnostic from day one — it costs almost nothing now and is expensive to retrofit.*
 
 ---
 

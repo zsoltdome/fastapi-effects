@@ -8,8 +8,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from fastapi_mergen import __version__
-from fastapi_mergen.readiness import (
+from fastapi_effects import __version__
+from fastapi_effects.readiness import (
     candidate_matches_release,
     classify_release_version,
     partner_is_complete,

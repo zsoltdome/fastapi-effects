@@ -1,6 +1,6 @@
 # Boundary conformance and assurance
 
-Milestone 7 turns the Mergen Boundary Contract into an executable certification kit.
+Milestone 7 turns the FastAPI Effects Boundary Contract into an executable certification kit.
 The suite is transport- and storage-neutral: a system under test implements narrow
 facet protocols, declares its capabilities, and is exercised through deterministic
 scenarios.
@@ -91,8 +91,8 @@ The built-in secret-minimization scenario checks known reference canaries. A dep
 can additionally supply environment-variable names:
 
 ```bash
-fastapi-mergen conformance run \
-  --adapter myapp.mergen_conformance:create_driver \
+fastapi-effects conformance run \
+  --adapter myapp.fastapi_effects_conformance:create_driver \
   --profile complete \
   --secret-canary-env DATABASE_PASSWORD \
   --secret-canary-env WEBHOOK_MASTER_KEY

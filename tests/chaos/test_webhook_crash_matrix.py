@@ -8,23 +8,23 @@ import pytest
 from sqlalchemy import func, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from fastapi_mergen import Event, MergenUnitOfWork, Principal, RetryPolicy
-from fastapi_mergen.postgres import PostgresStore
-from fastapi_mergen.postgres.leasing import LeaseRepository
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
-from fastapi_mergen.postgres.webhook_schema import install_webhook_schema
-from fastapi_mergen.sqlalchemy.models import DeliveryRow
-from fastapi_mergen.webhooks.address_policy import EndpointTarget
-from fastapi_mergen.webhooks.http11 import HttpResponseMetadata
-from fastapi_mergen.webhooks.secrets import (
+from fastapi_effects import Event, FastAPIEffectsUnitOfWork, Principal, RetryPolicy
+from fastapi_effects.postgres import PostgresStore
+from fastapi_effects.postgres.leasing import LeaseRepository
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
+from fastapi_effects.postgres.webhook_schema import install_webhook_schema
+from fastapi_effects.sqlalchemy.models import DeliveryRow
+from fastapi_effects.webhooks.address_policy import EndpointTarget
+from fastapi_effects.webhooks.http11 import HttpResponseMetadata
+from fastapi_effects.webhooks.secrets import (
     MasterKey,
     StaticMasterKeyProvider,
     WebhookSecretService,
 )
-from fastapi_mergen.webhooks.sink import WebhookDeliverySink
-from fastapi_mergen.webhooks.subscriptions import SubscriptionRepository, WebhookRouteProvider
-from fastapi_mergen.webhooks.transport import TransportLimits, TransportResult
+from fastapi_effects.webhooks.sink import WebhookDeliverySink
+from fastapi_effects.webhooks.subscriptions import SubscriptionRepository, WebhookRouteProvider
+from fastapi_effects.webhooks.transport import TransportLimits, TransportResult
 from tests.integration.postgres import ProvisionedDatabase
 
 pytestmark = [pytest.mark.integration, pytest.mark.security]
@@ -101,7 +101,7 @@ async def test_receiver_success_then_relay_crash_retries_stable_identity(
         await install_webhook_schema(migration_engine, roles=roles)
         async with (
             app_sessions() as session,
-            MergenUnitOfWork(
+            FastAPIEffectsUnitOfWork(
                 session=session,
                 principal=principal,
                 store=PostgresStore(),

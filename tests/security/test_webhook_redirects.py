@@ -7,23 +7,23 @@ from uuid import UUID
 
 import pytest
 
-from fastapi_mergen.core.delivery import (
+from fastapi_effects.core.delivery import (
     AttemptOutcome,
     AttemptRecord,
     DeliveryRecord,
     DeliveryState,
 )
-from fastapi_mergen.core.event import EventRecord
-from fastapi_mergen.core.principal import Principal
-from fastapi_mergen.core.retry import RetryPolicy
-from fastapi_mergen.errors import PermanentDeliveryError, RetryableDeliveryError
-from fastapi_mergen.postgres.leasing import ClaimedDelivery
-from fastapi_mergen.sqlalchemy.canonical import canonical_sha256, versioned_canonical_bytes
-from fastapi_mergen.webhooks.address_policy import EndpointTarget
-from fastapi_mergen.webhooks.http11 import HttpResponseMetadata
-from fastapi_mergen.webhooks.secrets import SigningSecret
-from fastapi_mergen.webhooks.sink import WebhookDeliverySink
-from fastapi_mergen.webhooks.transport import TransportLimits, TransportResult
+from fastapi_effects.core.event import EventRecord
+from fastapi_effects.core.principal import Principal
+from fastapi_effects.core.retry import RetryPolicy
+from fastapi_effects.errors import PermanentDeliveryError, RetryableDeliveryError
+from fastapi_effects.postgres.leasing import ClaimedDelivery
+from fastapi_effects.sqlalchemy.canonical import canonical_sha256, versioned_canonical_bytes
+from fastapi_effects.webhooks.address_policy import EndpointTarget
+from fastapi_effects.webhooks.http11 import HttpResponseMetadata
+from fastapi_effects.webhooks.secrets import SigningSecret
+from fastapi_effects.webhooks.sink import WebhookDeliverySink
+from fastapi_effects.webhooks.transport import TransportLimits, TransportResult
 
 pytestmark = pytest.mark.security
 

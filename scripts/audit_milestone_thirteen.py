@@ -9,9 +9,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-import fastapi_mergen
-from fastapi_mergen.postgres.revisions import MIGRATION_HEAD, SCHEMA_REVISION_REGISTRY
-from fastapi_mergen.readiness import classify_release_version, validate_readiness_record
+import fastapi_effects
+from fastapi_effects.postgres.revisions import MIGRATION_HEAD, SCHEMA_REVISION_REGISTRY
+from fastapi_effects.readiness import classify_release_version, validate_readiness_record
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = (
@@ -95,7 +95,7 @@ def main() -> int:
         (
             "compatibility",
             compatibility_workflow,
-            ("write_compatibility_evidence.py", "MERGEN_TEST_REDIS_URL"),
+            ("write_compatibility_evidence.py", "FASTAPI_EFFECTS_TEST_REDIS_URL"),
         ),
     ):
         absent = [token for token in required_tokens if token not in content]
@@ -109,7 +109,7 @@ def main() -> int:
     }:
         raise AssertionError("M13 schema registry differs from the reviewed head")
     api_document = (ROOT / "docs/reference/public-api.md").read_text(encoding="utf-8")
-    undocumented = [name for name in fastapi_mergen.__all__ if name not in api_document]
+    undocumented = [name for name in fastapi_effects.__all__ if name not in api_document]
     if undocumented:
         raise AssertionError(f"M13 public root exports are undocumented: {undocumented}")
     for version in ("16", "18"):
@@ -148,7 +148,7 @@ def main() -> int:
     readiness = json.loads(
         (ROOT / "docs/planning/production-readiness-record.json").read_text(encoding="utf-8")
     )
-    release_phase = classify_release_version(fastapi_mergen.__version__) in {"rc", "final"}
+    release_phase = classify_release_version(fastapi_effects.__version__) in {"rc", "final"}
     record_errors = validate_readiness_record(
         readiness,
         require_candidate=release_phase,

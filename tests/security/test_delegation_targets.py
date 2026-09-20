@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from fastapi_mergen.delegation.targets import canonical_target_path
-from fastapi_mergen.errors import MergenConfigurationError
+from fastapi_effects.delegation.targets import canonical_target_path
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
 
 
 @pytest.mark.parametrize(
@@ -25,7 +25,7 @@ from fastapi_mergen.errors import MergenConfigurationError
     ],
 )
 def test_ambiguous_delegation_targets_fail_closed(path: str) -> None:
-    with pytest.raises(MergenConfigurationError):
+    with pytest.raises(FastAPIEffectsConfigurationError):
         canonical_target_path(path)
 
 

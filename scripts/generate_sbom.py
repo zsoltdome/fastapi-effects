@@ -36,7 +36,7 @@ def generate() -> dict[str, object]:
         "serialNumber": "urn:uuid:00000000-0000-0000-0000-000000000000",
         "version": 1,
         "metadata": {
-            "component": next(item for item in components if item["name"] == "fastapi-mergen")
+            "component": next(item for item in components if item["name"] == "fastapi-effects")
         },
         "components": components,
     }

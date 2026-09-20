@@ -30,26 +30,26 @@ jobs:
           version: "0.12.4"
           enable-cache: true
       - name: Install test environment
-        run: uv sync --group test
+        run: uv sync --locked --group test
       - name: Run conformance tests
-        run: uv run pytest -q tests/conformance tests/security
+        run: uv run --no-sync pytest -q tests/conformance tests/security
       - name: Run milestone audit
         run: |
           mkdir -p build/conformance
-          uv run python scripts/audit_milestone_seven.py \
+          uv run --no-sync python scripts/audit_milestone_seven.py \
             --skip-git-governance \
             --json-output build/conformance/audit.json \
             --markdown-output build/conformance/audit.md
       - name: Generate complete evidence
         run: |
-          uv run fastapi-mergen conformance run \
+          uv run --no-sync fastapi-effects conformance run \
             --reference \
             --profile complete \
             --format json \
             --output build/conformance/report.json
-          uv run fastapi-mergen conformance manifest \
+          uv run --no-sync fastapi-effects conformance manifest \
             --reference > build/conformance/manifest.json
-          uv run fastapi-mergen conformance verify \
+          uv run --no-sync fastapi-effects conformance verify \
             --manifest build/conformance/manifest.json \
             --report build/conformance/report.json
       - name: Upload conformance evidence
@@ -94,9 +94,9 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      MERGEN_TEST_ADMIN_DSN: postgresql://postgres:postgres@127.0.0.1:55432/postgres
-      MERGEN_TEST_REDIS_URL: redis://127.0.0.1:56379/0
-      MERGEN_IMPLEMENTATION_COMMIT: ${{ github.sha }}
+      FASTAPI_EFFECTS_TEST_ADMIN_DSN: postgresql://postgres:postgres@127.0.0.1:55432/postgres
+      FASTAPI_EFFECTS_TEST_REDIS_URL: redis://127.0.0.1:56379/0
+      FASTAPI_EFFECTS_IMPLEMENTATION_COMMIT: ${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -110,15 +110,15 @@ jobs:
           version: "0.12.4"
           enable-cache: true
       - name: Install real-runtime environment
-        run: uv sync --group test --all-extras
+        run: uv sync --locked --group test --all-extras
       - name: Generate cumulative real-runtime evidence
         run: >-
-          uv run python scripts/generate_real_certification.py
+          uv run --no-sync python scripts/generate_real_certification.py
           --manifest build/conformance-real/manifest.json
           --report build/conformance-real/report.json
       - name: Verify cumulative evidence
         run: >-
-          uv run fastapi-mergen conformance verify
+          uv run --no-sync fastapi-effects conformance verify
           --manifest build/conformance-real/manifest.json
           --report build/conformance-real/report.json
       - name: Upload cumulative evidence

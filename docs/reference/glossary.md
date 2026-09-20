@@ -1,7 +1,7 @@
 # Glossary
 
 **Application transaction**  
-The outer SQLAlchemy/PostgreSQL transaction owned by `MergenUnitOfWork` and containing
+The outer SQLAlchemy/PostgreSQL transaction owned by `FastAPIEffectsUnitOfWork` and containing
 application state plus event/delivery intents.
 
 **Attempt**  

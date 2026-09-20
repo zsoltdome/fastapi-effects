@@ -28,13 +28,13 @@ def test_git_governance_scopes_history_and_preserves_exact_recovery(
 ) -> None:
     recovery = (
         "6b8d3626445bd577cc6c5af80f3b84e30e2c7712\x00"
-        "mergen-institute\x00zsemed@gmail.com\x00"
-        "mergen-institute\x00zsemed@gmail.com\x00.gitignore"
+        "zsoltdome\x00zsemed@gmail.com\x00"
+        "zsoltdome\x00zsemed@gmail.com\x00.gitignore"
     )
     current = (
         "a" * 40
-        + "\x00mergen-institute\x00mergen-institute@users.noreply.github.com"
-        + "\x00mergen-institute\x00mergen-institute@users.noreply.github.com"
+        + "\x00zsoltdome\x00zsoltdome@users.noreply.github.com"
+        + "\x00zsoltdome\x00zsoltdome@users.noreply.github.com"
         + "\x00Harden delivery runtime boundaries"
     )
 

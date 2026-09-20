@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status
 
-from fastapi_mergen import Event, MergenUnitOfWork
+from fastapi_effects import Event, FastAPIEffectsUnitOfWork
 
 from .db import get_async_session
-from .mergen_config import mergen
+from .fastapi_effects_config import fastapi_effects
 from .models import Invoice
 from .schemas import InvoiceCreated, InvoiceIn, InvoiceOut
 
 router = APIRouter()
-get_uow = mergen.uow_dependency(get_async_session)
+get_uow = fastapi_effects.uow_dependency(get_async_session)
 
 
 @router.get("/health", tags=["operations"])
@@ -28,7 +28,7 @@ async def health() -> dict[str, str]:
 )
 async def create_invoice(
     data: InvoiceIn,
-    uow: MergenUnitOfWork = Depends(get_uow),
+    uow: FastAPIEffectsUnitOfWork = Depends(get_uow),
 ) -> InvoiceOut:
     """Commit the invoice and its immutable effect intent in one transaction."""
     async with uow:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi_mergen.testing import ReferenceBoundaryDriver
+from fastapi_effects.testing import ReferenceBoundaryDriver
 
 
 def create_driver() -> ReferenceBoundaryDriver:

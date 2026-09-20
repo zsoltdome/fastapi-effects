@@ -2,7 +2,7 @@
 
 Use PostgreSQL physical/PITR tooling for the database service's recovery objectives and a
 logical custom-format backup before every migration, retention-policy change, key
-operation, or bulk replay. Include the entire `fastapi_mergen` schema and role/grant
+operation, or bulk replay. Include the entire `fastapi_effects` schema and role/grant
 definitions. Store backups encrypted with separately managed access; a backup contains
 event payloads, principals, response bodies, and encrypted webhook secret material.
 
@@ -10,13 +10,13 @@ Example logical rehearsal (use `.pgpass`, a secret manager, or short-lived crede
 do not put production passwords in shell history):
 
 ```console
-pg_dump --format=custom --no-owner --schema=fastapi_mergen --file=mergen.dump "$SOURCE_DSN"
-createdb mergen_restore_rehearsal
+pg_dump --format=custom --no-owner --schema=fastapi_effects --file=fastapi_effects.dump "$SOURCE_DSN"
+createdb fastapi_effects_restore_rehearsal
 alembic upgrade head
-pg_restore --data-only --no-owner --dbname="$RESTORED_DSN" mergen.dump
+pg_restore --data-only --no-owner --dbname="$RESTORED_DSN" fastapi_effects.dump
 python scripts/verify_restore.py --source-dsn "$SOURCE_DSN" --restored-dsn "$RESTORED_DSN"
-fastapi-mergen schema check --dsn "$RESTORED_APP_DSN"
-fastapi-mergen doctor --dsn "$RESTORED_APP_DSN" --expected-role mergen_app
+fastapi-effects schema check --dsn "$RESTORED_APP_DSN"
+fastapi-effects doctor --dsn "$RESTORED_APP_DSN" --expected-role fastapi_effects_app
 ```
 
 The verifier compares every row of schema revisions, events, deliveries, attempts,

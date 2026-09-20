@@ -38,9 +38,9 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      MERGEN_TEST_ADMIN_DSN: postgresql://postgres:postgres@127.0.0.1:55432/postgres
-      MERGEN_TEST_REDIS_URL: redis://127.0.0.1:56379/0
-      MERGEN_IMPLEMENTATION_COMMIT: ${{ github.sha }}
+      FASTAPI_EFFECTS_TEST_ADMIN_DSN: postgresql://postgres:postgres@127.0.0.1:55432/postgres
+      FASTAPI_EFFECTS_TEST_REDIS_URL: redis://127.0.0.1:56379/0
+      FASTAPI_EFFECTS_IMPLEMENTATION_COMMIT: ${{ github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -52,7 +52,7 @@ jobs:
         with:
           version: "0.12.4"
           enable-cache: true
-      - run: uv sync --locked --group security --all-extras
+      - run: uv sync --locked --group security --group docs --all-extras
       - name: Verify hosted compatibility, security, and conformance checks
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -81,8 +81,8 @@ jobs:
           mkdir -p build/release
           uv run --no-sync python scripts/generate_sbom.py --output build/release/sbom.cdx.json
           sha256sum dist/* > build/release/SHA256SUMS
-          cp src/fastapi_mergen/conformance/spec/*.json build/release/
-          package_version="$(uv run --no-sync python -c 'from fastapi_mergen import __version__; print(__version__)')"
+          cp src/fastapi_effects/conformance/spec/*.json build/release/
+          package_version="$(uv run --no-sync python -c 'from fastapi_effects import __version__; print(__version__)')"
           uv run --no-sync python scripts/release_artifacts.py create \
             --root . \
             --manifest build/release/artifact-manifest.json \

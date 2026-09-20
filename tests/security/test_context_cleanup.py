@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
-from fastapi_mergen.core.context import current_principal, principal_context
-from fastapi_mergen.core.principal import Principal
+from fastapi_effects.core.context import current_principal, principal_context
+from fastapi_effects.core.principal import Principal
 
 
 @pytest.mark.asyncio

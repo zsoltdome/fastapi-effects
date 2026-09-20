@@ -42,6 +42,11 @@ with explicit pre-1.0 contract and evidence-schema notes.
 
 ### Changed
 
+- Renamed the project and distribution to FastAPI Effects / `fastapi-effects`, with
+  Zsolt Döme as the package author. The import package, Python API names, PostgreSQL
+  schema and roles, telemetry, environment variables, protocol identifiers, examples,
+  and command now consistently use the `fastapi_effects` namespace. This is an
+  intentional breaking change to the pre-release alpha surface.
 - Version advanced to the delegation/FastMCP alpha `0.11.0a1`.
 - The invoicing example now completes request → atomic publication → relay →
   tenant-bound handler end to end.

@@ -26,15 +26,15 @@ jobs:
           version: "0.12.4"
           enable-cache: true
       - name: Install security environment
-        run: uv sync --group security
+        run: uv sync --locked --group security
       - name: Audit dependencies
-        run: uv run pip-audit
+        run: uv run --no-sync pip-audit
       - name: Scan source
-        run: uv run bandit -q -c bandit.yaml -r src
+        run: uv run --no-sync bandit -q -c bandit.yaml -r src
       - name: Scan tracked files and dependency licenses
-        run: uv run python scripts/security_scan.py
+        run: uv run --no-sync python scripts/security_scan.py
       - name: Generate CycloneDX SBOM
-        run: uv run python scripts/generate_sbom.py --output build/sbom.cdx.json
+        run: uv run --no-sync python scripts/generate_sbom.py --output build/sbom.cdx.json
       - name: Upload SBOM
         uses: actions/upload-artifact@043fb46c0a2a885bee3be2e27b237cefc35e90e8 # v7.0.1
         with:

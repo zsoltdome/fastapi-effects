@@ -10,8 +10,8 @@
   "package_version": "0.11.0a1",
   "lock_sha256": "b7fd3f0a58418806d1c39922c4899cef0d9ea45ef68bedd0425973aee9b3e3df",
   "artifact_digests": {
-    "fastapi_mergen-0.11.0a1-py3-none-any.whl": "41481b472b29a6591b8e67419eafac8605c951cf7dfed1fe39a6a64fcf6a9b9a",
-    "fastapi_mergen-0.11.0a1.tar.gz": "14cccb2a755172246708a792f34015c7d57908e3b41667c47fa940de0fce8354"
+    "fastapi_effects-0.11.0a1-py3-none-any.whl": "41481b472b29a6591b8e67419eafac8605c951cf7dfed1fe39a6a64fcf6a9b9a",
+    "fastapi_effects-0.11.0a1.tar.gz": "14cccb2a755172246708a792f34015c7d57908e3b41667c47fa940de0fce8354"
   },
   "infrastructure": {
     "postgresql": ["16.15", "18.6"],
@@ -43,12 +43,12 @@
       "detail": "Ruff, mypy, milestone audits, automatic readiness-phase audit, documentation inventory, 266 non-integration/non-packaging tests, clean artifact smoke tests, and Twine passed."
     },
     {
-      "command": "MERGEN_TEST_ADMIN_DSN=<postgresql-16> MERGEN_TEST_REDIS_URL=<redis> uv run pytest -q -m integration",
+      "command": "FASTAPI_EFFECTS_TEST_ADMIN_DSN=<postgresql-16> FASTAPI_EFFECTS_TEST_REDIS_URL=<redis> uv run pytest -q -m integration",
       "result": "pass",
       "detail": "45 passed; 273 deselected; no skipped tests."
     },
     {
-      "command": "MERGEN_TEST_ADMIN_DSN=<postgresql-18> MERGEN_TEST_REDIS_URL=<redis> uv run pytest -q -m integration",
+      "command": "FASTAPI_EFFECTS_TEST_ADMIN_DSN=<postgresql-18> FASTAPI_EFFECTS_TEST_REDIS_URL=<redis> uv run pytest -q -m integration",
       "result": "pass",
       "detail": "45 passed; 273 deselected; no skipped tests."
     },

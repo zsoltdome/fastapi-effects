@@ -5,7 +5,7 @@ not depend on exception-message parsing.
 
 | Failure | Category | Default behavior | Sensitive data policy |
 |---|---|---|---|
-| `MergenConfigurationError` | Startup/configuration | Fail startup/command | Names and safe codes only |
+| `FastAPIEffectsConfigurationError` | Startup/configuration | Fail startup/command | Names and safe codes only |
 | `MilestoneNotImplementedError` | Pre-alpha safety gate | Fail before operation | No payload/session details |
 | `DedupeConflict` | Command conflict | Roll back caller transaction | Tenant/namespace/key may be redacted; no payload |
 | `AuthorizationExpired` | Terminal delivery | Dead | Subject/route may be approved identifiers; no token |
@@ -24,7 +24,7 @@ The following boundary matrix is normative for the focused 2026-09-20 remediatio
 | Condition | Scope | Outcome |
 |---|---|---|
 | Snapshotted webhook secret set has no active or unexpired retiring key | One delivery | `webhook.no_eligible_signing_key`, terminal without DNS or network I/O |
-| Master-key provider is missing, cannot supply a referenced key, or cannot decrypt material | Process/configuration | `MergenConfigurationError` remains visible |
+| Master-key provider is missing, cannot supply a referenced key, or cannot decrypt material | Process/configuration | `FastAPIEffectsConfigurationError` remains visible |
 | Reviewed raw refusal/reset/timeout or temporary DNS error while opening a database control connection | One polling cycle | Bounded control failure; a later cycle reconnects |
 | Authentication, permission, schema, integrity, certificate, DSN, or permanent name error | Process/configuration | Remains visible; not silently retried |
 

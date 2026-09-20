@@ -8,14 +8,14 @@ from alembic.config import Config
 from sqlalchemy import Connection, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import check_core_schema
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import check_core_schema
 from tests.integration.postgres import ProvisionedDatabase
 
 pytestmark = pytest.mark.integration
 
 MIGRATIONS = (
-    Path(__file__).resolve().parents[2] / "src" / "fastapi_mergen" / "postgres" / "migrations"
+    Path(__file__).resolve().parents[2] / "src" / "fastapi_effects" / "postgres" / "migrations"
 )
 
 
@@ -49,7 +49,7 @@ async def test_core_alembic_upgrade_downgrade_round_trip(
         async with engine.begin() as connection:
             await connection.run_sync(_run_revision, "base", roles)
             schema_exists = await connection.scalar(
-                text("SELECT to_regnamespace('fastapi_mergen')")
+                text("SELECT to_regnamespace('fastapi_effects')")
             )
         assert schema_exists is None
 

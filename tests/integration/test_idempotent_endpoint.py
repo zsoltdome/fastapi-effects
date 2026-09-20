@@ -10,17 +10,17 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.responses import JSONResponse, Response
 
-from fastapi_mergen.core.principal import Principal
-from fastapi_mergen.errors import MergenError
-from fastapi_mergen.idempotency.api import (
+from fastapi_effects.core.principal import Principal
+from fastapi_effects.errors import FastAPIEffectsError
+from fastapi_effects.idempotency.api import (
     command_context,
     command_http_exception,
     prepare_command,
 )
-from fastapi_mergen.postgres.command_schema import install_command_schema
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
-from fastapi_mergen.sqlalchemy.models import SCHEMA
+from fastapi_effects.postgres.command_schema import install_command_schema
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
+from fastapi_effects.sqlalchemy.models import SCHEMA
 from tests.integration.postgres import ProvisionedDatabase
 
 pytestmark = pytest.mark.integration
@@ -77,7 +77,7 @@ async def test_fastapi_endpoint_executes_once_and_replays_response(
                     await asyncio.sleep(0.02)
                     await context.complete(response)
                     return response
-        except MergenError as exc:
+        except FastAPIEffectsError as exc:
             raise command_http_exception(exc) from exc
 
     try:

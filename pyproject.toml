@@ -3,14 +3,14 @@ requires = ["setuptools>=82"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fastapi-mergen"
+name = "fastapi-effects"
 dynamic = ["version"]
-description = "Principal-preserving transactional eventing for FastAPI and PostgreSQL"
+description = "Durable, tenant-aware side effects for FastAPI and PostgreSQL."
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [{ name = "mergen-institute" }]
+authors = [{ name = "Zsolt Döme" }]
 keywords = [
   "fastapi",
   "multi-tenant",
@@ -75,6 +75,7 @@ test = [
   "httpx>=0.28.1,<1",
   "pytest>=9,<10",
   "pytest-asyncio>=1.3,<2",
+  "pytest-cov>=7,<8",
   "standardwebhooks>=1.1,<2",
   "taskiq>=0.12.5,<0.13",
   "taskiq-redis>=1.2,<2",
@@ -83,6 +84,7 @@ dev = [
   { include-group = "test" },
   "build>=1.5,<2",
   "mypy>=2.3,<3",
+  "pre-commit>=4,<5",
   "ruff>=0.16.4,<1",
   "twine>=6.2,<7",
 ]
@@ -97,12 +99,12 @@ docs = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/mergen-institute/fastapi-mergen#readme"
-Issues = "https://github.com/mergen-institute/fastapi-mergen/issues"
-Repository = "https://github.com/mergen-institute/fastapi-mergen"
+Documentation = "https://github.com/zsoltdome/fastapi-effects#readme"
+Issues = "https://github.com/zsoltdome/fastapi-effects/issues"
+Repository = "https://github.com/zsoltdome/fastapi-effects"
 
 [project.scripts]
-fastapi-mergen = "fastapi_mergen.cli.main:main"
+fastapi-effects = "fastapi_effects.cli.main:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -110,14 +112,14 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["fastapi_mergen*"]
+include = ["fastapi_effects*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-fastapi_mergen = ["py.typed", "conformance/spec/*.json", "postgres/migrations/alembic.ini"]
+fastapi_effects = ["py.typed", "conformance/spec/*.json", "postgres/migrations/alembic.ini"]
 
 [tool.setuptools.dynamic]
-version = { attr = "fastapi_mergen._version.__version__" }
+version = { attr = "fastapi_effects._version.__version__" }
 
 [tool.pytest.ini_options]
 addopts = [
@@ -136,6 +138,17 @@ markers = [
   "security: validates a security invariant",
 ]
 testpaths = ["tests", "examples"]
+
+[tool.coverage.run]
+branch = true
+relative_files = true
+source = ["fastapi_effects"]
+
+[tool.coverage.report]
+fail_under = 63.5
+precision = 2
+show_missing = true
+skip_covered = true
 
 [tool.ruff]
 line-length = 100

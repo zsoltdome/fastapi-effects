@@ -1,1 +1,1 @@
-"""FastAPI-Mergen reference examples."""
+"""FastAPI Effects reference examples."""

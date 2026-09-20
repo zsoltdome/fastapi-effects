@@ -7,25 +7,25 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy.exc import DBAPIError, OperationalError, ProgrammingError
 
-from fastapi_mergen import Principal, RetryPolicy
-from fastapi_mergen.core.delivery import (
+from fastapi_effects import Principal, RetryPolicy
+from fastapi_effects.core.delivery import (
     AttemptOutcome,
     AttemptRecord,
     DeliveryRecord,
     DeliveryState,
 )
-from fastapi_mergen.core.event import EventRecord
-from fastapi_mergen.errors import (
+from fastapi_effects.core.event import EventRecord
+from fastapi_effects.errors import (
+    FastAPIEffectsConfigurationError,
     LeaseLost,
-    MergenConfigurationError,
     PermanentDeliveryError,
     RetryableDeliveryError,
 )
-from fastapi_mergen.executors.taskiq.adapter import TaskiqDeliverySink
-from fastapi_mergen.executors.taskiq.envelope import TaskiqHandoffEnvelope
-from fastapi_mergen.observability.events import RuntimeEvent, RuntimeEventKind
-from fastapi_mergen.postgres.leasing import ClaimedDelivery
-from fastapi_mergen.postgres.relay import PollingRelay, RelayConfig, SinkDisposition
+from fastapi_effects.executors.taskiq.adapter import TaskiqDeliverySink
+from fastapi_effects.executors.taskiq.envelope import TaskiqHandoffEnvelope
+from fastapi_effects.observability.events import RuntimeEvent, RuntimeEventKind
+from fastapi_effects.postgres.leasing import ClaimedDelivery
+from fastapi_effects.postgres.relay import PollingRelay, RelayConfig, SinkDisposition
 
 
 class _Clock:
@@ -283,7 +283,7 @@ async def test_taskiq_broker_enqueue_uses_the_parent_attempt_deadline() -> None:
         handoff_id=uuid4(),
         delivery_id=claim.delivery.delivery_id,
         attempt_id=claim.attempt.attempt_id,
-        task_id=f"mergen-{claim.attempt.attempt_id}",
+        task_id=f"fastapi_effects_{claim.attempt.attempt_id}",
         handoff_token=uuid4(),
     )
 
@@ -329,7 +329,7 @@ async def test_relay_escalates_configuration_errors_without_retrying_delivery() 
     class InvalidSink:
         async def execute(self, claim: ClaimedDelivery) -> None:
             del claim
-            raise MergenConfigurationError("Controlled programming error.")
+            raise FastAPIEffectsConfigurationError("Controlled programming error.")
 
     leases = _Leases((claim,))
     relay = PollingRelay(
@@ -338,7 +338,7 @@ async def test_relay_escalates_configuration_errors_without_retrying_delivery() 
         leases=leases,  # type: ignore[arg-type]
         clock=_Clock(now),
     )
-    with pytest.raises(MergenConfigurationError, match="programming error"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="programming error"):
         await relay.execute_claim(claim)
     assert leases.failures == []
 

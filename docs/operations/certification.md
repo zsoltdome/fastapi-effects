@@ -5,7 +5,7 @@
 Expose a zero-argument synchronous or asynchronous factory:
 
 ```python
-# myapp/mergen_conformance.py
+# myapp/fastapi_effects_conformance.py
 async def create_driver() -> MyBoundaryDriver:
     return MyBoundaryDriver(test_database_url=settings.conformance_database_url)
 ```
@@ -17,15 +17,15 @@ other untrusted source.
 ## 2. Inspect the manifest
 
 ```bash
-fastapi-mergen conformance manifest \
-  --adapter myapp.mergen_conformance:create_driver \
+fastapi-effects conformance manifest \
+  --adapter myapp.fastapi_effects_conformance:create_driver \
   > build/conformance/manifest.json
 ```
 
 Validate a saved manifest without importing the adapter:
 
 ```bash
-fastapi-mergen conformance manifest \
+fastapi-effects conformance manifest \
   --input build/conformance/manifest.json
 ```
 
@@ -34,8 +34,8 @@ Exactly one of `--input`, `--adapter`, or `--reference` is permitted.
 ## 3. Run a profile
 
 ```bash
-fastapi-mergen conformance run \
-  --adapter myapp.mergen_conformance:create_driver \
+fastapi-effects conformance run \
+  --adapter myapp.fastapi_effects_conformance:create_driver \
   --profile core \
   --format json \
   --output build/conformance/report.json
@@ -59,15 +59,15 @@ bounded to 300 seconds.
 
 ```bash
 # JUnit
-fastapi-mergen conformance run --reference --profile complete \
+fastapi-effects conformance run --reference --profile complete \
   --format junit --output build/conformance/junit.xml
 
 # SARIF
-fastapi-mergen conformance run --reference --profile complete \
+fastapi-effects conformance run --reference --profile complete \
   --format sarif --output build/conformance/results.sarif
 
 # Human review
-fastapi-mergen conformance run --reference --profile complete \
+fastapi-effects conformance run --reference --profile complete \
   --format markdown --output build/conformance/report.md
 ```
 
@@ -76,7 +76,7 @@ JSON is the archival source of truth. JUnit, SARIF, and Markdown are projections
 ## 5. Verify archived evidence
 
 ```bash
-fastapi-mergen conformance verify \
+fastapi-effects conformance verify \
   --manifest build/conformance/manifest.json \
   --report build/conformance/report.json
 ```
@@ -111,8 +111,8 @@ Recommended defaults:
 The built-in reference driver can validate the suite itself:
 
 ```bash
-fastapi-mergen conformance run --reference --profile complete
-fastapi-mergen conformance run --reference --profile complete \
+fastapi-effects conformance run --reference --profile complete
+fastapi-effects conformance run --reference --profile complete \
   --fault stale_lease_accepted
 ```
 

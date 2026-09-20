@@ -1,6 +1,6 @@
 # Reproducible runtime benchmark
 
-Run `python scripts/benchmark.py --admin-dsn "$MERGEN_TEST_ADMIN_DSN" --output result.json`.
+Run `python scripts/benchmark.py --admin-dsn "$FASTAPI_EFFECTS_TEST_ADMIN_DSN" --output result.json`.
 The harness creates and destroys a unique database and restricted roles. It records the
 host/Python/PostgreSQL/package versions, dataset shape, single- and multi-tenant emission,
 claim throughput, tenant fairness, backlog age, retry scheduling, signed in-process

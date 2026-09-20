@@ -2,7 +2,7 @@
 
 This page is the v1 compatibility inventory. A symbol is contractual only when it is
 listed here or exported by one of the listed namespace `__all__` values. Everything
-else under `fastapi_mergen` is internal, even when Python can import it.
+else under `fastapi_effects` is internal, even when Python can import it.
 
 ## Stable root surface
 
@@ -10,8 +10,8 @@ The following typed imports are stable for the v1 line:
 
 | Category | Symbols |
 | --- | --- |
-| Runtime | `Mergen`, `MergenUnitOfWork`, `EffectContext`, `Event`, `Principal`, `RetryPolicy`, `AuthorizationMode` |
-| Base/configuration | `MergenError`, `MergenConfigurationError`, `OptionalDependencyError` |
+| Runtime | `FastAPIEffects`, `FastAPIEffectsUnitOfWork`, `EffectContext`, `Event`, `Principal`, `RetryPolicy`, `AuthorizationMode` |
+| Base/configuration | `FastAPIEffectsError`, `FastAPIEffectsConfigurationError`, `OptionalDependencyError` |
 | Authorization | `AuthenticationRequired`, `AuthorizationDenied`, `AuthorizationExpired` |
 | Concurrency/identity | `DedupeConflict`, `OptimisticConflict`, `CommandConflict`, `CommandInProgress`, `LeaseLost` |
 | Delivery/schema | `RetryableDeliveryError`, `PermanentDeliveryError`, `SchemaRevisionMismatch` |
@@ -20,7 +20,7 @@ The following typed imports are stable for the v1 line:
 `MilestoneNotImplementedError` remains importable for compatibility but is deprecated.
 It will not be raised by the production runtime and may be removed in v2.
 
-Every `MergenError` class has a stable, low-cardinality `error_code`. Delivery
+Every `FastAPIEffectsError` class has a stable, low-cardinality `error_code`. Delivery
 classification supplied by an application remains in the separate instance `code`
 field of `RetryableDeliveryError` and `PermanentDeliveryError`. Exception messages,
 summaries, and reprs are not machine contracts and must not be used for branching.
@@ -29,14 +29,14 @@ summaries, and reprs are not machine contracts and must not be used for branchin
 
 The exports in these namespace `__all__` values are stable and import-tested:
 
-- `fastapi_mergen.postgres`: store, explicit schema compatibility/install gates,
+- `fastapi_effects.postgres`: store, explicit schema compatibility/install gates,
   runtime roles, and polling relay/sink composition;
-- `fastapi_mergen.sqlalchemy`: UoW and extension types;
-- `fastapi_mergen.idempotency`: command-boundary values and request preparation;
-- `fastapi_mergen.delegation`: claims, key lifecycle, signing, verification;
-- `fastapi_mergen.executors`: durable handoff protocols;
-- `fastapi_mergen.observability`: bounded event/sink protocol;
-- `fastapi_mergen.conformance` and `fastapi_mergen.testing`: contract and adapter
+- `fastapi_effects.sqlalchemy`: UoW and extension types;
+- `fastapi_effects.idempotency`: command-boundary values and request preparation;
+- `fastapi_effects.delegation`: claims, key lifecycle, signing, verification;
+- `fastapi_effects.executors`: durable handoff protocols;
+- `fastapi_effects.observability`: bounded event/sink protocol;
+- `fastapi_effects.conformance` and `fastapi_effects.testing`: contract and adapter
   certification APIs.
 
 The supported PostgreSQL composition symbols are `PostgresStore`, `PollingRelay`,
@@ -66,8 +66,8 @@ validate-endpoint`, `commands prune`, and `conformance` (`run`, `manifest`, `ver
 `spec`). Existing options keep their meaning for the v1 line. New options and commands
 may be added compatibly.
 
-`MERGEN_DATABASE_DSN` is the only library CLI environment variable. Command-line
-`--dsn` takes precedence. `MERGEN_TEST_ADMIN_DSN`, `MERGEN_EXAMPLE_DATABASE_URL`, and
+`FASTAPI_EFFECTS_DATABASE_DSN` is the only library CLI environment variable. Command-line
+`--dsn` takes precedence. `FASTAPI_EFFECTS_TEST_ADMIN_DSN`, `FASTAPI_EFFECTS_EXAMPLE_DATABASE_URL`, and
 `WEBHOOK_SIGNING_SECRET` belong to tests or examples and are not library configuration.
 Secrets and DSNs are never emitted in diagnostic output.
 

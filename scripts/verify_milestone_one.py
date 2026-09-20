@@ -13,9 +13,10 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE = ROOT / "src" / "fastapi_mergen"
-AUTHOR_NAME = "mergen-institute"
-AUTHOR_EMAIL = "mergen-institute@users.noreply.github.com"
+PACKAGE = ROOT / "src" / "fastapi_effects"
+AUTHOR_NAME = "zsoltdome"
+AUTHOR_EMAIL_SUFFIX = "@users.noreply.github.com"
+PROJECT_AUTHOR = "Zsolt Döme"
 RECOVERED_BASELINE_COMMIT = "6b8d3626445bd577cc6c5af80f3b84e30e2c7712"
 RECOVERED_BASELINE_EMAIL = "zsemed@gmail.com"
 ALLOWED_BRANCH_PREFIXES = {"build", "chore", "ci", "docs", "feat", "fix", "refactor", "test"}
@@ -26,22 +27,21 @@ REQUIRED_PATHS = {
     "SECURITY.md",
     "CONTRIBUTING.md",
     "CHANGELOG.md",
-    "IMPLEMENTATION_REPORT.md",
     "compose.yaml",
     ".env.example",
     ".github/workflows/ci.yml",
     ".github/workflows/package.yml",
     ".github/workflows/security.yml",
     ".github/workflows/publish.yml",
-    "src/fastapi_mergen/__init__.py",
-    "src/fastapi_mergen/api.py",
-    "src/fastapi_mergen/errors.py",
-    "src/fastapi_mergen/py.typed",
-    "src/fastapi_mergen/core/protocols.py",
-    "src/fastapi_mergen/postgres/__init__.py",
-    "src/fastapi_mergen/postgres/store.py",
-    "src/fastapi_mergen/sqlalchemy/__init__.py",
-    "src/fastapi_mergen/sqlalchemy/uow.py",
+    "src/fastapi_effects/__init__.py",
+    "src/fastapi_effects/api.py",
+    "src/fastapi_effects/errors.py",
+    "src/fastapi_effects/py.typed",
+    "src/fastapi_effects/core/protocols.py",
+    "src/fastapi_effects/postgres/__init__.py",
+    "src/fastapi_effects/postgres/store.py",
+    "src/fastapi_effects/sqlalchemy/__init__.py",
+    "src/fastapi_effects/sqlalchemy/uow.py",
     "scripts/check.py",
     "scripts/architecture_gate.py",
     "scripts/build_and_test_artifacts.py",
@@ -68,7 +68,7 @@ REQUIRED_PATHS = {
     "examples/invoicing/app/models.py",
     "examples/invoicing/app/schemas.py",
     "examples/invoicing/app/auth.py",
-    "examples/invoicing/app/mergen_config.py",
+    "examples/invoicing/app/fastapi_effects_config.py",
     "examples/invoicing/tests/test_boot.py",
     "tests/integration/postgres.py",
     "tests/integration/test_postgres_environment.py",
@@ -88,10 +88,10 @@ REQUIRED_ROOT_EXPORTS = {
     "EffectContext",
     "Event",
     "LeaseLost",
-    "Mergen",
-    "MergenConfigurationError",
-    "MergenError",
-    "MergenUnitOfWork",
+    "FastAPIEffects",
+    "FastAPIEffectsConfigurationError",
+    "FastAPIEffectsError",
+    "FastAPIEffectsUnitOfWork",
     "MilestoneNotImplementedError",
     "OptimisticConflict",
     "OptionalDependencyError",
@@ -133,15 +133,16 @@ def check_metadata() -> None:
     with (ROOT / "pyproject.toml").open("rb") as stream:
         data: dict[str, Any] = tomllib.load(stream)
     project = data["project"]
-    if project["name"] != "fastapi-mergen":
-        fail("distribution name must be fastapi-mergen")
+    if project["name"] != "fastapi-effects":
+        fail("distribution name must be fastapi-effects")
     if project["requires-python"] != ">=3.11,<3.15":
         fail("supported Python range must remain 3.11 through 3.14")
-    if project.get("authors") != [{"name": AUTHOR_NAME}]:
-        fail("project metadata must name only mergen-institute")
+    if project.get("authors") != [{"name": PROJECT_AUTHOR}]:
+        fail("project metadata must name only Zsolt Döme")
     scripts = project.get("scripts", {})
-    if scripts.get("fastapi-mergen") != "fastapi_mergen.cli.main:main":
-        fail("console entry point must be fastapi-mergen")
+    entry_point = "fastapi_effects.cli.main:main"
+    if scripts.get("fastapi-effects") != entry_point:
+        fail("primary console entry point must be fastapi-effects")
     extras = project.get("optional-dependencies", {})
     if not {"otel", "webhooks"}.issubset(extras):
         fail("the preserved Milestone 1 optional extras are missing")
@@ -156,7 +157,7 @@ def check_metadata() -> None:
         if optional in base_dependencies:
             fail(f"optional dependency leaked into base dependencies: {optional}")
     package_data = data["tool"]["setuptools"]["package-data"]
-    if "py.typed" not in package_data.get("fastapi_mergen", []):
+    if "py.typed" not in package_data.get("fastapi_effects", []):
         fail("typed-package marker is not configured for the wheel")
 
 
@@ -187,8 +188,6 @@ def literal_all(path: Path) -> set[str]:
 def check_public_surface() -> None:
     if literal_all(PACKAGE / "__init__.py") != REQUIRED_ROOT_EXPORTS:
         fail("root package exports differ from the frozen public API")
-    if (ROOT / "src" / "mergen").exists():
-        fail("occupied top-level mergen import package exists")
 
 
 def require_phrases(path: str, phrases: tuple[str, ...]) -> None:
@@ -241,7 +240,7 @@ def check_contract_documents() -> None:
         (
             "already active",
             "before application SQL",
-            "Nested Mergen UoWs are rejected",
+            "Nested FastAPI Effects UoWs are rejected",
             "savepoints",
             "Commit failure",
             "Cancellation",
@@ -285,8 +284,8 @@ def check_contract_documents() -> None:
     require_phrases(
         "docs/reference/public-api-spike.md",
         (
-            "from fastapi_mergen.postgres import PostgresStore",
-            "from fastapi_mergen.sqlalchemy import MergenUnitOfWork",
+            "from fastapi_effects.postgres import PostgresStore",
+            "from fastapi_effects.sqlalchemy import FastAPIEffectsUnitOfWork",
             "Milestone 1 spike has become the narrow typed surface",
         ),
     )
@@ -302,26 +301,41 @@ def check_contract_documents() -> None:
 
 def check_ci_and_postgres_harness() -> None:
     workflows = "\n".join(
-        read(path)
-        for path in (
-            ".github/workflows/ci.yml",
-            ".github/workflows/package.yml",
-            ".github/workflows/security.yml",
-            ".github/workflows/publish.yml",
-        )
+        path.read_text(encoding="utf-8")
+        for path in sorted((ROOT / ".github" / "workflows").glob("*.yml"))
     )
     if "--extra test" in workflows:
         fail("CI refers to a nonexistent test optional extra")
     if "--locked" in workflows and not (ROOT / "uv.lock").exists():
         fail("CI requires a missing uv.lock")
+    for line in workflows.splitlines():
+        command = line.strip()
+        if (
+            "uv sync " in command
+            and "--locked" not in command
+            and "--resolution lowest-direct" not in command
+        ):
+            fail(f"CI dependency sync is not locked: {command}")
+        if "uv run " in command and "--no-sync" not in command:
+            fail(f"CI tool execution can mutate the environment: {command}")
     require_phrases(
         ".github/workflows/ci.yml",
         (
-            'python: ["3.11", "3.12", "3.13", "3.14"]',
+            "Tests and branch coverage / Python 3.13",
+            "--cov=fastapi_effects",
+            "--junitxml=junit.xml",
             'postgres: "16"',
             'postgres: "18"',
-            "uv sync --group dev",
-            "uv sync --group test",
+            "uv sync --locked --group dev",
+            "uv sync --locked --group test",
+        ),
+    )
+    require_phrases(
+        ".github/workflows/compatibility.yml",
+        (
+            'python: ["3.11", "3.12", "3.13", "3.14"]',
+            "uv sync --locked --group dev --all-extras",
+            "uv sync --locked --group test --all-extras",
         ),
     )
     require_phrases(
@@ -334,10 +348,10 @@ def check_ci_and_postgres_harness() -> None:
             fail(f"compose.yaml is missing: {phrase}")
     helper = read("tests/integration/postgres.py")
     for phrase in (
-        "mergen_owner_",
-        "mergen_app_",
-        "mergen_relay_",
-        "mergen_bad_",
+        "fastapi_effects_owner_",
+        "fastapi_effects_app_",
+        "fastapi_effects_relay_",
+        "fastapi_effects_bad_",
         "BYPASSRLS",
         "DROP DATABASE IF EXISTS",
     ):
@@ -397,8 +411,8 @@ def check_git_governance(*, require_clean: bool) -> None:
                 fail("documented recovered baseline identity changed")
             continue
         if (author, committer) != (AUTHOR_NAME, AUTHOR_NAME):
-            fail(f"non-Mergen author or committer found: {subject}")
-        if (author_email, committer_email) != (AUTHOR_EMAIL, AUTHOR_EMAIL):
+            fail(f"non-FastAPIEffects author or committer found: {subject}")
+        if author_email != committer_email or not author_email.endswith(AUTHOR_EMAIL_SUFFIX):
             fail(f"unexpected author or committer email found: {subject}")
         words = subject.split()
         if not 3 <= len(words) <= 7:

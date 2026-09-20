@@ -4,7 +4,7 @@ Status: accepted
 
 ## Decision
 
-Mergen delegation is a short-lived internal credential minted from host-verified
+FastAPI Effects delegation is a short-lived internal credential minted from host-verified
 caller metadata. It is not authentication for MCP clients and never copies an
 inbound bearer token, cookie, session token, API key, or arbitrary transport
 header. Host authentication supplies an immutable `Principal` and an approved

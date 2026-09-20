@@ -41,4 +41,4 @@ The relay role has no direct command-table privileges. It receives execute acces
 only to a security-definer pruning function whose internal query validates the
 batch bound and uses `FOR UPDATE SKIP LOCKED`. External effects performed directly
 inside endpoint code are not made exactly once by this boundary; they must instead
-be recorded as Mergen effect intent or use a destination-side idempotency identity.
+be recorded as FastAPI Effects effect intent or use a destination-side idempotency identity.

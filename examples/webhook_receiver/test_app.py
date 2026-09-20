@@ -7,7 +7,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from examples.webhook_receiver import app as receiver
-from fastapi_mergen.webhooks.signing import sign_webhook
+from fastapi_effects.webhooks.signing import sign_webhook
 
 
 def _encode(value: bytes) -> str:

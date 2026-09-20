@@ -4,11 +4,11 @@ Status: accepted
 
 ## Decision
 
-Mergen owns delivery attempts, retry timing, and terminal state. Taskiq owns only
+FastAPI Effects owns delivery attempts, retry timing, and terminal state. Taskiq owns only
 broker transport and worker invocation. A broker acknowledgement changes a durable
-handoff from `prepared` to `enqueued`; it never completes the Mergen delivery.
+handoff from `prepared` to `enqueued`; it never completes the FastAPI Effects delivery.
 
-Each delivery attempt has at most one handoff, a stable `mergen-<attempt UUID>`
+Each delivery attempt has at most one handoff, a stable `fastapi_effects_<attempt UUID>`
 Taskiq ID, and an opaque handoff token. A worker atomically moves `prepared` or
 `enqueued` work to `executing` with a unique execution token and deadline.
 Completion is a compare-and-set on that token and finalizes the parent delivery
@@ -30,6 +30,6 @@ relay.
 
 Taskiq retry middleware is not application retry authority and must be disabled for
 the bridge task. Duplicate broker messages are expected; only one execution token
-may be active. Expired work is finalized into Mergen retry/dead policy. External
+may be active. Expired work is finalized into FastAPI Effects retry/dead policy. External
 effects remain at least once and handlers must use the stable delivery identity for
 their own deduplication.

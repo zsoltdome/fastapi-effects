@@ -17,10 +17,11 @@ from tests.integration.postgres import ProvisionedDatabase, provision_test_datab
 
 @pytest.fixture(scope="session")
 def postgres_admin_dsn() -> str:
-    dsn = os.getenv("MERGEN_TEST_ADMIN_DSN")
+    dsn = os.getenv("FASTAPI_EFFECTS_TEST_ADMIN_DSN")
     if not dsn:
         pytest.skip(
-            "MERGEN_TEST_ADMIN_DSN is unset; start a compose profile and export the admin DSN."
+            "FASTAPI_EFFECTS_TEST_ADMIN_DSN is unset; start a compose profile "
+            "and export the admin DSN."
         )
     return dsn
 

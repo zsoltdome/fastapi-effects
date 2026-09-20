@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from fastapi_mergen.conformance import (
+from fastapi_effects.conformance import (
     CertificationProfile,
     ConformanceRunner,
     RunnerConfiguration,
     decide,
 )
-from fastapi_mergen.testing import ReferenceBoundaryDriver, assert_certified
+from fastapi_effects.testing import ReferenceBoundaryDriver, assert_certified
 
 
 @pytest.mark.parametrize("profile", list(CertificationProfile))
@@ -24,7 +24,7 @@ async def test_reference_driver_certifies_every_profile(profile: CertificationPr
 
 
 async def test_fail_fast_stops_after_first_detected_failure() -> None:
-    from fastapi_mergen.testing import Fault
+    from fastapi_effects.testing import Fault
 
     report = await ConformanceRunner(
         RunnerConfiguration(profile=CertificationProfile.CORE, fail_fast=True)
@@ -35,8 +35,8 @@ async def test_fail_fast_stops_after_first_detected_failure() -> None:
 
 
 async def test_configured_secret_canary_fails_closed() -> None:
-    from fastapi_mergen.conformance.contract import Invariant
-    from fastapi_mergen.testing import ReferenceBoundaryDriver
+    from fastapi_effects.conformance.contract import Invariant
+    from fastapi_effects.testing import ReferenceBoundaryDriver
 
     class CanaryDriver(ReferenceBoundaryDriver):
         async def public_evidence(self):  # type: ignore[no-untyped-def]
@@ -56,7 +56,7 @@ async def test_configured_secret_canary_fails_closed() -> None:
 
 
 async def test_manifest_failure_still_closes_driver() -> None:
-    from fastapi_mergen.errors import MergenConfigurationError
+    from fastapi_effects.errors import FastAPIEffectsConfigurationError
 
     class BrokenManifestDriver:
         closed = False
@@ -75,14 +75,16 @@ async def test_manifest_failure_still_closes_driver() -> None:
             return {}
 
     driver = BrokenManifestDriver()
-    with pytest.raises(MergenConfigurationError, match="manifest could not be read") as caught:
+    with pytest.raises(
+        FastAPIEffectsConfigurationError, match="manifest could not be read"
+    ) as caught:
         await ConformanceRunner().run(driver)  # type: ignore[arg-type]
     assert driver.closed
     assert "secret adapter detail" not in str(caught.value)
 
 
 async def test_cleanup_failure_prevents_certification() -> None:
-    from fastapi_mergen.conformance import CheckStatus
+    from fastapi_effects.conformance import CheckStatus
 
     class CleanupFailureDriver(ReferenceBoundaryDriver):
         async def close(self) -> None:
@@ -98,16 +100,16 @@ async def test_cleanup_failure_prevents_certification() -> None:
 
 
 def test_runner_rejects_non_finite_timeout() -> None:
-    from fastapi_mergen.errors import MergenConfigurationError
+    from fastapi_effects.errors import FastAPIEffectsConfigurationError
 
-    with pytest.raises(MergenConfigurationError, match="timeout"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="timeout"):
         RunnerConfiguration(check_timeout_seconds=float("nan"))
 
 
 async def test_cleanup_timeout_is_bounded_and_fails_certification() -> None:
     import asyncio
 
-    from fastapi_mergen.conformance import CheckStatus
+    from fastapi_effects.conformance import CheckStatus
 
     class HangingCleanupDriver(ReferenceBoundaryDriver):
         async def close(self) -> None:
@@ -126,7 +128,7 @@ async def test_cleanup_timeout_is_bounded_and_fails_certification() -> None:
 
 
 def test_runner_rejects_non_finite_cleanup_timeout() -> None:
-    from fastapi_mergen.errors import MergenConfigurationError
+    from fastapi_effects.errors import FastAPIEffectsConfigurationError
 
-    with pytest.raises(MergenConfigurationError, match="cleanup timeout"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="cleanup timeout"):
         RunnerConfiguration(cleanup_timeout_seconds=float("inf"))

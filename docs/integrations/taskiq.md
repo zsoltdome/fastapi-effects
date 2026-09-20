@@ -1,14 +1,14 @@
 # Taskiq integration
 
-Install `fastapi-mergen[taskiq]`, migrate through `0003_taskiq`, and choose a Taskiq
-broker supported by your deployment. Mergen does not replace Taskiq: Taskiq moves
-one small handoff message to a worker, while Mergen remains authoritative for
+Install `fastapi-effects[taskiq]`, migrate through `0003_taskiq`, and choose a Taskiq
+broker supported by your deployment. FastAPI Effects does not replace Taskiq: Taskiq moves
+one small handoff message to a worker, while FastAPI Effects remains authoritative for
 attempt state, leases, retries, dead letters, and principal provenance.
 
 ```python
 worker = TaskiqWorkerBridge(
     sessions=relay_sessions,
-    executor=mergen.handler_executor(),
+    executor=fastapi_effects.handler_executor(),
 )
 bridge_task = register_taskiq_bridge(broker, worker)
 taskiq_sink = TaskiqDeliverySink(
@@ -19,10 +19,10 @@ taskiq_sink = TaskiqDeliverySink(
 
 Run the broker's normal Taskiq worker command against the module that constructs
 and exports `broker`. Register exactly one bridge task in every sender and worker
-process. Use the same frozen Mergen route registry and tenant application-session
+process. Use the same frozen FastAPI Effects route registry and tenant application-session
 factory in workers.
 
-Do not install Taskiq retry middleware on this task. Mergen snapshots retry policy
+Do not install Taskiq retry middleware on this task. FastAPI Effects snapshots retry policy
 on the delivery and creates the next attempt after a fenced failure. Broker
 redelivery is duplicate transport, not an application retry, and produces a bounded
 no-op once the handoff is already executing or terminal. Before admitting a handler,

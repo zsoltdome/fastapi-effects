@@ -52,12 +52,12 @@ A claimed worker:
 - reads immutable event, route, destination, retry, and authorization snapshots;
 - reconstructs or revalidates authority;
 - binds process-local principal context for the attempt;
-- obtains a fresh tenant-bound `mergen_app` session for an internal handler;
+- obtains a fresh tenant-bound `fastapi_effects_app` session for an internal handler;
 - invokes exactly one sink outside the claim transaction;
 - renews a lease only through token-checked compare-and-set;
 - applies timeout, payload, and concurrency limits.
 
-The `mergen_relay` control-plane session is never exposed through `EffectContext`, a
+The `fastapi_effects_relay` control-plane session is never exposed through `EffectContext`, a
 handler dependency, or an application session provider.
 
 ## Finalization
@@ -79,7 +79,7 @@ relay records it without cancelling sibling deliveries. Reviewed SQLAlchemy fail
 and raw refusal/reset/timeout or temporary-DNS errors at database-owned connection
 boundaries leave committed leases for normal expiry/reconciliation while the supervisor
 continues polling. Authentication, permission, schema, integrity, invalid-DSN,
-certificate, permanent-DNS, Mergen configuration/invariant errors, and explicit shutdown
+certificate, permanent-DNS, FastAPI Effects configuration/invariant errors, and explicit shutdown
 cancellation still propagate.
 
 ## Lease expiry and reconciliation

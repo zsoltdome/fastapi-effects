@@ -9,11 +9,11 @@ from datetime import timedelta
 
 from fastapi import FastAPI, HTTPException, Request
 
-from fastapi_mergen.errors import MergenConfigurationError
-from fastapi_mergen.webhooks.secrets import decode_public_secret
-from fastapi_mergen.webhooks.signing import verify_webhook
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
+from fastapi_effects.webhooks.secrets import decode_public_secret
+from fastapi_effects.webhooks.signing import verify_webhook
 
-app = FastAPI(title="FastAPI-Mergen webhook receiver")
+app = FastAPI(title="FastAPI Effects webhook receiver")
 _processed: dict[str, str] = {}
 _lock = asyncio.Lock()
 _DEFAULT_MAX_BODY_BYTES = 1024 * 1024
@@ -51,7 +51,7 @@ async def receive(
                 maximum=86400,
             )
         )
-    except MergenConfigurationError as exc:
+    except FastAPIEffectsConfigurationError as exc:
         raise HTTPException(status_code=503, detail="Receiver configuration is invalid.") from exc
     headers = _security_headers(request)
     body = await _bounded_body(request, maximum=maximum_body_bytes)
@@ -112,7 +112,7 @@ def _integer_setting(name: str, *, default: int, minimum: int, maximum: int) -> 
     try:
         value = int(raw)
     except ValueError as exc:
-        raise MergenConfigurationError(f"{name} must be an integer.") from exc
+        raise FastAPIEffectsConfigurationError(f"{name} must be an integer.") from exc
     if value < minimum or value > maximum:
-        raise MergenConfigurationError(f"{name} is outside the supported range.")
+        raise FastAPIEffectsConfigurationError(f"{name} is outside the supported range.")
     return value

@@ -14,5 +14,5 @@ sessions. It never passes the relay, request, or broker session into handler cod
 Worker success or classified failure fences on both handoff execution token and
 parent delivery lease token. Stale workers cannot overwrite recovery or a newer
 attempt. `TaskiqRecovery` handles bounded batches of old prepared/enqueued records
-and expired executions. Automatic retry creates a new Mergen attempt and therefore
+and expired executions. Automatic retry creates a new FastAPI Effects attempt and therefore
 a new handoff/Taskiq ID while retaining event and delivery identity.

@@ -1,6 +1,6 @@
 # Failure and recovery model
 
-FastAPI-Mergen promises durable committed intent and fenced stale work. Delivery is at
+FastAPI Effects promises durable committed intent and fenced stale work. Delivery is at
 least once. It does not promise exactly-once external effects. A consumer achieves one
 effective result only by durably deduplicating the stable delivery, webhook, task, or
 command identity.

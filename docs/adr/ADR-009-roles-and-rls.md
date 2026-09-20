@@ -3,9 +3,9 @@
 - Status: Accepted
 - Date: 2026-08-30
 
-The migration owner owns schema objects and is not a runtime credential. `mergen_app`
-may operate only tenant rows selected by transaction-local `mergen.tenant_id` and
-`mergen.subject_id`. `mergen_relay` receives narrowly enumerated control-plane grants
+The migration owner owns schema objects and is not a runtime credential. `fastapi_effects_app`
+may operate only tenant rows selected by transaction-local `fastapi_effects.tenant_id` and
+`fastapi_effects.subject_id`. `fastapi_effects_relay` receives narrowly enumerated control-plane grants
 and is never injected into application handlers.
 
 Runtime roles must not be superusers, table owners, or `BYPASSRLS`. Tenant tables enable

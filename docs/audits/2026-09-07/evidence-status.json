@@ -3,17 +3,12 @@
   "audit_date": "2026-09-07",
   "recorded_at": "2026-09-07T18:30:00+02:00",
   "historical_archive": {
-    "supplied_name": "FastAPI-Mergen-main(1).zip",
+    "supplied_name": "fastapi-effects-main(1).zip",
     "claimed_sha256": "14db08002daa8771699d03b925dbccba46e5a39857db4a637818ebb2e3039fb0",
     "availability": "unavailable",
     "digest_recomputed": false
   },
-  "available_sources": [
-    {"supplied_name": "audit_road.md", "repository_path": "sup/audit_road.md"},
-    {"supplied_name": "remediation.md", "repository_path": "sup/remediation.md"},
-    {"supplied_name": "plan(8).md", "repository_path": "sup/plan.md"},
-    {"supplied_name": "todo(8).md", "repository_path": "sup/todo.md"}
-  ],
+  "public_summary": "docs/audits/2026-09-07/README.md",
   "unavailable_evidence": [
     "results/audit-manifest.json",
     "results/pytest-available.log",

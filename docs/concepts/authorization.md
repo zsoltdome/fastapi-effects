@@ -2,7 +2,7 @@
 
 ## Trust entry
 
-Mergen is authentication-agnostic. A host-provided `PrincipalProvider` must:
+FastAPI Effects is authentication-agnostic. A host-provided `PrincipalProvider` must:
 
 1. authenticate the caller;
 2. collect candidate tenant identifiers;
@@ -83,5 +83,5 @@ An unresolved service policy fails startup.
 | Snapshot expired | Terminal `AuthorizationExpired` |
 | Revalidation denies required scope | Terminal `AuthorizationDenied` |
 | Authorization provider temporarily unavailable | Retryable delivery failure |
-| Service policy unresolved at startup | `MergenConfigurationError` |
+| Service policy unresolved at startup | `FastAPIEffectsConfigurationError` |
 | Stored policy schema unsupported | Terminal `SchemaRevisionMismatch` |

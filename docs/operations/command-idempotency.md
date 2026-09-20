@@ -18,8 +18,8 @@ completed data. Retention uses the relay credential and deletes only expired
 `completed` or `superseded` rows in bounded, skip-locked batches:
 
 ```bash
-fastapi-mergen commands prune \
-  --dsn "$MERGEN_DATABASE_DSN" \
+fastapi-effects commands prune \
+  --dsn "$FASTAPI_EFFECTS_DATABASE_DSN" \
   --before 2026-08-01T00:00:00Z \
   --batch-size 500
 ```
@@ -30,7 +30,7 @@ scheduler; monitor deleted counts and transaction latency.
 
 ## External effects
 
-The command transaction protects PostgreSQL business writes and Mergen effect
+The command transaction protects PostgreSQL business writes and FastAPI Effects effect
 intent. It cannot atomically commit a direct HTTP call, email, broker publish, or
 other remote side effect. Emit durable effect intent inside `CommandContext`, then
 let the polling relay deliver it at least once with stable delivery identity.

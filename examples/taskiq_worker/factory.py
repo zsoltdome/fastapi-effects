@@ -1,4 +1,4 @@
-"""Host-facing composition helper for one Mergen Taskiq bridge task."""
+"""Host-facing composition helper for one FastAPIEffects Taskiq bridge task."""
 
 from __future__ import annotations
 
@@ -6,10 +6,10 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from fastapi_mergen.executors.protocols import HandoffExecutor
-from fastapi_mergen.executors.taskiq.adapter import register_taskiq_bridge
-from fastapi_mergen.executors.taskiq.store import TaskiqHandoffStore
-from fastapi_mergen.executors.taskiq.worker import TaskiqWorkerBridge
+from fastapi_effects.executors.protocols import HandoffExecutor
+from fastapi_effects.executors.taskiq.adapter import register_taskiq_bridge
+from fastapi_effects.executors.taskiq.store import TaskiqHandoffStore
+from fastapi_effects.executors.taskiq.worker import TaskiqWorkerBridge
 
 
 def register_worker(

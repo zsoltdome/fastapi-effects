@@ -9,12 +9,12 @@ from fastapi import Depends, FastAPI, Request
 from fastmcp import Client, FastMCP
 from httpx import ASGITransport, AsyncClient, Response
 
-from fastapi_mergen import Principal
-from fastapi_mergen.delegation.bridge import TrustedCallerMetadata
-from fastapi_mergen.delegation.fastapi import delegated_principal_dependency
-from fastapi_mergen.delegation.keys import InMemoryKeyRing, SigningKey
-from fastapi_mergen.delegation.signing import DelegationIssuer, DelegationVerifier
-from fastapi_mergen.integrations.fastmcp import FastMCPDelegationBridge
+from fastapi_effects import Principal
+from fastapi_effects.delegation.bridge import TrustedCallerMetadata
+from fastapi_effects.delegation.fastapi import delegated_principal_dependency
+from fastapi_effects.delegation.keys import InMemoryKeyRing, SigningKey
+from fastapi_effects.delegation.signing import DelegationIssuer, DelegationVerifier
+from fastapi_effects.integrations.fastmcp import FastMCPDelegationBridge
 
 pytestmark = pytest.mark.security
 
@@ -73,7 +73,7 @@ async def test_real_fastmcp_tool_dispatches_only_internal_delegation() -> None:
             "subject_id": principal.subject_id,
         }
 
-    mcp = FastMCP("Mergen delegation")
+    mcp = FastMCP("FastAPIEffects delegation")
 
     @mcp.tool
     async def pay_invoice(invoice_id: str) -> dict[str, str]:
@@ -117,7 +117,7 @@ async def test_real_fastmcp_tool_dispatches_only_internal_delegation() -> None:
         "tenant_id": str(caller.principal.tenant_id),
         "subject_id": caller.principal.subject_id,
     }
-    assert "mergen-delegation" in observed_headers
+    assert "fastapi-effects-delegation" in observed_headers
     assert "traceparent" in observed_headers
     serialized_headers = repr(observed_headers).lower()
     for forbidden in (

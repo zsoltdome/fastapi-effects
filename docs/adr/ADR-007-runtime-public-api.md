@@ -3,8 +3,8 @@
 - Status: Accepted
 - Date: 2026-08-30
 
-`MergenUnitOfWork` owns one explicit outer `AsyncSession` transaction. Entry rejects
-SQLAlchemy autobegin, an existing transaction, or another Mergen UoW on the session.
+`FastAPIEffectsUnitOfWork` owns one explicit outer `AsyncSession` transaction. Entry rejects
+SQLAlchemy autobegin, an existing transaction, or another FastAPI Effects UoW on the session.
 Tenant and subject settings are transaction-local and are bound before application SQL.
 The host may not commit independently. Normal exit commits; exceptional exit rolls back.
 

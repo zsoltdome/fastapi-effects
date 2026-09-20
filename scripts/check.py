@@ -20,7 +20,7 @@ def require(command: str) -> None:
     if shutil.which(command) is None:
         raise SystemExit(
             f"Required command '{command}' is unavailable. Run "
-            "'uv sync --all-extras --all-groups' first."
+            "'uv sync --locked --all-extras --all-groups' first."
         )
 
 
@@ -31,7 +31,7 @@ def built_distributions(directory: Path) -> tuple[Path, ...]:
 
 
 def main(*, skip_artifact_build: bool = False) -> int:
-    required: tuple[str, ...] = ("uv", "ruff", "mypy", "pytest")
+    required: tuple[str, ...] = ("uv", "ruff", "mypy", "pytest", "mkdocs")
     if not skip_artifact_build:
         required = (*required, "twine")
     for command in required:
@@ -60,7 +60,16 @@ def main(*, skip_artifact_build: bool = False) -> int:
     run(sys.executable, "scripts/audit_milestone_thirteen.py")
     run(sys.executable, "scripts/audit_release_candidate.py", "--phase", "auto")
     run(sys.executable, "scripts/check_documentation.py")
-    run("pytest", "-q", "-m", "not integration and not packaging")
+    run("mkdocs", "build", "--strict")
+    run(
+        "pytest",
+        "-q",
+        "-m",
+        "not integration and not packaging",
+        "--cov=fastapi_effects",
+        "--cov-report=term-missing",
+        "--durations=20",
+    )
     if not skip_artifact_build:
         run(sys.executable, "scripts/build_and_test_artifacts.py")
         distributions = built_distributions(ROOT / "dist")

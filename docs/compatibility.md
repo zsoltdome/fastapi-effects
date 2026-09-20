@@ -29,10 +29,16 @@ runtime depends on asyncpg-specific operational testing and one driver is suffic
 v1. Adding psycopg would multiply cancellation, pooling, server-side binding, and
 failover combinations without current design-partner evidence.
 
-Optional extras are isolated: importing `fastapi_mergen` and PostgreSQL persistence does
+Optional extras are isolated: importing `fastapi_effects` and PostgreSQL persistence does
 not import webhook crypto/networking, OpenTelemetry SDK, Taskiq, or FastMCP. Missing
 optional dependencies fail at the feature boundary with
-`mergen.optional_dependency` and an installation instruction.
+`fastapi_effects.optional_dependency` and an installation instruction.
+
+The distribution and command are named `fastapi-effects`. Python imports, the
+PostgreSQL schema and roles, telemetry names, environment variables, protocol
+identifiers, and error codes use `fastapi_effects`. The pre-release namespace was
+removed before v1; this alpha does not provide compatibility aliases or an automatic
+database-object migration from earlier development snapshots.
 
 See [Public API](reference/public-api.md) for compatibility semantics and
 [Migrations](operations/migrations.md) for the independent database revision contract.

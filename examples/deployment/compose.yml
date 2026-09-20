@@ -3,13 +3,13 @@ services:
     image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-mergen}
+      POSTGRES_DB: ${POSTGRES_DB:-fastapi_effects}
       POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?set POSTGRES_ADMIN_PASSWORD}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ADMIN_USER:-postgres} -d ${POSTGRES_DB:-mergen}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ADMIN_USER:-postgres} -d ${POSTGRES_DB:-fastapi_effects}"]
       interval: 5s
       timeout: 5s
       retries: 20

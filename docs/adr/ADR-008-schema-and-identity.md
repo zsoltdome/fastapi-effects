@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-08-30
 
-All durable objects use the `fastapi_mergen` schema. Tenant-owned relationships use
+All durable objects use the `fastapi_effects` schema. Tenant-owned relationships use
 composite keys containing `tenant_id`. Events are immutable origin intent; deliveries
 are independently retryable destination intent; attempts are append-only observations.
 

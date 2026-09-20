@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from fastapi_mergen.webhooks.classification import parse_retry_after
+from fastapi_effects.webhooks.classification import parse_retry_after
 
 
 def test_retry_after_delta_and_date_are_clamped() -> None:

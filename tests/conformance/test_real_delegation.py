@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from fastapi_mergen.conformance import (
+from fastapi_effects.conformance import (
     CertificationProfile,
     ConformanceRunner,
     RunnerConfiguration,
 )
-from fastapi_mergen.testing.delegation_driver import RealDelegationBoundaryDriver
+from fastapi_effects.testing.delegation_driver import RealDelegationBoundaryDriver
 
 pytestmark = pytest.mark.conformance
 

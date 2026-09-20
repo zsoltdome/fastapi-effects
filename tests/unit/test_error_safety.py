@@ -6,13 +6,13 @@ from uuid import uuid4
 
 import pytest
 
-import fastapi_mergen
-from fastapi_mergen import (
+import fastapi_effects
+from fastapi_effects import (
     AuthenticationRequired,
     CommandConflict,
     DedupeConflict,
+    FastAPIEffectsConfigurationError,
     LeaseLost,
-    MergenConfigurationError,
     PermanentDeliveryError,
     RetryableDeliveryError,
     SchemaRevisionMismatch,
@@ -38,27 +38,27 @@ def test_public_errors_exclude_payloads_from_string_and_repr() -> None:
 
 
 def test_public_error_fields_reject_unsafe_runtime_values() -> None:
-    with pytest.raises(MergenConfigurationError, match="error code"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="error code"):
         RetryableDeliveryError(code="bad\ncode", summary="safe")
-    with pytest.raises(MergenConfigurationError, match="dedupe key"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="dedupe key"):
         DedupeConflict(namespace="invoice-create", key="bad\nkey")
-    with pytest.raises(MergenConfigurationError, match="UUID"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="UUID"):
         LeaseLost(delivery_id=cast(Any, "not-a-uuid"))
-    with pytest.raises(MergenConfigurationError, match="non-negative"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="non-negative"):
         SchemaRevisionMismatch(component="route-snapshot", expected=1, actual=-1)
 
 
 def test_public_errors_expose_stable_machine_codes() -> None:
-    assert AuthenticationRequired.error_code == "mergen.authentication_required"
-    assert CommandConflict.error_code == "mergen.command_conflict"
-    assert RetryableDeliveryError.error_code == "mergen.delivery_retryable"
-    assert SchemaRevisionMismatch.error_code == "mergen.schema_revision_mismatch"
-    values = (getattr(fastapi_mergen, name) for name in fastapi_mergen.__all__)
+    assert AuthenticationRequired.error_code == "fastapi_effects.authentication_required"
+    assert CommandConflict.error_code == "fastapi_effects.command_conflict"
+    assert RetryableDeliveryError.error_code == "fastapi_effects.delivery_retryable"
+    assert SchemaRevisionMismatch.error_code == "fastapi_effects.schema_revision_mismatch"
+    values = (getattr(fastapi_effects, name) for name in fastapi_effects.__all__)
     error_types = [
         value
         for value in values
-        if isinstance(value, type) and issubclass(value, fastapi_mergen.MergenError)
+        if isinstance(value, type) and issubclass(value, fastapi_effects.FastAPIEffectsError)
     ]
     codes = [error_type.error_code for error_type in error_types]
     assert len(codes) == len(set(codes))
-    assert all(re.fullmatch(r"mergen\.[a-z_]+", code) for code in codes)
+    assert all(re.fullmatch(r"fastapi_effects\.[a-z_]+", code) for code in codes)

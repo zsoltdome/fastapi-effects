@@ -9,10 +9,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import patch
 
-from fastapi_mergen.cli.main import main
-from fastapi_mergen.conformance.manifest import CapabilityManifest
-from fastapi_mergen.conformance.models import ConformanceReport
-from fastapi_mergen.testing import ReferenceBoundaryDriver
+from fastapi_effects.cli.main import main
+from fastapi_effects.conformance.manifest import CapabilityManifest
+from fastapi_effects.conformance.models import ConformanceReport
+from fastapi_effects.testing import ReferenceBoundaryDriver
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,7 +48,7 @@ def run_cli(
     with patch.dict(os.environ, env, clear=True):
         thread = threading.Thread(
             target=target,
-            name="mergen-cli-test",
+            name="fastapi_effects_cli-test",
             daemon=True,
         )
         thread.start()
@@ -184,8 +184,8 @@ def test_missing_secret_canary_environment_fails_configuration() -> None:
         "run",
         "--reference",
         "--secret-canary-env",
-        "MERGEN_TEST_MISSING_CANARY",
-        unset_environment=("MERGEN_TEST_MISSING_CANARY",),
+        "FASTAPI_EFFECTS_TEST_MISSING_CANARY",
+        unset_environment=("FASTAPI_EFFECTS_TEST_MISSING_CANARY",),
     )
     assert completed.returncode == 2
     assert "environment variable" in completed.stderr

@@ -4,9 +4,9 @@ from uuid import UUID
 
 import pytest
 
-from fastapi_mergen.errors import MergenConfigurationError
-from fastapi_mergen.idempotency.fingerprint import BodyFingerprintMode, fingerprint_request
-from fastapi_mergen.idempotency.models import CommandIdentity
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
+from fastapi_effects.idempotency.fingerprint import BodyFingerprintMode, fingerprint_request
+from fastapi_effects.idempotency.models import CommandIdentity
 
 TENANT = UUID("10000000-0000-0000-0000-000000000011")
 
@@ -38,7 +38,7 @@ def test_canonical_json_fingerprint_is_stable_but_query_order_is_exact() -> None
     )
     assert first == reordered_json
     assert first != reordered_query
-    assert first.hex_digest == "44610b283805e782afba613e571fe7783d437e874cc8da8b5d8be9b658661d75"
+    assert first.hex_digest == "a7e6256025e5a880166c7929a71bae14bd13878e7c37b1114e8c134e71567b26"
 
 
 @pytest.mark.parametrize(
@@ -51,7 +51,7 @@ def test_canonical_json_fingerprint_is_stable_but_query_order_is_exact() -> None
     ],
 )
 def test_canonical_json_rejects_ambiguous_or_malformed_input(body: bytes) -> None:
-    with pytest.raises(MergenConfigurationError):
+    with pytest.raises(FastAPIEffectsConfigurationError):
         fingerprint_request(
             path_parameters={},
             raw_query=b"",
@@ -78,7 +78,7 @@ def test_opaque_key_is_hashed_exactly_and_never_represented() -> None:
     assert first == second
     assert first.method == "POST"
     assert "opaque-key-canary" not in repr(first)
-    with pytest.raises(MergenConfigurationError):
+    with pytest.raises(FastAPIEffectsConfigurationError):
         CommandIdentity.from_key(
             tenant_id=TENANT,
             route_id="invoice.create",
@@ -92,7 +92,7 @@ def test_fingerprint_rejects_sensitive_or_repeated_headers() -> None:
         {"authorization": "Bearer canary"},
         [("if-match", "one"), ("If-Match", "two")],
     ):
-        with pytest.raises(MergenConfigurationError):
+        with pytest.raises(FastAPIEffectsConfigurationError):
             fingerprint_request(
                 path_parameters={},
                 raw_query=b"",

@@ -7,15 +7,15 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from fastapi_mergen import RetryPolicy
-from fastapi_mergen.errors import MergenConfigurationError, PermanentDeliveryError
-from fastapi_mergen.postgres.relay import PollingRelay
-from fastapi_mergen.webhooks.secrets import (
+from fastapi_effects import RetryPolicy
+from fastapi_effects.errors import FastAPIEffectsConfigurationError, PermanentDeliveryError
+from fastapi_effects.postgres.relay import PollingRelay
+from fastapi_effects.webhooks.secrets import (
     MasterKey,
     StaticMasterKeyProvider,
     WebhookSecretService,
 )
-from fastapi_mergen.webhooks.sink import WebhookDeliverySink
+from fastapi_effects.webhooks.sink import WebhookDeliverySink
 
 
 class _Clock:
@@ -179,5 +179,5 @@ async def test_missing_master_key_configuration_still_surfaces() -> None:
         clock=_Clock(now),
     )
 
-    with pytest.raises(MergenConfigurationError, match="master key"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="master key"):
         await sink.execute(_claim(now))  # type: ignore[arg-type]

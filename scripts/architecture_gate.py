@@ -7,7 +7,7 @@ import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE = ROOT / "src" / "fastapi_mergen"
+PACKAGE = ROOT / "src" / "fastapi_effects"
 FORBIDDEN_PACKAGES = {"mcp", "queue", "tasks", "workflow", "workflows"}
 REQUIRED_ADRS = {
     "0001-trust-model.md",
@@ -39,9 +39,6 @@ def main() -> int:
     forbidden = package_dirs & FORBIDDEN_PACKAGES
     if forbidden:
         raise AssertionError(f"out-of-scope packages exist: {sorted(forbidden)}")
-    if (ROOT / "src" / "mergen").exists():
-        raise AssertionError("occupied top-level 'mergen' import must not exist")
-
     exports = _root_exports()
     forbidden_exports = {"Repository", "SQLExpression", "DBAPIConnection", "HTTPClient"}
     if exports & forbidden_exports:

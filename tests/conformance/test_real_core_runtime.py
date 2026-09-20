@@ -3,14 +3,14 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from fastapi_mergen.conformance import (
+from fastapi_effects.conformance import (
     CertificationProfile,
     ConformanceRunner,
     RunnerConfiguration,
 )
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
-from fastapi_mergen.testing.postgres_driver import PostgresBoundaryDriver
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
+from fastapi_effects.testing.postgres_driver import PostgresBoundaryDriver
 from tests.integration.postgres import ProvisionedDatabase
 
 pytestmark = [pytest.mark.integration, pytest.mark.conformance]

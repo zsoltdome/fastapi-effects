@@ -10,19 +10,19 @@ from alembic.config import Config
 from sqlalchemy import Connection, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from fastapi_mergen.errors import SchemaRevisionMismatch
-from fastapi_mergen.postgres.revisions import (
+from fastapi_effects.errors import SchemaRevisionMismatch
+from fastapi_effects.postgres.revisions import (
     MIGRATION_HEAD,
     SCHEMA_REVISION_REGISTRY,
     check_schema_revisions,
 )
-from fastapi_mergen.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.roles import RuntimeRoles
 from tests.integration.postgres import ProvisionedDatabase
 
 pytestmark = pytest.mark.integration
 
 MIGRATIONS = (
-    Path(__file__).resolve().parents[2] / "src" / "fastapi_mergen" / "postgres" / "migrations"
+    Path(__file__).resolve().parents[2] / "src" / "fastapi_effects" / "postgres" / "migrations"
 )
 REVISIONS = (
     "0001_core_runtime",
@@ -82,7 +82,7 @@ def _seed_revision(connection: Connection, revision: str) -> tuple[str, ...]:
     }
     connection.execute(
         text(
-            "INSERT INTO fastapi_mergen.events "
+            "INSERT INTO fastapi_effects.events "
             "(tenant_id,event_id,event_type,event_version,canonical_version,payload,"
             "payload_canonical,payload_sha256,principal,occurred_at,created_at) VALUES "
             "(:tenant,:event,'migration.probe',1,1,CAST('{}' AS jsonb),:canonical,:digest,"
@@ -90,7 +90,7 @@ def _seed_revision(connection: Connection, revision: str) -> tuple[str, ...]:
         ),
         {
             **common,
-            "canonical": b"fastapi-mergen:canonical-json:v1\n{}",
+            "canonical": b"fastapi_effects:canonical-json:v1\n{}",
             "digest": bytes(32),
             "principal": (
                 '{"tenant_id":"' + str(tenant) + '","subject_id":"migration-probe","scopes":[]}'
@@ -99,7 +99,7 @@ def _seed_revision(connection: Connection, revision: str) -> tuple[str, ...]:
     )
     connection.execute(
         text(
-            "INSERT INTO fastapi_mergen.deliveries "
+            "INSERT INTO fastapi_effects.deliveries "
             "(tenant_id,delivery_id,event_id,route_key,route_version,destination_kind,"
             "destination_key,route_snapshot,route_snapshot_bytes,state,attempts_started,"
             "next_attempt_at,created_at,updated_at) VALUES "
@@ -110,7 +110,7 @@ def _seed_revision(connection: Connection, revision: str) -> tuple[str, ...]:
     )
     connection.execute(
         text(
-            "INSERT INTO fastapi_mergen.attempts "
+            "INSERT INTO fastapi_effects.attempts "
             "(tenant_id,attempt_id,delivery_id,attempt_number,lease_token,outcome,started_at,"
             "finished_at) VALUES (:tenant,:attempt,:delivery,1,:lease,'succeeded',:now,:now)"
         ),
@@ -121,7 +121,7 @@ def _seed_revision(connection: Connection, revision: str) -> tuple[str, ...]:
     if revision >= "0002_webhooks":
         connection.execute(
             text(
-                "INSERT INTO fastapi_mergen.webhook_secret_sets "
+                "INSERT INTO fastapi_effects.webhook_secret_sets "
                 "(tenant_id,secret_set_id,revision,created_by,created_at,updated_at) "
                 "VALUES (:tenant,:secret_set,1,'migration-probe',:now,:now)"
             ),
@@ -129,7 +129,7 @@ def _seed_revision(connection: Connection, revision: str) -> tuple[str, ...]:
         )
         connection.execute(
             text(
-                "INSERT INTO fastapi_mergen.webhook_subscriptions "
+                "INSERT INTO fastapi_effects.webhook_subscriptions "
                 "(tenant_id,subscription_id,current_version,revision,state,failure_streak,"
                 "auto_pause_threshold,created_by,updated_by,created_at,updated_at) VALUES "
                 "(:tenant,:subscription,1,1,'active',0,20,'migration-probe',"
@@ -139,7 +139,7 @@ def _seed_revision(connection: Connection, revision: str) -> tuple[str, ...]:
         )
         connection.execute(
             text(
-                "INSERT INTO fastapi_mergen.webhook_secret_versions "
+                "INSERT INTO fastapi_effects.webhook_secret_versions "
                 "(tenant_id,secret_set_id,secret_version,key_id,nonce,ciphertext,state,created_at) "
                 "VALUES (:tenant,:secret_set,1,'migration-key',:nonce,:ciphertext,'active',:now)"
             ),
@@ -152,7 +152,7 @@ def _seed_revision(connection: Connection, revision: str) -> tuple[str, ...]:
         )
         connection.execute(
             text(
-                "INSERT INTO fastapi_mergen.webhook_subscription_versions "
+                "INSERT INTO fastapi_effects.webhook_subscription_versions "
                 "(tenant_id,subscription_id,version,exact_event_types,endpoint_url,retry_policy,"
                 "secret_set_id,created_by,created_at) VALUES "
                 "(:tenant,:subscription,1,CAST('[\"migration.probe\"]' AS jsonb),"
@@ -163,7 +163,7 @@ def _seed_revision(connection: Connection, revision: str) -> tuple[str, ...]:
         )
         connection.execute(
             text(
-                "INSERT INTO fastapi_mergen.webhook_audit "
+                "INSERT INTO fastapi_effects.webhook_audit "
                 "(tenant_id,audit_id,subject_id,action,target_kind,target_id,details,occurred_at) "
                 "VALUES (:tenant,:audit,'migration-probe','created','subscription',"
                 ":subscription,CAST('{}' AS jsonb),:now)"
@@ -183,7 +183,7 @@ def _seed_revision(connection: Connection, revision: str) -> tuple[str, ...]:
     if revision >= "0003_taskiq":
         connection.execute(
             text(
-                "INSERT INTO fastapi_mergen.taskiq_handoffs "
+                "INSERT INTO fastapi_effects.taskiq_handoffs "
                 "(tenant_id,handoff_id,delivery_id,attempt_id,task_id,handoff_token,state,"
                 "principal,route_snapshot,route_snapshot_bytes,event_metadata,execution_count,"
                 "prepared_at,enqueued_at,finished_at,updated_at) VALUES "
@@ -203,7 +203,7 @@ def _seed_revision(connection: Connection, revision: str) -> tuple[str, ...]:
     if revision >= "0004_commands":
         connection.execute(
             text(
-                "INSERT INTO fastapi_mergen.commands "
+                "INSERT INTO fastapi_effects.commands "
                 "(tenant_id,command_id,route_id,method,key_digest,generation,is_current,"
                 "subject_id,fingerprint_version,fingerprint,state,response_status,"
                 "response_headers,response_body,response_media_type,created_at,updated_at,"
@@ -245,12 +245,12 @@ async def test_every_published_revision_upgrades_to_head_without_data_loss(
         async with engine.connect() as connection:
             for table in seeded:
                 count = await connection.scalar(
-                    text(f"SELECT count(*) FROM fastapi_mergen.{table}")
+                    text(f"SELECT count(*) FROM fastapi_effects.{table}")
                 )
                 assert count == 1
             installed = (
                 await connection.execute(
-                    text("SELECT component, revision FROM fastapi_mergen.schema_revision")
+                    text("SELECT component, revision FROM fastapi_effects.schema_revision")
                 )
             ).all()
             revision_rows = {str(row.component): int(row.revision) for row in installed}
@@ -261,7 +261,7 @@ async def test_every_published_revision_upgrades_to_head_without_data_loss(
                         "SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity, "
                         "pg_get_userbyid(c.relowner) FROM pg_class c "
                         "JOIN pg_namespace n ON n.oid = c.relnamespace "
-                        "WHERE n.nspname = 'fastapi_mergen' AND c.relname = ANY(:tables)"
+                        "WHERE n.nspname = 'fastapi_effects' AND c.relname = ANY(:tables)"
                     ),
                     {"tables": list(TABLES)},
                 )
@@ -280,16 +280,16 @@ async def test_every_published_revision_upgrades_to_head_without_data_loss(
                     text(
                         "SELECT p.prosecdef, pg_get_userbyid(p.proowner), p.proconfig "
                         "FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace "
-                        "WHERE n.nspname = 'fastapi_mergen' "
+                        "WHERE n.nspname = 'fastapi_effects' "
                         "AND p.proname = 'prune_webhook_history'"
                     )
                 )
             ).one()
             assert retention_function.prosecdef is True
             assert retention_function[1] == test_database.migration_role
-            assert retention_function.proconfig == ["search_path=pg_catalog, fastapi_mergen"]
+            assert retention_function.proconfig == ["search_path=pg_catalog, fastapi_effects"]
             signature = (
-                "fastapi_mergen.prune_webhook_history(uuid,timestamp with time zone,integer)"
+                "fastapi_effects.prune_webhook_history(uuid,timestamp with time zone,integer)"
             )
             application_can_execute = await connection.scalar(
                 text("SELECT has_function_privilege(:role, :signature, 'EXECUTE')"),
@@ -331,7 +331,7 @@ async def test_schema_gate_rejects_older_and_newer_revisions(
         async with engine.begin() as connection:
             await connection.execute(
                 text(
-                    "UPDATE fastapi_mergen.schema_revision SET revision = 2 "
+                    "UPDATE fastapi_effects.schema_revision SET revision = 2 "
                     "WHERE component = 'core'"
                 )
             )
@@ -386,19 +386,19 @@ async def test_retention_revision_downgrade_preserves_data(
             )
             function_exists = await connection.scalar(
                 text(
-                    "SELECT to_regprocedure('fastapi_mergen.prune_webhook_history"
+                    "SELECT to_regprocedure('fastapi_effects.prune_webhook_history"
                     "(uuid,timestamp with time zone,integer)') IS NOT NULL"
                 )
             )
             webhook_revision = await connection.scalar(
                 text(
-                    "SELECT revision FROM fastapi_mergen.schema_revision "
+                    "SELECT revision FROM fastapi_effects.schema_revision "
                     "WHERE component = 'webhooks'"
                 )
             )
             for table in seeded:
                 count = await connection.scalar(
-                    text(f"SELECT count(*) FROM fastapi_mergen.{table}")
+                    text(f"SELECT count(*) FROM fastapi_effects.{table}")
                 )
                 assert count == 1
         assert function_exists is False

@@ -7,21 +7,21 @@ import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from fastapi_mergen import Event, MergenUnitOfWork, Principal, RetryPolicy
-from fastapi_mergen.observability.events import RuntimeEvent
-from fastapi_mergen.postgres import PostgresStore
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
-from fastapi_mergen.postgres.webhook_schema import install_webhook_schema
-from fastapi_mergen.sqlalchemy.models import DeliveryRow
-from fastapi_mergen.webhooks.models import WebhookAuditRow, WebhookSubscriptionRow
-from fastapi_mergen.webhooks.operations import WebhookHealthRepository
-from fastapi_mergen.webhooks.secrets import (
+from fastapi_effects import Event, FastAPIEffectsUnitOfWork, Principal, RetryPolicy
+from fastapi_effects.observability.events import RuntimeEvent
+from fastapi_effects.postgres import PostgresStore
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
+from fastapi_effects.postgres.webhook_schema import install_webhook_schema
+from fastapi_effects.sqlalchemy.models import DeliveryRow
+from fastapi_effects.webhooks.models import WebhookAuditRow, WebhookSubscriptionRow
+from fastapi_effects.webhooks.operations import WebhookHealthRepository
+from fastapi_effects.webhooks.secrets import (
     MasterKey,
     StaticMasterKeyProvider,
     WebhookSecretService,
 )
-from fastapi_mergen.webhooks.subscriptions import SubscriptionRepository, WebhookRouteProvider
+from fastapi_effects.webhooks.subscriptions import SubscriptionRepository, WebhookRouteProvider
 from tests.integration.postgres import ProvisionedDatabase
 
 pytestmark = pytest.mark.integration
@@ -66,7 +66,7 @@ async def test_failure_threshold_pauses_only_future_snapshotting(
         await install_webhook_schema(migration_engine, roles=roles)
         async with (
             app_sessions() as session,
-            MergenUnitOfWork(
+            FastAPIEffectsUnitOfWork(
                 session=session,
                 principal=principal,
                 store=PostgresStore(),
@@ -101,7 +101,7 @@ async def test_failure_threshold_pauses_only_future_snapshotting(
 
         async with (
             app_sessions() as session,
-            MergenUnitOfWork(
+            FastAPIEffectsUnitOfWork(
                 session=session,
                 principal=principal,
                 store=PostgresStore(),
@@ -111,7 +111,7 @@ async def test_failure_threshold_pauses_only_future_snapshotting(
             await uow.emit(Event(type="invoice.created", version=1, data={"n": 2}))
         async with app_sessions() as session, session.begin():
             await session.execute(
-                text("SELECT set_config('mergen.tenant_id', :tenant, true)"),
+                text("SELECT set_config('fastapi_effects.tenant_id', :tenant, true)"),
                 {"tenant": str(tenant_id)},
             )
             delivery_count = await session.scalar(select(func.count()).select_from(DeliveryRow))

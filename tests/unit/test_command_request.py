@@ -5,9 +5,9 @@ from uuid import UUID
 import pytest
 from starlette.requests import Request
 
-from fastapi_mergen.core.principal import Principal
-from fastapi_mergen.errors import MergenConfigurationError
-from fastapi_mergen.idempotency.request import prepare_request
+from fastapi_effects.core.principal import Principal
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
+from fastapi_effects.idempotency.request import prepare_request
 
 
 def _request(*, body: bytes, key: bytes = b"command-1") -> Request:
@@ -52,7 +52,7 @@ async def test_preparation_retains_body_for_endpoint_parsing() -> None:
 @pytest.mark.asyncio
 async def test_preparation_rejects_missing_or_oversized_key() -> None:
     request = _request(body=b"{}", key=b"x" * 513)
-    with pytest.raises(MergenConfigurationError):
+    with pytest.raises(FastAPIEffectsConfigurationError):
         await prepare_request(
             request,
             principal=Principal(

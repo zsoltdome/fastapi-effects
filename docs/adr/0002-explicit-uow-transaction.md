@@ -11,13 +11,13 @@ widen connection-pool and nesting failure modes.
 
 ## Decision
 
-`MergenUnitOfWork` owns the outermost async SQLAlchemy transaction through the MDP.
+`FastAPIEffectsUnitOfWork` owns the outermost async SQLAlchemy transaction through the MDP.
 
 - Entry rejects an already active session transaction.
 - Entry begins explicitly and executes transaction-local tenant binding before
   application SQL.
 - `emit()` is available only through the active UoW.
-- Nested Mergen UoWs are rejected.
+- Nested FastAPI Effects UoWs are rejected.
 - Application savepoints after binding are allowed.
 - Exit commits once on success, otherwise rolls back.
 - Context tokens and session metadata reset in `finally`.
@@ -32,11 +32,11 @@ widen connection-pool and nesting failure modes.
 | Emit/snapshot failure | Rollback all application/effect rows | Reset |
 | Commit failure | Report failure; attempt cleanup | Reset; unusable connection discarded by provider |
 | Cancellation | Rollback cleanup; cancellation propagates | Reset |
-| Dependency finalizer failure | UoW result already explicit | Mergen context remains reset |
+| Dependency finalizer failure | UoW result already explicit | FastAPI Effects context remains reset |
 
 ## Consequences
 
-- Integration requires the Mergen UoW pattern rather than wrapping an arbitrary
+- Integration requires the FastAPI Effects UoW pattern rather than wrapping an arbitrary
   already-open transaction.
 - Transaction ownership is testable and narrow.
 - Applications needing an existing outer transaction are a post-MDP design problem.

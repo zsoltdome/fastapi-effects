@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from fastapi_mergen.conformance.safety import (
+from fastapi_effects.conformance.safety import (
     reject_sensitive_keys,
     safe_json,
     scan_for_secret_values,
 )
-from fastapi_mergen.errors import MergenConfigurationError
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
 
 
 def test_nested_sensitive_fields_are_redacted() -> None:
@@ -30,7 +30,7 @@ def test_nested_sensitive_fields_are_redacted() -> None:
 
 
 def test_manifest_metadata_rejects_nested_sensitive_field() -> None:
-    with pytest.raises(MergenConfigurationError):
+    with pytest.raises(FastAPIEffectsConfigurationError):
         reject_sensitive_keys({"runtime": {"private_key": "secret"}})
 
 

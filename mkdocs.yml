@@ -1,6 +1,6 @@
-site_name: FastAPI-Mergen
+site_name: FastAPI Effects
 site_description: Principal-preserving transactional eventing for FastAPI and PostgreSQL
-repo_url: https://github.com/mergen-institute/fastapi-mergen
+repo_url: https://github.com/zsoltdome/fastapi-effects
 strict: true
 theme:
   name: material

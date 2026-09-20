@@ -7,13 +7,13 @@ import pytest
 from fastapi import Depends, FastAPI, Request
 from httpx import ASGITransport, AsyncClient
 
-from fastapi_mergen.core.principal import Principal
-from fastapi_mergen.delegation.fastapi import (
+from fastapi_effects.core.principal import Principal
+from fastapi_effects.delegation.fastapi import (
     VerifiedDelegation,
     verified_delegation_dependency,
 )
-from fastapi_mergen.delegation.keys import InMemoryKeyRing, SigningKey
-from fastapi_mergen.delegation.signing import DelegationIssuer, DelegationVerifier
+from fastapi_effects.delegation.keys import InMemoryKeyRing, SigningKey
+from fastapi_effects.delegation.signing import DelegationIssuer, DelegationVerifier
 
 pytestmark = pytest.mark.security
 
@@ -49,7 +49,7 @@ async def test_downstream_route_enforces_delegation_independent_of_discovery() -
         request: Request,
         delegation: VerifiedDelegation = Depends(dependency),
     ) -> dict[str, object]:
-        assert request.state.mergen_delegation == delegation
+        assert request.state.fastapi_effects_delegation == delegation
         return {
             "invoice_id": invoice_id,
             "tenant_id": str(delegation.principal.tenant_id),
@@ -75,8 +75,12 @@ async def test_downstream_route_enforces_delegation_independent_of_discovery() -
         transport=ASGITransport(app=app), base_url="https://billing.example"
     ) as client:
         missing = await client.post("/v1/invoices/42/pay")
-        wrong_path = await client.post("/v1/invoices/43/pay", headers={"Mergen-Delegation": token})
-        allowed = await client.post("/v1/invoices/42/pay", headers={"Mergen-Delegation": token})
+        wrong_path = await client.post(
+            "/v1/invoices/43/pay", headers={"FastAPI-Effects-Delegation": token}
+        )
+        allowed = await client.post(
+            "/v1/invoices/42/pay", headers={"FastAPI-Effects-Delegation": token}
+        )
     assert missing.status_code == 401
     assert wrong_path.status_code == 403
     assert allowed.status_code == 200

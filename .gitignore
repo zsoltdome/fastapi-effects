@@ -6,8 +6,13 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .coverage
+.coverage.*
 coverage.xml
+junit.xml
 htmlcov/
+.hypothesis/
+.nox/
+.tox/
 
 # Environments and builds
 .venv/
@@ -15,6 +20,7 @@ venv/
 build/
 dist/
 site/
+docs/_build/
 *.whl
 
 # Editors and operating systems
@@ -27,9 +33,9 @@ Thumbs.db
 .env
 .env.*
 !.env.example
-.mergen-test-state/
+.fastapi_effects_test_state/
 
-# Preserve the supplied planning/audit record while ignoring unrelated scratch files.
+# Keep internal supplementary material out of release artifacts and public documentation.
 sup/*
 !sup/audit_road.md
 !sup/remediation.md

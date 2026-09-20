@@ -1,0 +1,37 @@
+minimum_pre_commit_version: "4.0.0"
+
+repos:
+  - repo: local
+    hooks:
+      - id: uv-lock-check
+        name: Check uv lockfile
+        entry: uv lock --check
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: ruff-check
+        name: Ruff lint
+        entry: uv run --locked --no-sync ruff check --fix
+        language: system
+        types_or: [python, pyi]
+
+      - id: ruff-format
+        name: Ruff format
+        entry: uv run --locked --no-sync ruff format
+        language: system
+        types_or: [python, pyi]
+
+      - id: mypy
+        name: Mypy
+        entry: uv run --locked --no-sync mypy
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi]
+
+      - id: documentation-contract
+        name: Documentation contract
+        entry: uv run --locked --no-sync python scripts/check_documentation.py
+        language: system
+        pass_filenames: false
+        files: ^(README\.md|docs/.*\.md|examples/.*/README\.md)$

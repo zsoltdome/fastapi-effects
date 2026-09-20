@@ -14,13 +14,15 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from fastapi_mergen import Principal
+from fastapi_effects import Principal
 
 
 def _database_url() -> str:
-    url = os.getenv("MERGEN_EXAMPLE_DATABASE_URL")
+    url = os.getenv("FASTAPI_EFFECTS_EXAMPLE_DATABASE_URL")
     if not url:
-        raise RuntimeError("MERGEN_EXAMPLE_DATABASE_URL is required for database operations.")
+        raise RuntimeError(
+            "FASTAPI_EFFECTS_EXAMPLE_DATABASE_URL is required for database operations."
+        )
     return url
 
 
@@ -68,11 +70,11 @@ async def get_handler_session(principal: Principal) -> AsyncIterator[AsyncSessio
 
     async with _session_factory()() as session, session.begin():
         await session.execute(
-            text("SELECT set_config('mergen.tenant_id', :tenant_id, true)"),
+            text("SELECT set_config('fastapi_effects.tenant_id', :tenant_id, true)"),
             {"tenant_id": str(principal.tenant_id)},
         )
         await session.execute(
-            text("SELECT set_config('mergen.subject_id', :subject_id, true)"),
+            text("SELECT set_config('fastapi_effects.subject_id', :subject_id, true)"),
             {"subject_id": principal.subject_id},
         )
         yield session

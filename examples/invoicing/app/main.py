@@ -7,11 +7,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from fastapi_mergen import __version__
+from fastapi_effects import __version__
 
 from .api import router
 from .db import start_database, stop_database
-from .mergen_config import mergen
+from .fastapi_effects_config import fastapi_effects
 
 
 @asynccontextmanager
@@ -19,14 +19,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     del app
     start_database()
     try:
-        mergen.freeze()
+        fastapi_effects.freeze()
         yield
     finally:
         await stop_database()
 
 
 app = FastAPI(
-    title="FastAPI-Mergen Invoicing Example",
+    title="FastAPI Effects Invoicing Example",
     version=__version__,
     lifespan=lifespan,
 )

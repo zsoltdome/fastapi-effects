@@ -8,15 +8,15 @@ import os
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from fastapi_mergen.postgres import RuntimeRoles
+from fastapi_effects.postgres import RuntimeRoles
 
 from .app.models import Base
 
 
 async def bootstrap() -> None:
-    dsn = os.getenv("MERGEN_EXAMPLE_MIGRATION_DATABASE_URL")
+    dsn = os.getenv("FASTAPI_EFFECTS_EXAMPLE_MIGRATION_DATABASE_URL")
     if not dsn:
-        raise RuntimeError("MERGEN_EXAMPLE_MIGRATION_DATABASE_URL is required.")
+        raise RuntimeError("FASTAPI_EFFECTS_EXAMPLE_MIGRATION_DATABASE_URL is required.")
     engine = create_async_engine(dsn)
     roles = RuntimeRoles()
     try:
@@ -29,9 +29,10 @@ async def bootstrap() -> None:
                 await connection.execute(
                     text(
                         f"CREATE POLICY {table}_tenant ON {table} FOR ALL TO {roles.application} "
-                        "USING (tenant_id = nullif(current_setting('mergen.tenant_id', true), "
+                        "USING (tenant_id = nullif(current_setting("
+                        "'fastapi_effects.tenant_id', true), "
                         "'')::uuid) WITH CHECK (tenant_id = "
-                        "nullif(current_setting('mergen.tenant_id', true), '')::uuid)"
+                        "nullif(current_setting('fastapi_effects.tenant_id', true), '')::uuid)"
                     )
                 )
                 await connection.execute(

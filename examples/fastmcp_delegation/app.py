@@ -9,12 +9,12 @@ from fastapi import Depends, FastAPI
 from fastmcp import FastMCP
 from httpx import AsyncClient, Response
 
-from fastapi_mergen.core.principal import Principal
-from fastapi_mergen.delegation.bridge import TrustedCallerMetadata
-from fastapi_mergen.delegation.fastapi import delegated_principal_dependency
-from fastapi_mergen.delegation.keys import InMemoryKeyRing, SigningKey
-from fastapi_mergen.delegation.signing import DelegationIssuer, DelegationVerifier
-from fastapi_mergen.integrations.fastmcp import FastMCPDelegationBridge
+from fastapi_effects.core.principal import Principal
+from fastapi_effects.delegation.bridge import TrustedCallerMetadata
+from fastapi_effects.delegation.fastapi import delegated_principal_dependency
+from fastapi_effects.delegation.keys import InMemoryKeyRing, SigningKey
+from fastapi_effects.delegation.signing import DelegationIssuer, DelegationVerifier
+from fastapi_effects.integrations.fastmcp import FastMCPDelegationBridge
 
 
 def build_apps(

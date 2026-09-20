@@ -1,1 +1,1 @@
-"""FastAPI-Mergen tests."""
+"""FastAPI Effects tests."""

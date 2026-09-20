@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   publish:
-    if: github.repository == 'mergen-institute/fastapi-mergen'
+    if: github.repository == 'zsoltdome/fastapi-effects'
     runs-on: ubuntu-latest
     environment: pypi
     timeout-minutes: 10
@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 0
       - name: Verify release version
         run: |
-          package_version="$(python -c 'exec(open("src/fastapi_mergen/_version.py").read()); print(__version__)')"
+          package_version="$(python -c 'exec(open("src/fastapi_effects/_version.py").read()); print(__version__)')"
           test "v${package_version}" = "${{ github.event.release.tag_name }}"
       - name: Resolve the successful evidence workflow for this exact tag and commit
         id: evidence
@@ -75,7 +75,7 @@ jobs:
           unzip -q "${archive}" -d approved
       - name: Verify promoted artifact identity
         run: |
-          package_version="$(python -c 'exec(open("src/fastapi_mergen/_version.py").read()); print(__version__)')"
+          package_version="$(python -c 'exec(open("src/fastapi_effects/_version.py").read()); print(__version__)')"
           python scripts/release_artifacts.py verify \
             --root approved \
             --manifest approved/build/release/artifact-manifest.json \

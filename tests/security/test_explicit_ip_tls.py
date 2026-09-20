@@ -12,9 +12,9 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-from fastapi_mergen.errors import MergenConfigurationError
-from fastapi_mergen.webhooks.address_policy import parse_endpoint
-from fastapi_mergen.webhooks.transport import ExplicitIPTransport, TransportLimits
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
+from fastapi_effects.webhooks.address_policy import parse_endpoint
+from fastapi_effects.webhooks.transport import ExplicitIPTransport, TransportLimits
 
 pytestmark = pytest.mark.security
 
@@ -77,7 +77,7 @@ def test_production_transport_rejects_insecure_supplied_context() -> None:
     context = ssl.create_default_context()
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
-    with pytest.raises(MergenConfigurationError, match="certificate and hostname"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="certificate and hostname"):
         ExplicitIPTransport(production=True, ssl_context=context)
 
 
@@ -105,7 +105,7 @@ async def test_mutated_production_context_is_revalidated_before_io() -> None:
         production=True,
         allowed_ports=frozenset({443}),
     )
-    with pytest.raises(MergenConfigurationError, match="certificate and hostname"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="certificate and hostname"):
         await transport.send(
             endpoint=endpoint,
             connected_ip="8.8.8.8",
@@ -218,7 +218,7 @@ async def test_custom_ca_keeps_hostname_verification_and_original_sni(
     client_context = ssl.create_default_context(cadata=certificate_pem.decode("ascii"))
     client_context.minimum_version = ssl.TLSVersion.TLSv1_2
     monkeypatch.setattr(
-        "fastapi_mergen.webhooks.transport.validate_public_addresses",
+        "fastapi_effects.webhooks.transport.validate_public_addresses",
         lambda values: tuple(values),
     )
     endpoint = parse_endpoint(

@@ -4,7 +4,7 @@
 2. Construct `WebhookSecretService` from a deployment master-key provider and
    create `SubscriptionRepository`, `WebhookOperations`, and
    `WebhookRouteProvider`.
-3. Pass the route provider to `Mergen(route_providers=(...))` or directly to a
+3. Pass the route provider to `FastAPIEffects(route_providers=(...))` or directly to a
    unit of work. Create a subscription for `invoice.created`; copy its one-time
    signing secret into the receiver.
 4. In the invoice endpoint, insert the invoice and call `uow.emit(...)` in the

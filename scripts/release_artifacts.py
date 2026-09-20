@@ -196,7 +196,7 @@ def _validate_distribution_metadata(
         metadata = _distribution_metadata(distribution)
         name = metadata.get("Name")
         version = metadata.get("Version")
-        if not isinstance(name, str) or _normalized_project_name(name) != "fastapi-mergen":
+        if not isinstance(name, str) or _normalized_project_name(name) != "fastapi-effects":
             raise ValueError("Release distribution project name is invalid.")
         if version != package_version:
             raise ValueError("Release distribution version does not match the promotion target.")

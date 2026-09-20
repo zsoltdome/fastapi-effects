@@ -4,10 +4,10 @@ import json
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi_mergen import Principal
-from fastapi_mergen.core.event import EventRecord
-from fastapi_mergen.sqlalchemy.canonical import canonical_sha256, versioned_canonical_bytes
-from fastapi_mergen.webhooks.serializer import serialize_webhook_envelope
+from fastapi_effects import Principal
+from fastapi_effects.core.event import EventRecord
+from fastapi_effects.sqlalchemy.canonical import canonical_sha256, versioned_canonical_bytes
+from fastapi_effects.webhooks.serializer import serialize_webhook_envelope
 
 
 def test_envelope_is_stable_across_automatic_attempts() -> None:

@@ -2,9 +2,9 @@
 
 **Baseline:** `0.11.0a1`, committed local-verification source
 `24503cdcaf5cc204534e3aa8d8ec476804dcb11d`
-**Detailed audit-origin plan:** the supplied `sup/audit_road.md`, `sup/remediation.md`,
-`sup/plan.md`, and `sup/todo.md` now have explicit Git-trackable exceptions. The missing
-ZIP and evidence files are governed as unavailable in
+**Audit-origin record:** internal planning narratives are supplementary inputs, not
+public documentation dependencies. The clean historical summary and unavailable
+evidence classification are recorded in
 [`docs/audits/2026-09-07/evidence-status.json`](../audits/2026-09-07/evidence-status.json).
 
 ## 2026-09-13 audit correction status

@@ -26,19 +26,25 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from tests.integration.postgres import provision_test_database
 
-from fastapi_mergen import AuthorizationMode, Event, MergenUnitOfWork, Principal, RetryPolicy
-from fastapi_mergen import __version__ as mergen_version
-from fastapi_mergen.core.routing import RouteSpecification
-from fastapi_mergen.errors import RetryableDeliveryError
-from fastapi_mergen.idempotency import CommandContext, CommandIdentity, RequestFingerprint
-from fastapi_mergen.idempotency.responses import CapturedResponse
-from fastapi_mergen.idempotency.store import CommandStore
-from fastapi_mergen.postgres import PostgresStore
-from fastapi_mergen.postgres.command_schema import install_command_schema
-from fastapi_mergen.postgres.leasing import LeaseRepository
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
-from fastapi_mergen.webhooks.signing import sign_webhook, verify_webhook
+from fastapi_effects import (
+    AuthorizationMode,
+    Event,
+    FastAPIEffectsUnitOfWork,
+    Principal,
+    RetryPolicy,
+)
+from fastapi_effects import __version__ as fastapi_effects_version
+from fastapi_effects.core.routing import RouteSpecification
+from fastapi_effects.errors import RetryableDeliveryError
+from fastapi_effects.idempotency import CommandContext, CommandIdentity, RequestFingerprint
+from fastapi_effects.idempotency.responses import CapturedResponse
+from fastapi_effects.idempotency.store import CommandStore
+from fastapi_effects.postgres import PostgresStore
+from fastapi_effects.postgres.command_schema import install_command_schema
+from fastapi_effects.postgres.leasing import LeaseRepository
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
+from fastapi_effects.webhooks.signing import sign_webhook, verify_webhook
 
 
 class MidpointRandom:
@@ -172,7 +178,7 @@ async def run_benchmark(admin_dsn: str, *, tenants: int, events_per_tenant: int)
                     started = time.perf_counter()
                     async with (
                         app_sessions() as session,
-                        MergenUnitOfWork(
+                        FastAPIEffectsUnitOfWork(
                             session=session,
                             principal=principal,
                             store=PostgresStore(),
@@ -192,7 +198,7 @@ async def run_benchmark(admin_dsn: str, *, tenants: int, events_per_tenant: int)
                 backlog_age = await connection.scalar(
                     text(
                         "SELECT EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - min(created_at))) "
-                        "FROM fastapi_mergen.deliveries WHERE state = 'pending'"
+                        "FROM fastapi_effects.deliveries WHERE state = 'pending'"
                     )
                 )
 
@@ -251,7 +257,7 @@ async def run_benchmark(admin_dsn: str, *, tenants: int, events_per_tenant: int)
             async with relay_engine.connect() as connection:
                 before_size = int(
                     await connection.scalar(
-                        text("SELECT pg_total_relation_size('fastapi_mergen.commands')")
+                        text("SELECT pg_total_relation_size('fastapi_effects.commands')")
                     )
                     or 0
                 )
@@ -266,7 +272,7 @@ async def run_benchmark(admin_dsn: str, *, tenants: int, events_per_tenant: int)
             async with relay_engine.connect() as connection:
                 after_size = int(
                     await connection.scalar(
-                        text("SELECT pg_total_relation_size('fastapi_mergen.commands')")
+                        text("SELECT pg_total_relation_size('fastapi_effects.commands')")
                     )
                     or 0
                 )
@@ -291,7 +297,7 @@ async def run_benchmark(admin_dsn: str, *, tenants: int, events_per_tenant: int)
                     "platform": platform.platform(),
                     "python": platform.python_version(),
                     "postgresql": postgres_version,
-                    "fastapi_mergen": mergen_version,
+                    "fastapi_effects": fastapi_effects_version,
                 },
                 "dataset": {
                     "tenants": tenants,
@@ -336,13 +342,13 @@ async def run_benchmark(admin_dsn: str, *, tenants: int, events_per_tenant: int)
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--admin-dsn", default=os.getenv("MERGEN_TEST_ADMIN_DSN"))
+    parser.add_argument("--admin-dsn", default=os.getenv("FASTAPI_EFFECTS_TEST_ADMIN_DSN"))
     parser.add_argument("--tenants", type=int, default=4)
     parser.add_argument("--events-per-tenant", type=int, default=25)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if not args.admin_dsn:
-        parser.error("--admin-dsn or MERGEN_TEST_ADMIN_DSN is required")
+        parser.error("--admin-dsn or FASTAPI_EFFECTS_TEST_ADMIN_DSN is required")
     result = asyncio.run(
         run_benchmark(
             args.admin_dsn,

@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from scripts.audit_release_candidate import audit
 
-from fastapi_mergen.readiness import MANDATORY_PARTNER_EXERCISES, classify_release_version
+from fastapi_effects.readiness import MANDATORY_PARTNER_EXERCISES, classify_release_version
 
 
 def test_release_gate_fails_closed_without_external_evidence() -> None:

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from fastapi_mergen.errors import MergenConfigurationError, PermanentDeliveryError
-from fastapi_mergen.webhooks.address_policy import parse_endpoint, validate_public_addresses
+from fastapi_effects.errors import FastAPIEffectsConfigurationError, PermanentDeliveryError
+from fastapi_effects.webhooks.address_policy import parse_endpoint, validate_public_addresses
 
 pytestmark = pytest.mark.security
 
@@ -21,7 +21,7 @@ pytestmark = pytest.mark.security
     ],
 )
 def test_hostile_endpoint_syntax_fails_closed(url: str) -> None:
-    with pytest.raises(MergenConfigurationError):
+    with pytest.raises(FastAPIEffectsConfigurationError):
         parse_endpoint(url)
 
 
@@ -74,5 +74,5 @@ def test_existing_percent_escapes_are_preserved_without_double_encoding() -> Non
 
 @pytest.mark.parametrize("url", ["https://example.com/%", "https://example.com/%GG"])
 def test_malformed_percent_escape_fails_at_registration(url: str) -> None:
-    with pytest.raises(MergenConfigurationError, match="percent escape"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="percent escape"):
         parse_endpoint(url)

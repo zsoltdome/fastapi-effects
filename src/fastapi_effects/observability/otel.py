@@ -1,0 +1,82 @@
+"""Lazy OpenTelemetry mapping; importing core never imports the SDK."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi_effects._optional import require_modules
+from fastapi_effects.observability.events import RuntimeEvent
+
+_METRIC_LABELS = frozenset(
+    {
+        "authorization.result",
+        "auto_paused",
+        "capability",
+        "destination.kind",
+        "outcome",
+        "state",
+    }
+)
+
+
+class OpenTelemetryEventSink:
+    def __init__(self, meter: Any, tracer: Any | None = None) -> None:
+        self._counter = meter.create_counter("fastapi_effects.runtime.events")
+        self._duration = meter.create_histogram(
+            "fastapi_effects.operation.duration",
+            unit="ms",
+        )
+        self._backlog_age = meter.create_histogram(
+            "fastapi_effects.backlog.oldest_age",
+            unit="s",
+        )
+        self._tracer = tracer
+
+    def record(self, event: RuntimeEvent) -> None:
+        metric_attributes: dict[str, str | int | float | bool] = {
+            "fastapi_effects.event.kind": event.kind.value,
+            **{
+                f"fastapi_effects.{key}": value
+                for key, value in event.attributes.items()
+                if key in _METRIC_LABELS
+            },
+        }
+        try:
+            self._counter.add(1, attributes=metric_attributes)
+            duration = event.attributes.get("duration.ms")
+            if isinstance(duration, (int, float)) and not isinstance(duration, bool):
+                self._duration.record(float(duration), attributes=metric_attributes)
+            backlog_age = event.attributes.get("backlog.age.seconds")
+            if isinstance(backlog_age, (int, float)) and not isinstance(backlog_age, bool):
+                self._backlog_age.record(float(backlog_age), attributes=metric_attributes)
+            if self._tracer is not None:
+                span_attributes = {
+                    **metric_attributes,
+                    **{f"fastapi_effects.{key}": value for key, value in event.attributes.items()},
+                    **{
+                        f"fastapi_effects.{key}": value
+                        for key, value in event.lineage.attributes().items()
+                    },
+                }
+                with self._tracer.start_as_current_span(
+                    f"fastapi_effects.{event.kind.value}",
+                    attributes=span_attributes,
+                ):
+                    pass
+        except Exception:
+            return
+
+
+def create_otel_sink(name: str = "fastapi_effects") -> OpenTelemetryEventSink:
+    require_modules(
+        feature="OpenTelemetry observability",
+        extra="otel",
+        modules=("opentelemetry",),
+    )
+    from opentelemetry.metrics import get_meter
+    from opentelemetry.trace import get_tracer
+
+    return OpenTelemetryEventSink(get_meter(name), get_tracer(name))
+
+
+__all__ = ["OpenTelemetryEventSink", "create_otel_sink"]

@@ -6,19 +6,19 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from fastapi_mergen.postgres.migrations import frozen_v1
+from fastapi_effects.postgres.migrations import frozen_v1
 
-REVISIONS = Path(__file__).resolve().parents[2] / "src/fastapi_mergen/postgres/migrations/versions"
+REVISIONS = Path(__file__).resolve().parents[2] / "src/fastapi_effects/postgres/migrations/versions"
 FORBIDDEN_MUTABLE_MODULES = {
-    "fastapi_mergen.executors.taskiq.models",
-    "fastapi_mergen.idempotency.models",
-    "fastapi_mergen.postgres.command_schema",
-    "fastapi_mergen.postgres.executor_schema",
-    "fastapi_mergen.postgres.rls",
-    "fastapi_mergen.postgres.roles",
-    "fastapi_mergen.postgres.webhook_schema",
-    "fastapi_mergen.sqlalchemy.models",
-    "fastapi_mergen.webhooks.models",
+    "fastapi_effects.executors.taskiq.models",
+    "fastapi_effects.idempotency.models",
+    "fastapi_effects.postgres.command_schema",
+    "fastapi_effects.postgres.executor_schema",
+    "fastapi_effects.postgres.rls",
+    "fastapi_effects.postgres.roles",
+    "fastapi_effects.postgres.webhook_schema",
+    "fastapi_effects.sqlalchemy.models",
+    "fastapi_effects.webhooks.models",
 }
 
 
@@ -59,5 +59,5 @@ def test_published_revision_contract_digest_is_frozen() -> None:
     encoded = json.dumps(statements, ensure_ascii=True, separators=(",", ":")).encode()
 
     assert hashlib.sha256(encoded).hexdigest() == (
-        "45b06b41d1adba46eda13080ad441cfed2d67272264b730a86df6e07a355ba94"
+        "93efb53cd62bf84fa5dd15e19a55531c14a9bfdcbfa313af3eb7c64fdab86b4b"
     )

@@ -2,7 +2,7 @@
 
 This journey runs a persistent FastAPI process and relay from an installed wheel. It
 keeps administrator, migration, application, and relay credentials separate. Commands
-assume a checkout only for the example application; `fastapi_mergen` itself is imported
+assume a checkout only for the example application; `fastapi_effects` itself is imported
 from the wheel, not `src/`.
 
 ## 1. Build and install the package
@@ -33,24 +33,24 @@ that credential.
 ```console
 docker compose --env-file examples/deployment/.env \
   -f examples/deployment/compose.yml exec -T postgres \
-  psql -U postgres -d mergen \
-  -v migration_password="$MERGEN_MIGRATION_PASSWORD" \
-  -v application_password="$MERGEN_APPLICATION_PASSWORD" \
-  -v relay_password="$MERGEN_RELAY_PASSWORD" \
+  psql -U postgres -d fastapi_effects \
+  -v migration_password="$FASTAPI_EFFECTS_MIGRATION_PASSWORD" \
+  -v application_password="$FASTAPI_EFFECTS_APPLICATION_PASSWORD" \
+  -v relay_password="$FASTAPI_EFFECTS_RELAY_PASSWORD" \
   < examples/deployment/bootstrap.sql
 
-MERGEN_DATABASE_DSN="$MERGEN_EXAMPLE_MIGRATION_DATABASE_URL" \
-  .quickstart/bin/fastapi-mergen schema upgrade --no-create-runtime-roles
+FASTAPI_EFFECTS_DATABASE_DSN="$FASTAPI_EFFECTS_EXAMPLE_MIGRATION_DATABASE_URL" \
+  .quickstart/bin/fastapi-effects schema upgrade --no-create-runtime-roles
 PYTHONPATH=. .quickstart/bin/python -m examples.invoicing.bootstrap
 ```
 
 Check both least-privileged roles without printing either DSN:
 
 ```console
-MERGEN_DATABASE_DSN="$MERGEN_EXAMPLE_DATABASE_URL" \
-  .quickstart/bin/fastapi-mergen doctor --expected-role mergen_app
-MERGEN_DATABASE_DSN="$MERGEN_EXAMPLE_RELAY_DATABASE_URL" \
-  .quickstart/bin/fastapi-mergen doctor --expected-role mergen_relay
+FASTAPI_EFFECTS_DATABASE_DSN="$FASTAPI_EFFECTS_EXAMPLE_DATABASE_URL" \
+  .quickstart/bin/fastapi-effects doctor --expected-role fastapi_effects_app
+FASTAPI_EFFECTS_DATABASE_DSN="$FASTAPI_EFFECTS_EXAMPLE_RELAY_DATABASE_URL" \
+  .quickstart/bin/fastapi-effects doctor --expected-role fastapi_effects_relay
 ```
 
 ## 3. Start the application and relay
@@ -63,7 +63,7 @@ PYTHONPATH=. .quickstart/bin/uvicorn examples.invoicing.app.main:app \
 ```
 
 ```console
-PYTHONPATH=. .quickstart/bin/fastapi-mergen relay run \
+PYTHONPATH=. .quickstart/bin/fastapi-effects relay run \
   --factory examples.invoicing.relay:create_relay
 ```
 
@@ -92,8 +92,8 @@ attempt ID; the conflict-safe render remains one row. Run it against a disposabl
 database when developing:
 
 ```console
-MERGEN_TEST_ADMIN_DSN=postgresql://postgres:postgres@127.0.0.1:55432/postgres \
-  uv run pytest -q tests/integration/test_invoicing_postgres_boot.py \
+FASTAPI_EFFECTS_TEST_ADMIN_DSN=postgresql://postgres:postgres@127.0.0.1:55432/postgres \
+  uv run --locked pytest -q tests/integration/test_invoicing_postgres_boot.py \
   tests/integration/test_core_concurrency.py::test_fanout_failure_rolls_back_business_and_event_rows
 ```
 

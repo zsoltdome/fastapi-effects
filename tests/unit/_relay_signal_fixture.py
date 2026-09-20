@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi_mergen.postgres.relay import PollingRelay, RelayConfig
+from fastapi_effects.postgres.relay import PollingRelay, RelayConfig
 
 
 class _SessionContext:
@@ -37,7 +37,7 @@ class _Sink:
 
 
 def create_relay() -> PollingRelay:
-    ready_file = os.environ.get("MERGEN_SIGNAL_READY_FILE")
+    ready_file = os.environ.get("FASTAPI_EFFECTS_SIGNAL_READY_FILE")
     if ready_file:
         Path(ready_file).touch()
     return PollingRelay(

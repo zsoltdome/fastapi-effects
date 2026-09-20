@@ -5,12 +5,12 @@ from uuid import UUID
 
 import pytest
 
-from fastapi_mergen import Principal
-from fastapi_mergen.delegation.encoding import claims_bytes
-from fastapi_mergen.delegation.keys import InMemoryKeyRing, SigningKey
-from fastapi_mergen.delegation.models import DelegationClaims
-from fastapi_mergen.delegation.signing import DelegationIssuer, DelegationVerifier
-from fastapi_mergen.errors import AuthorizationDenied, MergenConfigurationError
+from fastapi_effects import Principal
+from fastapi_effects.delegation.encoding import claims_bytes
+from fastapi_effects.delegation.keys import InMemoryKeyRing, SigningKey
+from fastapi_effects.delegation.models import DelegationClaims
+from fastapi_effects.delegation.signing import DelegationIssuer, DelegationVerifier
+from fastapi_effects.errors import AuthorizationDenied, FastAPIEffectsConfigurationError
 
 NOW = datetime(2026, 8, 30, 12, 0, tzinfo=UTC)
 TENANT = UUID("11111111-1111-4111-8111-111111111111")
@@ -123,7 +123,7 @@ def test_delegation_rejects_expiry_tamper_and_scope_expansion() -> None:
         scopes=frozenset({"billing:write"}),
         issued_at=NOW,
     )
-    with pytest.raises(MergenConfigurationError, match="exceed"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="exceed"):
         issuer.mint(
             principal=principal,
             audience="billing-api",

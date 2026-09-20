@@ -5,19 +5,19 @@ from datetime import UTC, datetime
 
 import pytest
 
-from fastapi_mergen.errors import MergenConfigurationError
-from fastapi_mergen.observability.events import RuntimeEvent, RuntimeEventKind
-from fastapi_mergen.observability.protocols import NoOpEventSink
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
+from fastapi_effects.observability.events import RuntimeEvent, RuntimeEventKind
+from fastapi_effects.observability.protocols import NoOpEventSink
 
 
 def test_runtime_events_reject_payload_secret_and_unbounded_attributes() -> None:
     now = datetime.now(UTC)
     for key in ("payload", "http.body", "credential_ref", "api_key"):
-        with pytest.raises(MergenConfigurationError, match="unsafe"):
+        with pytest.raises(FastAPIEffectsConfigurationError, match="unsafe"):
             RuntimeEvent(RuntimeEventKind.PUBLISHED, now, {key: "canary"})
-    with pytest.raises(MergenConfigurationError, match="finite"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="finite"):
         RuntimeEvent(RuntimeEventKind.ATTEMPTED, now, {"duration": math.inf})
-    with pytest.raises(MergenConfigurationError, match="oversized"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="oversized"):
         RuntimeEvent(RuntimeEventKind.DEAD, now, {"failure.code": "x" * 257})
 
 

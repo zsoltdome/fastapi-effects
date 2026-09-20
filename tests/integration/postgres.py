@@ -108,11 +108,11 @@ async def provision_test_database(
 ) -> AsyncIterator[ProvisionedDatabase]:
     """Create unique roles/database and remove them even after a failed test."""
     suffix = f"{os.getpid()}_{uuid4().hex[:10]}"
-    database = f"mergen_test_{suffix}"
-    migration_role = f"mergen_owner_{suffix}"
-    app_role = f"mergen_app_{suffix}"
-    relay_role = f"mergen_relay_{suffix}"
-    misconfigured_role = f"mergen_bad_{suffix}"
+    database = f"fastapi_effects_test_{suffix}"
+    migration_role = f"fastapi_effects_owner_{suffix}"
+    app_role = f"fastapi_effects_app_{suffix}"
+    relay_role = f"fastapi_effects_relay_{suffix}"
+    misconfigured_role = f"fastapi_effects_bad_{suffix}"
     roles = (migration_role, app_role, relay_role, misconfigured_role)
     passwords = {role: secrets.token_urlsafe(24) for role in roles}
 

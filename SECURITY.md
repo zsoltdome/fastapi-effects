@@ -2,7 +2,7 @@
 
 ## Supported status
 
-FastAPI-Mergen `0.11.0a1` is a production-hardening alpha. Core, webhook, Taskiq,
+FastAPI Effects `0.11.0a1` is a production-hardening alpha. Core, webhook, Taskiq,
 command-idempotency, and delegation claims are covered by real implementations and
 conformance, but v1 promotion remains blocked on external design-partner and independent
 review evidence. Supported Python/database versions are listed in `docs/compatibility.md`.
@@ -31,9 +31,9 @@ production DSNs in a report.
 
 ## Security model summary
 
-- `mergen_migration` owns objects by default and is never a runtime credential.
-- `mergen_app` is restricted by forced RLS to one transaction-bound tenant.
-- `mergen_relay` operates across tenants only on Mergen-owned control-plane tables.
+- `fastapi_effects_migration` owns objects by default and is never a runtime credential.
+- `fastapi_effects_app` is restricted by forced RLS to one transaction-bound tenant.
+- `fastapi_effects_relay` operates across tenants only on FastAPI Effects-owned control-plane tables.
 - Relay connections never enter application handler code.
 - Tenant GUCs propagate trusted application context; they do not authenticate the
   holder of an application database credential.

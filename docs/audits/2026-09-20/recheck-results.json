@@ -6,8 +6,7 @@
   "source": {
     "base_commit": "06d63b701daab26bf00909a5c7150c0ed097ef3c",
     "state": "uncommitted_remediation_worktree",
-    "todo_path": "sup/todo_0920.md",
-    "todo_sha256": "40ee40ab7326914551130722bf4031b64624648cfc77d2b4f78213581b5d98d0",
+    "internal_checklist_sha256": "40ee40ab7326914551130722bf4031b64624648cfc77d2b4f78213581b5d98d0",
     "limitation": "The base commit predates these changes; results are local diagnostics and are not bound to a candidate commit or protected workflow."
   },
   "infrastructure": {
@@ -41,17 +40,17 @@
       "detail": "Locked dependency audit found no known vulnerabilities; the unpublished local package was explicitly unauditable on PyPI. Bandit and the offline secret/forbidden-license scan passed."
     },
     {
-      "command": "MERGEN_TEST_ADMIN_DSN=<postgresql-16> MERGEN_TEST_REDIS_URL=<redis-7> uv run --no-sync pytest -q -m integration",
+      "command": "FASTAPI_EFFECTS_TEST_ADMIN_DSN=<postgresql-16> FASTAPI_EFFECTS_TEST_REDIS_URL=<redis-7> uv run --no-sync pytest -q -m integration",
       "result": "pass",
       "detail": "49 passed, 383 deselected; no skipped integration tests."
     },
     {
-      "command": "MERGEN_TEST_ADMIN_DSN=<postgresql-18> MERGEN_TEST_REDIS_URL=<redis-7> uv run --no-sync pytest -q -m integration",
+      "command": "FASTAPI_EFFECTS_TEST_ADMIN_DSN=<postgresql-18> FASTAPI_EFFECTS_TEST_REDIS_URL=<redis-7> uv run --no-sync pytest -q -m integration",
       "result": "pass",
       "detail": "49 passed, 383 deselected; no skipped integration tests."
     },
     {
-      "command": "MERGEN_TEST_ADMIN_DSN=<postgresql-18> MERGEN_TEST_REDIS_URL=<redis-7> uv run --no-sync python scripts/build_and_test_artifacts.py --runtime-certification <four selected database journeys>",
+      "command": "FASTAPI_EFFECTS_TEST_ADMIN_DSN=<postgresql-18> FASTAPI_EFFECTS_TEST_REDIS_URL=<redis-7> uv run --no-sync python scripts/build_and_test_artifacts.py --runtime-certification <four selected database journeys>",
       "result": "pass",
       "detail": "The locked PEP 517 backend built both candidates. Clean wheel and sdist-derived environments each passed six selected tests, package-origin checks, and complete-profile real-service certification with lock-constrained runtime dependencies."
     },

@@ -10,9 +10,9 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_advertised_core_runtime_contains_no_reachable_stub() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     runtime_sources = (
-        ROOT / "src" / "fastapi_mergen" / "postgres",
-        ROOT / "src" / "fastapi_mergen" / "sqlalchemy",
-        ROOT / "src" / "fastapi_mergen" / "handlers",
+        ROOT / "src" / "fastapi_effects" / "postgres",
+        ROOT / "src" / "fastapi_effects" / "sqlalchemy",
+        ROOT / "src" / "fastapi_effects" / "handlers",
     )
     assert "Real PostgreSQL transactional runtime | Implemented" in readme
     for source_root in runtime_sources:

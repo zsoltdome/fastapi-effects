@@ -11,29 +11,29 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from fastapi_mergen import (
+from fastapi_effects import (
     AuthorizationDenied,
     Event,
-    MergenConfigurationError,
-    MergenUnitOfWork,
+    FastAPIEffectsConfigurationError,
+    FastAPIEffectsUnitOfWork,
     Principal,
     RetryPolicy,
 )
-from fastapi_mergen.postgres import PostgresStore
-from fastapi_mergen.postgres.leasing import LeaseRepository
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
-from fastapi_mergen.postgres.webhook_schema import install_webhook_schema
-from fastapi_mergen.sqlalchemy.models import DeliveryRow
-from fastapi_mergen.webhooks.api import webhook_router
-from fastapi_mergen.webhooks.models import WebhookSecretVersionRow
-from fastapi_mergen.webhooks.operations import RetentionResult, WebhookOperations
-from fastapi_mergen.webhooks.secrets import (
+from fastapi_effects.postgres import PostgresStore
+from fastapi_effects.postgres.leasing import LeaseRepository
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
+from fastapi_effects.postgres.webhook_schema import install_webhook_schema
+from fastapi_effects.sqlalchemy.models import DeliveryRow
+from fastapi_effects.webhooks.api import webhook_router
+from fastapi_effects.webhooks.models import WebhookSecretVersionRow
+from fastapi_effects.webhooks.operations import RetentionResult, WebhookOperations
+from fastapi_effects.webhooks.secrets import (
     MasterKey,
     StaticMasterKeyProvider,
     WebhookSecretService,
 )
-from fastapi_mergen.webhooks.subscriptions import (
+from fastapi_effects.webhooks.subscriptions import (
     SubscriptionRepository,
     WebhookRouteProvider,
 )
@@ -69,7 +69,7 @@ async def test_subscription_versions_and_secrets_snapshot_atomically(
         await install_webhook_schema(migration_engine, roles=roles)
 
         async with app_sessions() as session:
-            uow = MergenUnitOfWork(
+            uow = FastAPIEffectsUnitOfWork(
                 session=session,
                 principal=principal,
                 store=PostgresStore(),
@@ -95,7 +95,7 @@ async def test_subscription_versions_and_secrets_snapshot_atomically(
                 )
             assert created_secret.plaintext not in repr(created_secret)
 
-            second_uow = MergenUnitOfWork(
+            second_uow = FastAPIEffectsUnitOfWork(
                 session=session,
                 principal=principal,
                 store=PostgresStore(),
@@ -120,7 +120,7 @@ async def test_subscription_versions_and_secrets_snapshot_atomically(
 
             async with session.begin():
                 await session.execute(
-                    text("SELECT set_config('mergen.tenant_id', :tenant, true)"),
+                    text("SELECT set_config('fastapi_effects.tenant_id', :tenant, true)"),
                     {"tenant": str(tenant_id)},
                 )
                 deliveries = (
@@ -145,7 +145,7 @@ async def test_subscription_versions_and_secrets_snapshot_atomically(
 
             async with session.begin():
                 await session.execute(
-                    text("SELECT set_config('mergen.tenant_id', :tenant, true)"),
+                    text("SELECT set_config('fastapi_effects.tenant_id', :tenant, true)"),
                     {"tenant": str(tenant_id)},
                 )
                 rotated = await secrets.rotate(
@@ -158,7 +158,7 @@ async def test_subscription_versions_and_secrets_snapshot_atomically(
                 )
             async with session.begin():
                 await session.execute(
-                    text("SELECT set_config('mergen.tenant_id', :tenant, true)"),
+                    text("SELECT set_config('fastapi_effects.tenant_id', :tenant, true)"),
                     {"tenant": str(tenant_id)},
                 )
                 eligible = await secrets.eligible_for_signing(
@@ -206,7 +206,7 @@ async def test_webhook_replay_works_with_exact_application_role_grants(
         await install_webhook_schema(migration_engine, roles=roles)
         async with (
             app_sessions() as session,
-            MergenUnitOfWork(
+            FastAPIEffectsUnitOfWork(
                 session=session,
                 principal=principal,
                 store=PostgresStore(),
@@ -246,7 +246,7 @@ async def test_webhook_replay_works_with_exact_application_role_grants(
 
         async with (
             app_sessions() as session,
-            MergenUnitOfWork(session=session, principal=principal),
+            FastAPIEffectsUnitOfWork(session=session, principal=principal),
         ):
             replay = await operations.replay(
                 session,
@@ -307,7 +307,7 @@ async def test_webhook_replay_works_with_exact_application_role_grants(
 
         async with app_sessions() as session, session.begin():
             await session.execute(
-                text("SELECT set_config('mergen.tenant_id', :tenant, true)"),
+                text("SELECT set_config('fastapi_effects.tenant_id', :tenant, true)"),
                 {"tenant": str(tenant_id)},
             )
             original_state = await session.scalar(
@@ -330,10 +330,10 @@ async def test_webhook_replay_works_with_exact_application_role_grants(
             subject_id="user:other-tenant",
             scopes=frozenset({"webhooks:manage"}),
         )
-        with pytest.raises(MergenConfigurationError, match="terminal delivery"):
+        with pytest.raises(FastAPIEffectsConfigurationError, match="terminal delivery"):
             async with (
                 app_sessions() as session,
-                MergenUnitOfWork(session=session, principal=other),
+                FastAPIEffectsUnitOfWork(session=session, principal=other),
             ):
                 await operations.replay(
                     session,

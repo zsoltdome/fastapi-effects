@@ -5,7 +5,7 @@
 
 ## Context
 
-The Mergen thesis depends on cross-boundary invariants that ordinary library API tests
+The FastAPI Effects thesis depends on cross-boundary invariants that ordinary library API tests
 cannot establish for custom adapters or deployments. A prose contract without
 executable evidence is easy to reinterpret, while a runtime-specific suite would lock
 the project to one queue, database wrapper, webhook transport, or MCP integration.
@@ -34,7 +34,7 @@ verification.
 
 ## Consequences
 
-- Adapter authors can certify one common contract without adopting Mergen's internal
+- Adapter authors can certify one common contract without adopting FastAPI Effects's internal
   storage implementation.
 - A certification claim is specific to the adapter, manifest, implementation version,
   profile, and run evidence.

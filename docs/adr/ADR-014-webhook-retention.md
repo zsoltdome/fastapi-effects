@@ -8,7 +8,7 @@
 Webhook history pruning is a dedicated maintenance transaction executed through a
 `SECURITY DEFINER` PostgreSQL function owned by the migration role. The function has a
 fixed `search_path`, accepts an explicit tenant, cutoff, and bounded batch size, and
-rejects a tenant that does not equal the transaction-local `mergen.tenant_id` setting.
+rejects a tenant that does not equal the transaction-local `fastapi_effects.tenant_id` setting.
 Only the application role receives `EXECUTE`; it receives no new direct delete grant on
 immutable core history.
 

@@ -1,15 +1,62 @@
-# FastAPI-Mergen
+# FastAPI Effects
+
+> **Durable, tenant-aware side effects for FastAPI and PostgreSQL.**
+
+Many applications need to save information and then trigger another action, such as
+sending a webhook, starting a job, or notifying another system. A crash at the wrong
+moment can otherwise lose that action, repeat it unexpectedly, or run it under the wrong
+customer account. FastAPI Effects records the intended action in the same PostgreSQL
+transaction as the data change, then delivers it with retry and audit information intact.
+It is useful when a multi-tenant FastAPI service needs stronger guarantees than a
+best-effort background task.
+
+[Documentation](https://github.com/zsoltdome/fastapi-effects/tree/main/docs) ·
+[PyPI](https://pypi.org/project/fastapi-effects/) ·
+[Changelog](https://github.com/zsoltdome/fastapi-effects/blob/main/CHANGELOG.md) ·
+[Security](https://github.com/zsoltdome/fastapi-effects/blob/main/SECURITY.md) ·
+[License](https://github.com/zsoltdome/fastapi-effects/blob/main/LICENSE)
 
 > **Status:** production-hardening alpha `0.11.0a1`; v1 external gates are open.
 
-FastAPI-Mergen defines and tests the transaction boundary for **tenant-safe effects**
-in async FastAPI and PostgreSQL systems.
+Application changes and effect intent use the same SQLAlchemy transaction. After
+commit, a fenced PostgreSQL relay executes immutable delivery snapshots through fresh,
+tenant-bound application sessions.
 
-> **One commit. Every effect keeps its tenant and authority provenance.**
+## Install
 
-Write application state and effect intent through the same SQLAlchemy transaction;
-after commit, a fenced PostgreSQL relay executes immutable delivery snapshots through
-fresh tenant-bound application sessions.
+FastAPI Effects supports Python 3.11 through 3.14.
+
+```bash
+python -m pip install fastapi-effects
+```
+
+Install only the integrations you use: `webhooks`, `otel`, `taskiq`, and `fastmcp`.
+For example, `python -m pip install "fastapi-effects[webhooks]"` adds signed webhook
+delivery without forcing that dependency set on every installation.
+
+## Check the contract in 30 seconds
+
+The bundled reference driver runs without PostgreSQL and demonstrates the core
+atomicity, isolation, authority, retry, fan-out, lineage, and replay contracts:
+
+```bash
+fastapi-effects conformance run --reference --profile core --format markdown
+```
+
+The report ends with nine passing checks and includes this result:
+
+```text
+- Profile: `core`
+- Contract: `1.0`
+- Certified: **yes**
+```
+
+This certifies the reference driver, not an application deployment. Use a real adapter
+and the PostgreSQL profiles to certify your integration.
+
+## Commit state and effect intent together
+
+The application owns the unit-of-work boundary:
 
 ```python
 async with uow:
@@ -21,136 +68,109 @@ async with uow:
     )
 ```
 
-Delivery is at least once. Consumers that need one business result must deduplicate in
-the same transaction as that result. Automatic retries retain the delivery/message ID;
-manual replay creates a new linked delivery ID.
+If the transaction rolls back, neither the invoice nor its event and original
+deliveries remain. If it commits, the relay can recover delivery after a crash without
+reconstructing tenant, route, or authority state from mutable application data.
 
-Start with the [installed-wheel PostgreSQL quickstart](docs/tutorials/quickstart.md).
+The
+[installed-wheel PostgreSQL quickstart](https://github.com/zsoltdome/fastapi-effects/blob/main/docs/tutorials/quickstart.md)
+runs the complete application and relay path with separate administrator, migration,
+application, and relay credentials.
 
-## Capability status
+## Why FastAPI Effects?
+
+- Atomic local commit for business state, event, and original delivery rows.
+- PostgreSQL roles and forced row-level security for tenant isolation.
+- Fenced leases, immutable attempts, deterministic retry, and accountable replay.
+- Snapshot, revalidated, and service-policy authority modes.
+- Signed, encrypted, SSRF-resistant webhook delivery.
+- Durable Taskiq handoff, inbound command idempotency, and scoped delegation.
+- Executable conformance profiles with JSON, JUnit, SARIF, and Markdown evidence.
+
+## Delivery guarantees
+
+FastAPI Effects does not promise generic exactly-once distributed execution.
+
+| Boundary | Guarantee |
+|---|---|
+| Application state and original effect intent | Atomic local commit |
+| Delivery or external execution | At least once |
+| Automatic retry | Stable delivery/message identity; new attempt identity |
+| Manual replay | New delivery identity linked to the original |
+| One consumer-visible business result | Consumer must deduplicate durably in its transaction |
+
+## Capability maturity
 
 | Capability | Status in `0.11.0a1` |
 |---|---|
 | Boundary Contract and conformance profiles | Implemented |
-| Deterministic in-memory conformance driver | Reference-only |
 | Real PostgreSQL transactional runtime | Implemented |
-| Explicit SQLAlchemy UoW, dedupe, and immutable fan-out | Implemented |
-| Leases, reconciliation, polling relay, and in-process handlers | Implemented |
-| PostgreSQL roles, forced RLS, schema checks, and doctor | Implemented |
-| Target-bound delegation and FastMCP 3.4 bridge | Implemented alpha |
-| Encrypted, signed, SSRF-safe webhook delivery | Implemented beta |
-| Durable Taskiq external executor | Implemented alpha |
-| Transactional inbound command idempotency | Implemented alpha |
-| API/schema compatibility, recovery, telemetry, and release evidence | Implemented locally |
-| Two external deployments, independent review, RC observation | Required; not complete |
+| SQLAlchemy UoW, dedupe, immutable fan-out, relay, and replay | Implemented |
+| PostgreSQL 16/18 roles, forced RLS, migrations, and diagnostics | Implemented |
+| Target-bound delegation and FastMCP bridge | Alpha |
+| Signed webhook delivery and receiver replay protection | Beta |
+| Durable Taskiq external executor | Alpha |
+| Transactional inbound command idempotency | Alpha |
+| Compatibility, recovery, telemetry, and release evidence | Locally verified |
+| Two external deployments, independent review, and RC observation | Required; open |
 
-The source-recovery and milestone chronology is retained in
-[`docs/planning/original-feasibility-plan.md`](docs/planning/original-feasibility-plan.md)
-and the audit history; it is not release evidence for the current artifact.
+The in-memory driver is a reference oracle, not a production store. Detailed evidence
+stages and remaining promotion gates are recorded in the
+[current remediation record](https://github.com/zsoltdome/fastapi-effects/blob/main/docs/planning/current-remediation.md).
 
-## What this alpha provides
+## Requirements and compatibility
 
-- Boundary Contract v1 with fourteen stable invariants;
-- strict capability manifests and eight certification profiles;
-- deterministic asynchronous conformance scenarios;
-- an in-memory reference oracle with twenty injectable defects;
-- JSON, JUnit, SARIF, and Markdown reports;
-- independently verifiable manifest/report digests;
-- credential-safe bounded evidence and deployment secret canaries;
-- private, atomic report-file output;
-- CLI, testing helpers, JSON schemas, CI workflow, and a cumulative milestone audit.
-- atomic event and original-delivery persistence in a caller-owned async SQLAlchemy
-  transaction;
-- tenant-scoped dedupe with immutable payload conflict detection;
-- PostgreSQL 16/18 RLS, role, migration, and pooled-context diagnostics;
-- fenced delivery leases, deterministic retry, reconciliation, replay, and polling;
-- snapshot, revalidated, and service-policy handler authority; and
-- a real PostgreSQL adapter certifying the `core`, `delivery`, and `security` profiles.
-- versioned exact-event webhook subscriptions and AES-GCM encrypted signing keys;
-- Standard Webhooks-compatible deterministic bodies and rotation-overlap signatures;
-- attempt-time DNS policy, explicit-IP TLS/HTTP, bounded response parsing, pause,
-  replay, retention, and a real adapter certifying the `webhook` profile.
-- durable per-attempt Taskiq handoffs, stable task IDs, duplicate worker fencing,
-  principal restoration, expiry recovery, and a real `executor` profile adapter.
-- transaction-owned command generations, exact request fingerprinting, bounded
-  response replay, restricted retention, and a real `command` profile adapter.
-- audience/method/path-bound delegation, scope/depth attenuation, key
-  rotation/revocation, token-free audit, and a real `delegation` profile adapter.
+- Python 3.11–3.14 and async SQLAlchemy 2.x.
+- PostgreSQL 16 and 18 are the certified runtime lines.
+- FastAPI, SQLAlchemy, Pydantic, and Alembic are core dependencies.
+- Webhooks, OpenTelemetry, Taskiq, and FastMCP are optional extras.
+- Linux is the release-certification environment; the package is pure Python, but
+  production behavior depends on PostgreSQL and integration services.
+- Stable symbols and the deprecation policy are listed in the
+  [public API inventory](https://github.com/zsoltdome/fastapi-effects/blob/main/docs/reference/public-api.md).
+- Python imports, the PostgreSQL schema and roles, telemetry names, protocol identifiers,
+  environment variables, and the console command all use the `fastapi_effects` namespace
+  (with `fastapi-effects` where packaging and command conventions require a hyphen).
 
-This is an alpha integration release: polling remains the correctness path and
-Taskiq is an optional transport for durable handler handoffs. Command idempotency
-protects local database work and durable effect intent, not direct remote calls.
-FastMCP tool visibility is not authorization; downstream routes verify delegation.
-Webhook promotion to stable still requires recorded design-partner staging feedback.
+## Limitations and non-goals
 
-## Run the reference suite
+- The package is async-only and PostgreSQL-specific; it is not a synchronous or
+  database-agnostic outbox.
+- Polling is the correctness path. Taskiq is an optional durable transport for handler
+  handoff, not the source of delivery truth.
+- Command idempotency protects local database work and durable effect intent, not
+  uncoordinated remote calls made inside an endpoint.
+- FastMCP tool visibility is not authorization; downstream routes verify delegation.
+- FastAPI Effects is not an authentication server, tenant manager, general queue,
+  scheduler, or workflow engine.
+- Webhook promotion to stable still requires recorded design-partner staging feedback.
 
-```bash
-PYTHONPATH=src fastapi-mergen conformance run \
-  --reference \
-  --profile complete \
-  --format json \
-  --output build/conformance/report.json
-
-PYTHONPATH=src fastapi-mergen conformance manifest \
-  --reference > build/conformance/manifest.json
-
-PYTHONPATH=src fastapi-mergen conformance verify \
-  --manifest build/conformance/manifest.json \
-  --report build/conformance/report.json
-```
-
-The first two commands normally run from an installed wheel or a `uv` environment, so
-`PYTHONPATH=src` is not needed:
-
-```bash
-uv sync --group test
-uv run fastapi-mergen conformance run --reference --profile complete
-```
-
-## Certify an implementation
-
-```bash
-fastapi-mergen conformance run \
-  --adapter myapp.mergen_conformance:create_driver \
-  --profile core \
-  --format json \
-  --output build/conformance/report.json
-```
-
-The adapter factory is trusted code imported with the authority of the CLI process.
-Never accept its module path from a tenant or other untrusted caller.
-
-## Guarantee language
-
-FastAPI-Mergen does not promise generic exactly-once distributed execution.
-
-- application state and original effect intent: **atomic local commit**;
-- delivery or external execution: **at least once**;
-- consumer-visible effectively-once behavior: requires durable consumer
-  deduplication using the stable message identity;
-- automatic retry: stable delivery/message identity and a new attempt identity;
-- manual replay: a new linked delivery identity.
+Choose a simpler transactional outbox when tenant-bound authority, RLS enforcement,
+replay accountability, and executable conformance evidence are not requirements.
 
 ## Documentation
 
-Start with:
-
-1. [PostgreSQL quickstart](docs/tutorials/quickstart.md);
-2. [Boundary Contract v1](docs/concepts/boundary-contract.md);
-3. [Public API and compatibility](docs/reference/public-api.md);
-4. [Production operations](docs/operations/migrations.md);
-5. [Certification operations](docs/operations/certification.md);
-6. [Security policy](SECURITY.md).
-7. [Current remediation and open evidence gates](docs/planning/current-remediation.md).
+- [PostgreSQL quickstart](https://github.com/zsoltdome/fastapi-effects/blob/main/docs/tutorials/quickstart.md)
+- [Boundary Contract](https://github.com/zsoltdome/fastapi-effects/blob/main/docs/concepts/boundary-contract.md)
+- [Architecture](https://github.com/zsoltdome/fastapi-effects/blob/main/ARCHITECTURE.md)
+- [Runtime API](https://github.com/zsoltdome/fastapi-effects/blob/main/docs/reference/runtime-api.md)
+- [Webhook tutorial](https://github.com/zsoltdome/fastapi-effects/blob/main/docs/tutorials/webhook-vertical-slice.md)
+- [Operations guides](https://github.com/zsoltdome/fastapi-effects/tree/main/docs/operations)
+- [Certification](https://github.com/zsoltdome/fastapi-effects/blob/main/docs/operations/certification.md)
+- [Known limitations](https://github.com/zsoltdome/fastapi-effects/blob/main/docs/planning/known-limitations.md)
 
 ## Development
 
 ```bash
-uv sync --all-extras --all-groups
-uv run python scripts/check.py
+uv sync --locked --all-extras --all-groups
+uv run --locked --no-sync pre-commit install
+uv run --locked --no-sync python scripts/check.py
 ```
 
-## Licence
+See [CONTRIBUTING.md](https://github.com/zsoltdome/fastapi-effects/blob/main/CONTRIBUTING.md)
+for branch, review, architecture, and security requirements.
 
-MIT.
+## License
+
+FastAPI Effects is authored by Zsolt Döme and distributed under the
+[MIT License](https://github.com/zsoltdome/fastapi-effects/blob/main/LICENSE).

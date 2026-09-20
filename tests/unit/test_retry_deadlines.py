@@ -4,13 +4,13 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from fastapi_mergen.core.retry import (
+from fastapi_effects.core.retry import (
     RetryPolicy,
     attempt_deadline,
     delivery_deadline,
     remaining_attempt_seconds,
 )
-from fastapi_mergen.webhooks.classification import parse_retry_after
+from fastapi_effects.webhooks.classification import parse_retry_after
 
 CREATED = datetime(2026, 9, 7, 12, tzinfo=UTC)
 POLICY = RetryPolicy(

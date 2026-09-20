@@ -7,15 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from fastapi_mergen.conformance import (
+from fastapi_effects.conformance import (
     CertificationProfile,
     ConformanceRunner,
     RunnerConfiguration,
 )
-from fastapi_mergen.conformance.models import ConformanceReport
-from fastapi_mergen.conformance.reporters import ReportFormat, render_report, write_report
-from fastapi_mergen.errors import MergenConfigurationError
-from fastapi_mergen.testing import ReferenceBoundaryDriver
+from fastapi_effects.conformance.models import ConformanceReport
+from fastapi_effects.conformance.reporters import ReportFormat, render_report, write_report
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
+from fastapi_effects.testing import ReferenceBoundaryDriver
 
 
 async def make_report() -> ConformanceReport:
@@ -54,6 +54,6 @@ async def test_report_write_rejects_symlink_destination(tmp_path: Path) -> None:
     target.write_text("original", encoding="utf-8")
     link = tmp_path / "report.json"
     link.symlink_to(target)
-    with pytest.raises(MergenConfigurationError, match="symlink"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="symlink"):
         write_report(link, render_report(report, "json"))
     assert target.read_text(encoding="utf-8") == "original"

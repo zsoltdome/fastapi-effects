@@ -15,15 +15,15 @@ Run Alembic only with the migration-owner credential. Application and relay cred
 must never own tables, functions, indexes, policies, or triggers. Deploy schema changes
 before starting candidate application processes, then run:
 
-The installed CLI exposes the bundled revision set through `fastapi-mergen schema
+The installed CLI exposes the bundled revision set through `fastapi-effects schema
 upgrade --dsn ...`. When an administrator has already created the three login roles,
 pass `--no-create-runtime-roles`; the migration process then needs no role-creation
 authority. The explicit Alembic environment remains available for advanced deployment
 or downgrade procedures.
 
 ```console
-fastapi-mergen schema check --dsn postgresql://...
-fastapi-mergen doctor --dsn postgresql://... --expected-role mergen_app
+fastapi-effects schema check --dsn postgresql://...
+fastapi-effects doctor --dsn postgresql://... --expected-role fastapi_effects_app
 ```
 
 Applications should also await `PostgresStore().check_schema(engine)` in their startup

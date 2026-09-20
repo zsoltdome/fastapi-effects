@@ -4,8 +4,8 @@ from uuid import UUID
 
 import pytest
 from examples.invoicing.app.auth import DEMO_AUTHORIZATION, DEMO_TENANT_ID
+from examples.invoicing.app.fastapi_effects_config import fastapi_effects
 from examples.invoicing.app.main import app
-from examples.invoicing.app.mergen_config import mergen
 from fastapi import status
 from httpx import ASGITransport, AsyncClient
 
@@ -18,7 +18,7 @@ INVOICE_BODY = {
 
 def test_openapi_boots_without_database_or_optional_extras() -> None:
     schema = app.openapi()
-    assert schema["info"]["title"] == "FastAPI-Mergen Invoicing Example"
+    assert schema["info"]["title"] == "FastAPI Effects Invoicing Example"
     assert "/invoices" in schema["paths"]
     assert "/health" in schema["paths"]
 
@@ -28,7 +28,7 @@ async def test_lifespan_freezes_routes_and_health_works(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv(
-        "MERGEN_EXAMPLE_DATABASE_URL",
+        "FASTAPI_EFFECTS_EXAMPLE_DATABASE_URL",
         "postgresql+asyncpg://unused:unused@127.0.0.1:1/unused",
     )
     async with (
@@ -38,7 +38,7 @@ async def test_lifespan_freezes_routes_and_health_works(
         response = await client.get("/health")
         assert response.status_code == status.HTTP_200_OK
         assert response.json() == {"status": "ok", "milestone": "8"}
-    assert mergen.frozen
+    assert fastapi_effects.frozen
 
 
 @pytest.mark.asyncio

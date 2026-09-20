@@ -3,10 +3,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from fastapi_mergen import Principal
-from fastapi_mergen.delegation.bridge import DelegationBridge
-from fastapi_mergen.delegation.keys import InMemoryKeyRing, SigningKey
-from fastapi_mergen.delegation.signing import DelegationIssuer
+from fastapi_effects import Principal
+from fastapi_effects.delegation.bridge import DelegationBridge
+from fastapi_effects.delegation.keys import InMemoryKeyRing, SigningKey
+from fastapi_effects.delegation.signing import DelegationIssuer
 
 
 class FixedClock:
@@ -46,7 +46,7 @@ def test_bridge_strips_inbound_credentials_and_attenuates_scopes() -> None:
     assert "authorization" not in lowered
     assert "cookie" not in lowered
     assert "origin-canary" not in repr(request)
-    assert "mrg1." not in repr(request)
+    assert "fastapi_effects1." not in repr(request)
     assert "x-session-token" not in lowered
     assert "x-untrusted" not in lowered
-    assert "mergen-delegation" in lowered
+    assert "fastapi-effects-delegation" in lowered

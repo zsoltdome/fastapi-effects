@@ -6,13 +6,13 @@ from uuid import uuid4
 
 import pytest
 
-from fastapi_mergen.core.delivery import (
+from fastapi_effects.core.delivery import (
     AttemptOutcome,
     AttemptRecord,
     DeliveryRecord,
     DeliveryState,
 )
-from fastapi_mergen.errors import MergenConfigurationError
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
 
 NOW = datetime(2026, 8, 30, 12, 0, tzinfo=UTC)
 
@@ -41,9 +41,9 @@ def test_delivery_is_immutable_and_lease_state_is_coherent() -> None:
     delivery = _delivery()
     with pytest.raises(FrozenInstanceError):
         delivery.state = DeliveryState.DEAD  # type: ignore[misc]
-    with pytest.raises(MergenConfigurationError, match="lease token"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="lease token"):
         _delivery(state=DeliveryState.LEASED)
-    with pytest.raises(MergenConfigurationError, match="Only a leased"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="Only a leased"):
         _delivery(lease_token=uuid4(), lease_expires_at=NOW + timedelta(seconds=30))
 
 
@@ -55,7 +55,7 @@ def test_replay_requires_new_identity_and_accountable_metadata() -> None:
         replay_reason="operator-approved",
     )
     assert replay.delivery_id != original.delivery_id
-    with pytest.raises(MergenConfigurationError, match="Replay"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="Replay"):
         _delivery(replay_of=original.delivery_id)
 
 
@@ -70,7 +70,7 @@ def test_attempt_outcomes_reject_impossible_failure_combinations() -> None:
     }
     started = AttemptRecord(outcome=AttemptOutcome.STARTED, **identities)
     assert started.finished_at is None
-    with pytest.raises(MergenConfigurationError, match="requires bounded failure"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="requires bounded failure"):
         AttemptRecord(
             outcome=AttemptOutcome.RETRYABLE,
             finished_at=NOW + timedelta(seconds=1),

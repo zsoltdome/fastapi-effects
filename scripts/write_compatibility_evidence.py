@@ -16,7 +16,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 TRACKED_DISTRIBUTIONS = (
-    "fastapi-mergen",
+    "fastapi-effects",
     "alembic",
     "asyncpg",
     "cryptography",
@@ -42,7 +42,7 @@ def _version(name: str) -> str | None:
 
 
 def _commit() -> str:
-    configured = os.getenv("MERGEN_IMPLEMENTATION_COMMIT") or os.getenv("GITHUB_SHA")
+    configured = os.getenv("FASTAPI_EFFECTS_IMPLEMENTATION_COMMIT") or os.getenv("GITHUB_SHA")
     if configured:
         return configured
     completed = subprocess.run(
@@ -56,7 +56,7 @@ def _commit() -> str:
 
 
 async def _database_binding() -> dict[str, str] | None:
-    dsn = os.getenv("MERGEN_TEST_ADMIN_DSN")
+    dsn = os.getenv("FASTAPI_EFFECTS_TEST_ADMIN_DSN")
     if not dsn:
         return None
     import asyncpg
@@ -82,7 +82,7 @@ async def _payload(evidence_id: str, selection: str) -> dict[str, Any]:
         "result": "pass",
         "release_authority": True,
         "binding": {
-            "package_version": _version("fastapi-mergen"),
+            "package_version": _version("fastapi-effects"),
             "implementation_commit": _commit(),
             "lock_sha256": hashlib.sha256(lock_bytes).hexdigest(),
             "python": platform.python_version(),

@@ -1,6 +1,6 @@
 # Conformance API reference
 
-Import assurance symbols from `fastapi_mergen.conformance`, not the package root.
+Import assurance symbols from `fastapi_effects.conformance`, not the package root.
 This keeps the runtime public surface narrow.
 
 ## Contract values
@@ -86,7 +86,7 @@ skipped check IDs.
 ### `verify_evidence(report, manifest)`
 
 Binds a parsed report to the exact manifest and returns the certification decision.
-A digest or profile-declaration mismatch raises `MergenConfigurationError`.
+A digest or profile-declaration mismatch raises `FastAPIEffectsConfigurationError`.
 
 ### Reporters
 
@@ -101,7 +101,7 @@ write_report(path, content)
 ## Testing helpers
 
 ```python
-from fastapi_mergen.testing import (
+from fastapi_effects.testing import (
     Fault,
     ReferenceBoundaryDriver,
     assert_certified,

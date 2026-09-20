@@ -3,7 +3,7 @@
 **Milestone:** Specification and repository foundation  
 **Repository version:** `0.0.1`  
 **Review date:** 2026-08-24  
-**Implementation owner:** `mergen-institute`  
+**Implementation owner:** Zsolt Döme
 **Decision:** **implementation complete; external matrix certification pending first CI run**
 
 ## 1. Scope of this sign-off
@@ -48,17 +48,18 @@ block a release and be fixed on a short `fix/...` branch before persistence work
 - Single Git repository with `main` plus typed short-lived branches.
 - Branch slugs and commit subjects contain three to seven short words.
 - Git author and committer name/email are checked across all local branches.
-- Only `mergen-institute <mergen-institute@users.noreply.github.com>` is permitted.
+- The historical Git identity is `zsoltdome`; package authorship is attributed to
+  Zsolt Döme.
 - Contribution, security, changelog, editor, ignore, and dependency-update policies exist.
 
 ### M1.02 — Packaging contract
 
 **Status:** Complete.
 
-- Distribution: `fastapi-mergen`.
-- Import root: `fastapi_mergen`; occupied `mergen` root is rejected by gates.
-- Console entry point: `fastapi-mergen`.
-- One authoritative version module exposes `fastapi_mergen.__version__`.
+- Distribution: `fastapi-effects`.
+- Import root: `fastapi_effects`; occupied `fastapi_effects` root is rejected by gates.
+- Console entry point: `fastapi-effects`.
+- One authoritative version module exposes `fastapi_effects.__version__`.
 - One distribution uses base dependencies plus `webhooks` and `otel` optional extras.
 - Wheel includes `py.typed`; project metadata declares Python 3.11–3.14 and pre-alpha status.
 
@@ -148,7 +149,7 @@ matrix. Handler or network I/O while claim locks are held is prohibited.
 **Status:** Complete.
 
 The spike includes immutable `Principal`, typed `Event`, route/handler registration,
-`RetryPolicy`, authorization modes, `EffectContext`, explicit `MergenUnitOfWork`, narrow
+`RetryPolicy`, authorization modes, `EffectContext`, explicit `FastAPIEffectsUnitOfWork`, narrow
 protocols, documented `postgres`/`sqlalchemy` integration namespaces, and a public exception
 taxonomy. Exact routes, active-version selection, service-capability snapshotting, and
 duplicate/downgrade/freeze checks execute; persistence-dependent calls fail closed.
@@ -192,7 +193,7 @@ python scripts/build_and_test_artifacts.py --offline-system-packages
 # wheel + sdist built and inspected; base wheel clean-installed and imported
 
 python -m pytest -q -m integration
-# 3 skipped because MERGEN_TEST_ADMIN_DSN was unavailable
+# 3 skipped because FASTAPI_EFFECTS_TEST_ADMIN_DSN was unavailable
 
 git diff --check
 git fsck --full
@@ -216,9 +217,9 @@ feature work.
 Milestone 2 must preserve the following decisions unless a superseding ADR is accepted:
 
 1. PostgreSQL RLS is the only MDP isolation mode.
-2. `mergen_migration`, `mergen_app`, and `mergen_relay` are separate roles.
+2. `fastapi_effects_migration`, `fastapi_effects_app`, and `fastapi_effects_relay` are separate roles.
 3. Handlers never receive the relay control connection.
-4. The Mergen UoW owns the outer transaction and rejects pre-existing transactions.
+4. The FastAPI Effects UoW owns the outer transaction and rejects pre-existing transactions.
 5. Business changes, event, and route-derived deliveries commit atomically.
 6. Event, delivery, and attempt are separate durable entities.
 7. Automatic retry keeps delivery identity; manual replay creates linked new identity.
@@ -232,9 +233,9 @@ Milestone 2 must preserve the following decisions unless a superseding ADR is ac
 
 | Question | Owner | Blocking? | Resolution gate |
 |---|---|---:|---|
-| Exact dependency lock after a networked resolver run | `mergen-institute` | No for M1 ZIP; **yes before public alpha** | Review generated `uv.lock` in first CI-enabled dependency PR |
-| Actual PostgreSQL 16/18 fixture behavior | `mergen-institute` | **Yes before M2 persistence merge** | Both integration matrix jobs pass |
-| Ruff/mypy findings under supported Python matrix | `mergen-institute` | **Yes before M2 persistence merge** | All quality jobs pass |
+| Exact dependency lock after a networked resolver run | Zsolt Döme | No for M1 ZIP; **yes before public alpha** | Review generated `uv.lock` in first CI-enabled dependency PR |
+| Actual PostgreSQL 16/18 fixture behavior | Zsolt Döme | **Yes before M2 persistence merge** | Both integration matrix jobs pass |
+| Ruff/mypy findings under supported Python matrix | Zsolt Döme | **Yes before M2 persistence merge** | All quality jobs pass |
 | First external design-partner API review | product owner | No for M1; yes for M2 exit | M2 design-partner gate |
 
 ## 7. Sign-off

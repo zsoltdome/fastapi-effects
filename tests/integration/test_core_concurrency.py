@@ -9,24 +9,24 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from fastapi_mergen import (
+from fastapi_effects import (
     AuthorizationMode,
     Event,
+    FastAPIEffectsUnitOfWork,
     LeaseLost,
-    MergenUnitOfWork,
     Principal,
     RetryableDeliveryError,
     RetryPolicy,
 )
-from fastapi_mergen.core.context import current_principal
-from fastapi_mergen.core.delivery import DeliveryState
-from fastapi_mergen.core.routing import RouteSpecification
-from fastapi_mergen.postgres.leasing import ClaimedDelivery, LeaseRepository
-from fastapi_mergen.postgres.relay import PollingRelay, RelayConfig
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
-from fastapi_mergen.postgres.store import PostgresStore
-from fastapi_mergen.sqlalchemy.models import AttemptRow, DeliveryRow, EventRow
+from fastapi_effects.core.context import current_principal
+from fastapi_effects.core.delivery import DeliveryState
+from fastapi_effects.core.routing import RouteSpecification
+from fastapi_effects.postgres.leasing import ClaimedDelivery, LeaseRepository
+from fastapi_effects.postgres.relay import PollingRelay, RelayConfig
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
+from fastapi_effects.postgres.store import PostgresStore
+from fastapi_effects.sqlalchemy.models import AttemptRow, DeliveryRow, EventRow
 from tests.integration.postgres import ObservedDatabaseClock, ProvisionedDatabase
 
 pytestmark = pytest.mark.integration
@@ -67,7 +67,7 @@ async def _emit(
     routes: tuple[RouteSpecification, ...] | None = None,
 ) -> UUID:
     async with sessions() as session:
-        uow = MergenUnitOfWork(
+        uow = FastAPIEffectsUnitOfWork(
             session=session,
             principal=principal,
             store=PostgresStore(),
@@ -100,7 +100,7 @@ async def test_uow_cancellation_rolls_back_and_cleans_context(
 
         async def cancelled_operation() -> None:
             async with sessions() as session:
-                uow = MergenUnitOfWork(
+                uow = FastAPIEffectsUnitOfWork(
                     session=session,
                     principal=principal,
                     store=PostgresStore(),
@@ -119,7 +119,7 @@ async def test_uow_cancellation_rolls_back_and_cleans_context(
 
         async with sessions() as session, session.begin():
             await session.execute(
-                text("SELECT set_config('mergen.tenant_id', :tenant, true)"),
+                text("SELECT set_config('fastapi_effects.tenant_id', :tenant, true)"),
                 {"tenant": str(principal.tenant_id)},
             )
             event_count = await session.scalar(select(func.count()).select_from(EventRow))
@@ -618,9 +618,9 @@ async def test_fanout_failure_rolls_back_business_and_event_rows(
                 text(
                     f"CREATE POLICY atomic_tenant ON public.atomic_business TO {roles.application} "
                     "USING (tenant_id = "
-                    "nullif(current_setting('mergen.tenant_id', true), '')::uuid) "
+                    "nullif(current_setting('fastapi_effects.tenant_id', true), '')::uuid) "
                     "WITH CHECK (tenant_id = "
-                    "nullif(current_setting('mergen.tenant_id', true), '')::uuid)"
+                    "nullif(current_setting('fastapi_effects.tenant_id', true), '')::uuid)"
                 )
             )
             await connection.execute(
@@ -640,7 +640,7 @@ async def test_fanout_failure_rolls_back_business_and_event_rows(
 
         async def publish_invalid_fanout() -> None:
             async with sessions() as session:
-                uow = MergenUnitOfWork(
+                uow = FastAPIEffectsUnitOfWork(
                     session=session,
                     principal=principal,
                     store=PostgresStore(),
@@ -664,7 +664,7 @@ async def test_fanout_failure_rolls_back_business_and_event_rows(
 
         async with sessions() as session, session.begin():
             await session.execute(
-                text("SELECT set_config('mergen.tenant_id', :tenant, true)"),
+                text("SELECT set_config('fastapi_effects.tenant_id', :tenant, true)"),
                 {"tenant": str(tenant)},
             )
             business_count = await session.scalar(

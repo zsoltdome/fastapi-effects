@@ -23,8 +23,8 @@ def main() -> int:
     args = parser.parse_args()
     manifest: dict[str, Any] = json.loads(MANIFEST.read_text(encoding="utf-8"))
     modes = {"injected"} if args.profile == "injected" else {"injected", "postgres"}
-    if "postgres" in modes and not os.getenv("MERGEN_TEST_ADMIN_DSN"):
-        parser.error("postgres chaos requires MERGEN_TEST_ADMIN_DSN")
+    if "postgres" in modes and not os.getenv("FASTAPI_EFFECTS_TEST_ADMIN_DSN"):
+        parser.error("postgres chaos requires FASTAPI_EFFECTS_TEST_ADMIN_DSN")
     selected = [scenario for scenario in manifest["scenarios"] if scenario["mode"] in modes]
     nodes = [str(scenario["node"]) for scenario in selected if scenario["node"]]
     started = datetime.now(UTC)

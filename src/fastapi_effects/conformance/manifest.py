@@ -1,0 +1,241 @@
+"""Capability manifest used to select and certify conformance scenarios."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from dataclasses import dataclass, field
+from typing import Any, NoReturn
+
+from fastapi_effects.conformance.contract import (
+    CONTRACT_VERSION,
+    MANIFEST_SCHEMA_VERSION,
+    Capability,
+    Invariant,
+    required_capabilities,
+)
+from fastapi_effects.conformance.safety import JsonValue, reject_sensitive_keys, safe_json
+from fastapi_effects.errors import FastAPIEffectsConfigurationError, SchemaRevisionMismatch
+
+_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._/-]{0,127}$")
+_VERSION = re.compile(r"^[0-9A-Za-z][0-9A-Za-z.+_-]{0,63}$")
+_MAX_MANIFEST_BYTES = 256 * 1024
+
+
+@dataclass(frozen=True, slots=True)
+class CapabilityManifest:
+    """Immutable declaration of the facets an implementation can exercise."""
+
+    adapter_name: str
+    adapter_version: str
+    implementation: str
+    capabilities: frozenset[Capability]
+    invariants: frozenset[Invariant]
+    metadata: dict[str, JsonValue] = field(default_factory=dict)
+    contract_version: str = CONTRACT_VERSION
+    schema_version: int = MANIFEST_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.adapter_name, str) or not _NAME.fullmatch(self.adapter_name):
+            raise FastAPIEffectsConfigurationError("Capability manifest adapter_name is invalid.")
+        if not isinstance(self.adapter_version, str) or not _VERSION.fullmatch(
+            self.adapter_version
+        ):
+            raise FastAPIEffectsConfigurationError(
+                "Capability manifest adapter_version is invalid."
+            )
+        if not isinstance(self.implementation, str) or not _NAME.fullmatch(self.implementation):
+            raise FastAPIEffectsConfigurationError("Capability manifest implementation is invalid.")
+        if self.schema_version != MANIFEST_SCHEMA_VERSION:
+            raise SchemaRevisionMismatch(
+                component="conformance-manifest",
+                expected=MANIFEST_SCHEMA_VERSION,
+                actual=self.schema_version,
+            )
+        if self.contract_version != CONTRACT_VERSION:
+            raise FastAPIEffectsConfigurationError("Unsupported Boundary Contract version.")
+        capabilities = frozenset(self.capabilities)
+        invariants = frozenset(self.invariants)
+        if any(not isinstance(item, Capability) for item in capabilities):
+            raise FastAPIEffectsConfigurationError("Manifest contains an unknown capability.")
+        if any(not isinstance(item, Invariant) for item in invariants):
+            raise FastAPIEffectsConfigurationError("Manifest contains an unknown invariant.")
+        for invariant in invariants:
+            missing = required_capabilities(invariant) - capabilities
+            if missing:
+                names = ", ".join(sorted(item.value for item in missing))
+                raise FastAPIEffectsConfigurationError(
+                    f"Invariant {invariant.value} requires undeclared capabilities: {names}."
+                )
+        reject_sensitive_keys(self.metadata)
+        normalized = safe_json(self.metadata)
+        if not isinstance(normalized, dict):
+            raise FastAPIEffectsConfigurationError("Manifest metadata must be a mapping.")
+        object.__setattr__(self, "capabilities", capabilities)
+        object.__setattr__(self, "invariants", invariants)
+        object.__setattr__(self, "metadata", normalized)
+
+    def as_dict(self) -> dict[str, JsonValue]:
+        """Return the canonical manifest representation."""
+
+        capabilities: list[JsonValue] = []
+        capabilities.extend(sorted(item.value for item in self.capabilities))
+        invariants: list[JsonValue] = []
+        invariants.extend(sorted(item.value for item in self.invariants))
+
+        return {
+            "schema_version": self.schema_version,
+            "contract_version": self.contract_version,
+            "adapter_name": self.adapter_name,
+            "adapter_version": self.adapter_version,
+            "implementation": self.implementation,
+            "capabilities": capabilities,
+            "invariants": invariants,
+            "metadata": self.metadata,
+        }
+
+    def canonical_bytes(self) -> bytes:
+        """Serialize without insignificant whitespace or unstable key ordering."""
+
+        return json.dumps(
+            self.as_dict(),
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+    @property
+    def digest(self) -> str:
+        """Return the stable SHA-256 identity of the declaration."""
+
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def to_json(self, *, indent: int | None = 2) -> str:
+        """Serialize a human- or machine-readable manifest."""
+
+        return json.dumps(
+            self.as_dict(),
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            indent=indent,
+        )
+
+    @classmethod
+    def from_dict(cls, value: dict[str, Any]) -> CapabilityManifest:
+        """Parse a strict manifest mapping."""
+
+        if not isinstance(value, dict):
+            raise FastAPIEffectsConfigurationError("Capability manifest must be an object.")
+        expected = {
+            "schema_version",
+            "contract_version",
+            "adapter_name",
+            "adapter_version",
+            "implementation",
+            "capabilities",
+            "invariants",
+            "metadata",
+        }
+        if set(value) != expected:
+            raise FastAPIEffectsConfigurationError(
+                "Capability manifest fields are incomplete or unknown."
+            )
+        if not isinstance(value["schema_version"], int) or isinstance(
+            value["schema_version"], bool
+        ):
+            raise FastAPIEffectsConfigurationError("Capability manifest schema_version is invalid.")
+        for field_name in (
+            "contract_version",
+            "adapter_name",
+            "adapter_version",
+            "implementation",
+        ):
+            if not isinstance(value[field_name], str):
+                raise FastAPIEffectsConfigurationError(
+                    f"Capability manifest {field_name} is invalid."
+                )
+        if not isinstance(value["capabilities"], list) or not isinstance(value["invariants"], list):
+            raise FastAPIEffectsConfigurationError(
+                "Capability manifest capabilities and invariants must be arrays."
+            )
+        if any(not isinstance(item, str) for item in value["capabilities"]):
+            raise FastAPIEffectsConfigurationError(
+                "Capability manifest capabilities must contain strings."
+            )
+        if any(not isinstance(item, str) for item in value["invariants"]):
+            raise FastAPIEffectsConfigurationError(
+                "Capability manifest invariants must contain strings."
+            )
+        if len(value["capabilities"]) != len(set(value["capabilities"])):
+            raise FastAPIEffectsConfigurationError("Capability manifest repeats a capability.")
+        if len(value["invariants"]) != len(set(value["invariants"])):
+            raise FastAPIEffectsConfigurationError("Capability manifest repeats an invariant.")
+        try:
+            capabilities = frozenset(Capability(item) for item in value["capabilities"])
+            invariants = frozenset(Invariant(item) for item in value["invariants"])
+        except (TypeError, ValueError) as exc:
+            raise FastAPIEffectsConfigurationError(
+                "Capability manifest enumeration is invalid."
+            ) from exc
+        metadata = value["metadata"]
+        if not isinstance(metadata, dict):
+            raise FastAPIEffectsConfigurationError(
+                "Capability manifest metadata must be a mapping."
+            )
+        return cls(
+            schema_version=value["schema_version"],
+            contract_version=value["contract_version"],
+            adapter_name=value["adapter_name"],
+            adapter_version=value["adapter_version"],
+            implementation=value["implementation"],
+            capabilities=capabilities,
+            invariants=invariants,
+            metadata=metadata,
+        )
+
+    @classmethod
+    def from_json(cls, payload: str | bytes) -> CapabilityManifest:
+        """Parse strict, bounded JSON and reject duplicate object keys."""
+
+        if not isinstance(payload, str | bytes):
+            raise FastAPIEffectsConfigurationError(
+                "Capability manifest JSON must be text or bytes."
+            )
+        encoded = payload.encode("utf-8") if isinstance(payload, str) else payload
+        if len(encoded) > _MAX_MANIFEST_BYTES:
+            raise FastAPIEffectsConfigurationError(
+                "Capability manifest JSON exceeds the size limit."
+            )
+
+        def reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            result: dict[str, Any] = {}
+            for key, item in pairs:
+                if key in result:
+                    raise FastAPIEffectsConfigurationError(
+                        "Capability manifest contains duplicate keys."
+                    )
+                result[key] = item
+            return result
+
+        def reject_constant(_value: str) -> NoReturn:
+            raise FastAPIEffectsConfigurationError(
+                "Capability manifest contains a non-finite number."
+            )
+
+        try:
+            decoded = payload.decode("utf-8") if isinstance(payload, bytes) else payload
+            value = json.loads(
+                decoded,
+                object_pairs_hook=reject_duplicates,
+                parse_constant=reject_constant,
+            )
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise FastAPIEffectsConfigurationError(
+                "Capability manifest is not valid UTF-8 JSON."
+            ) from exc
+        if not isinstance(value, dict):
+            raise FastAPIEffectsConfigurationError("Capability manifest root must be an object.")
+        return cls.from_dict(value)

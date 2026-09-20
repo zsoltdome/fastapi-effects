@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "title": "FastAPI-Mergen operations",
+  "title": "FastAPI Effects operations",
   "panels": [
-    {"title": "Oldest backlog age", "query": "max(fastapi_mergen_backlog_oldest_age_seconds)"},
-    {"title": "Dead delivery rate", "query": "sum(rate(fastapi_mergen_runtime_events_total{mergen_event_kind=\"dead\"}[5m]))"},
-    {"title": "Lease expiry reconciliation", "query": "sum(rate(fastapi_mergen_runtime_events_total{mergen_event_kind=\"reconciled\"}[5m]))"},
-    {"title": "Paused endpoints", "query": "sum(rate(fastapi_mergen_runtime_events_total{mergen_event_kind=\"webhook_paused\"}[15m]))"},
-    {"title": "Command conflicts", "query": "sum(rate(fastapi_mergen_runtime_events_total{mergen_event_kind=\"command_conflict\"}[5m]))"},
-    {"title": "Delegation denials", "query": "sum(rate(fastapi_mergen_runtime_events_total{mergen_event_kind=\"delegation_denied\"}[5m]))"}
+    {"title": "Oldest backlog age", "query": "max(fastapi_effects_backlog_oldest_age_seconds)"},
+    {"title": "Dead delivery rate", "query": "sum(rate(fastapi_effects_runtime_events_total{fastapi_effects_event_kind=\"dead\"}[5m]))"},
+    {"title": "Lease expiry reconciliation", "query": "sum(rate(fastapi_effects_runtime_events_total{fastapi_effects_event_kind=\"reconciled\"}[5m]))"},
+    {"title": "Paused endpoints", "query": "sum(rate(fastapi_effects_runtime_events_total{fastapi_effects_event_kind=\"webhook_paused\"}[15m]))"},
+    {"title": "Command conflicts", "query": "sum(rate(fastapi_effects_runtime_events_total{fastapi_effects_event_kind=\"command_conflict\"}[5m]))"},
+    {"title": "Delegation denials", "query": "sum(rate(fastapi_effects_runtime_events_total{fastapi_effects_event_kind=\"delegation_denied\"}[5m]))"}
   ]
 }

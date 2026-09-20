@@ -3,7 +3,7 @@
 Install the certified stable line:
 
 ```bash
-pip install "fastapi-mergen[fastmcp]"
+pip install "fastapi-effects[fastmcp]"
 ```
 
 The `0.11.0a1` integration range is FastMCP `>=3.4.7,<4`, FastAPI
@@ -15,7 +15,7 @@ tenant, subject, parent depth, or scopes to a tool's model-visible arguments. In
 the tool, call `FastMCPDelegationBridge.dispatch()` with the exact downstream
 audience, method, path, and required scopes. The bridge strips inbound credentials,
 intersects authority, signs a short-lived token, and attaches it only as
-`Mergen-Delegation`.
+`FastAPI-Effects-Delegation`.
 
 The downstream FastAPI application configures
 `verified_delegation_dependency()` or `delegated_principal_dependency()` on every

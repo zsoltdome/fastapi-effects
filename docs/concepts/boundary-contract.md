@@ -1,8 +1,8 @@
-# Mergen Boundary Contract v1.0
+# FastAPI Effects Boundary Contract v1.0
 
 **Status:** accepted and executable through the Milestone 7 assurance suite.
 **Contract version:** `1.0`
-**Applies to:** the Mergen-owned transition from an authenticated, tenant-scoped
+**Applies to:** the FastAPI Effects-owned transition from an authenticated, tenant-scoped
 application operation to durable and deferred effects.
 
 The key words **MUST**, **MUST NOT**, **SHALL**, **SHALL NOT**, and **DOES NOT** are
@@ -14,7 +14,7 @@ normative.
 authenticated operation
         │ trusted Principal
         ▼
-transactional command or MergenUnitOfWork
+transactional command or FastAPIEffectsUnitOfWork
         │ tenant context bound before application SQL
         ├── application state
         ├── immutable event / command identity
@@ -24,7 +24,7 @@ transactional command or MergenUnitOfWork
        handlers / executors / webhooks / delegated calls
 ```
 
-Mergen owns neither caller authentication nor remote consumer behavior. The host
+FastAPI Effects owns neither caller authentication nor remote consumer behavior. The host
 application supplies a trusted principal and an adapter that exposes observable
 boundary operations to the conformance suite.
 

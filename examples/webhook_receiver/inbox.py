@@ -11,7 +11,7 @@ from sqlalchemy import Column, DateTime, LargeBinary, MetaData, String, Table, f
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from fastapi_mergen.errors import MergenConfigurationError
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
 
 _SAFE_NAMESPACE = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,127}$")
 _MESSAGE_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
@@ -55,13 +55,13 @@ async def apply_once(
     """Record a verified message and its local effect in the caller's transaction."""
 
     if not session.in_transaction():
-        raise MergenConfigurationError("Webhook inbox requires an explicit transaction.")
+        raise FastAPIEffectsConfigurationError("Webhook inbox requires an explicit transaction.")
     if not isinstance(source_namespace, str) or _SAFE_NAMESPACE.fullmatch(source_namespace) is None:
-        raise MergenConfigurationError("Webhook inbox source namespace is invalid.")
+        raise FastAPIEffectsConfigurationError("Webhook inbox source namespace is invalid.")
     if not isinstance(message_id, str) or _MESSAGE_ID.fullmatch(message_id) is None:
-        raise MergenConfigurationError("Webhook inbox message ID is invalid.")
+        raise FastAPIEffectsConfigurationError("Webhook inbox message ID is invalid.")
     if not isinstance(body, bytes):
-        raise MergenConfigurationError("Webhook inbox body must be bytes.")
+        raise FastAPIEffectsConfigurationError("Webhook inbox body must be bytes.")
     digest = hashlib.sha256(body).digest()
     inserted = await session.scalar(
         insert(webhook_inbox)

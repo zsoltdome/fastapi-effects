@@ -7,23 +7,23 @@ import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from fastapi_mergen import (
+from fastapi_effects import (
     AuthorizationMode,
     DedupeConflict,
     EffectContext,
     Event,
+    FastAPIEffects,
+    FastAPIEffectsUnitOfWork,
     LeaseLost,
-    Mergen,
-    MergenUnitOfWork,
     Principal,
     RetryPolicy,
 )
-from fastapi_mergen.postgres import PostgresStore
-from fastapi_mergen.postgres.diagnostics import inspect_runtime_database
-from fastapi_mergen.postgres.leasing import LeaseRepository
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
-from fastapi_mergen.sqlalchemy.models import DeliveryRow, EventRow
+from fastapi_effects.postgres import PostgresStore
+from fastapi_effects.postgres.diagnostics import inspect_runtime_database
+from fastapi_effects.postgres.leasing import LeaseRepository
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
+from fastapi_effects.sqlalchemy.models import DeliveryRow, EventRow
 from tests.integration.postgres import ProvisionedDatabase
 
 pytestmark = pytest.mark.integration
@@ -60,8 +60,10 @@ async def test_atomic_publish_dedupe_rls_and_fenced_delivery(
         assert report.healthy, report.checks
         app_sessions = async_sessionmaker(app_engine, expire_on_commit=False)
         relay_sessions = async_sessionmaker(relay_engine, expire_on_commit=False)
-        mergen = Mergen(principal_provider=principal_provider, store=PostgresStore())
-        mergen.route(
+        fastapi_effects = FastAPIEffects(
+            principal_provider=principal_provider, store=PostgresStore()
+        )
+        fastapi_effects.route(
             event_type="invoice.created",
             route_key="invoice.render",
         ).to_handler(
@@ -74,16 +76,16 @@ async def test_atomic_publish_dedupe_rls_and_fenced_delivery(
                 lease_duration_seconds=10,
             ),
         )
-        mergen.freeze()
+        fastapi_effects.freeze()
         tenant = uuid4()
         principal = Principal(tenant_id=tenant, subject_id="user:integration")
 
         async with app_sessions() as session:
-            first_uow = MergenUnitOfWork(
+            first_uow = FastAPIEffectsUnitOfWork(
                 session=session,
                 principal=principal,
                 store=PostgresStore(),
-                routes=mergen.routes,
+                routes=fastapi_effects.routes,
             )
             async with first_uow:
                 first = await first_uow.emit(
@@ -91,11 +93,11 @@ async def test_atomic_publish_dedupe_rls_and_fenced_delivery(
                     dedupe_namespace="invoice-create",
                     dedupe_key="request-1",
                 )
-            second_uow = MergenUnitOfWork(
+            second_uow = FastAPIEffectsUnitOfWork(
                 session=session,
                 principal=principal,
                 store=PostgresStore(),
-                routes=mergen.routes,
+                routes=fastapi_effects.routes,
             )
             async with second_uow:
                 second = await second_uow.emit(
@@ -105,11 +107,11 @@ async def test_atomic_publish_dedupe_rls_and_fenced_delivery(
                 )
             assert second.event_id == first.event_id
 
-            conflict_uow = MergenUnitOfWork(
+            conflict_uow = FastAPIEffectsUnitOfWork(
                 session=session,
                 principal=principal,
                 store=PostgresStore(),
-                routes=mergen.routes,
+                routes=fastapi_effects.routes,
             )
             with pytest.raises(DedupeConflict):
                 async with conflict_uow:
@@ -125,14 +127,14 @@ async def test_atomic_publish_dedupe_rls_and_fenced_delivery(
 
             async with session.begin():
                 await session.execute(
-                    text("SELECT set_config('mergen.tenant_id', :tenant, true)"),
+                    text("SELECT set_config('fastapi_effects.tenant_id', :tenant, true)"),
                     {"tenant": str(tenant)},
                 )
                 assert await session.scalar(select(func.count()).select_from(EventRow)) == 1
                 assert await session.scalar(select(func.count()).select_from(DeliveryRow)) == 1
             async with session.begin():
                 await session.execute(
-                    text("SELECT set_config('mergen.tenant_id', :tenant, true)"),
+                    text("SELECT set_config('fastapi_effects.tenant_id', :tenant, true)"),
                     {"tenant": str(uuid4())},
                 )
                 assert await session.scalar(select(func.count()).select_from(EventRow)) == 0

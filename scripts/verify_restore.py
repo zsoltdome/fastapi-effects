@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare source and restored Mergen databases without emitting protected values."""
+"""Compare source and restored FastAPIEffects databases without emitting protected values."""
 
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ async def database_identity(engine: AsyncEngine) -> dict[str, TableIdentity]:
     result: dict[str, TableIdentity] = {}
     async with engine.connect() as connection:
         for table in TABLES:
-            rows = (await connection.execute(text(f"SELECT * FROM fastapi_mergen.{table}"))).all()
+            rows = (await connection.execute(text(f"SELECT * FROM fastapi_effects.{table}"))).all()
             row_digests = []
             for row in rows:
                 protected = _protected_json(dict(row._mapping))

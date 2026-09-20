@@ -2,13 +2,13 @@
 
 Observability is an optional, best-effort side channel. `NoOpEventSink` is the default;
 telemetry backend failures are swallowed and cannot commit, roll back, retry, or finalize
-runtime work. Install `fastapi-mergen[otel]` and pass `create_otel_sink()` to stores,
+runtime work. Install `fastapi-effects[otel]` and pass `create_otel_sink()` to stores,
 leases, command storage, webhook operations, or Taskiq bridges.
 
-The stable counter is `fastapi_mergen.runtime.events`, labelled by event kind and a small
+The stable counter is `fastapi_effects.runtime.events`, labelled by event kind and a small
 allowlist of capability, destination kind, outcome, state, authorization result, and
-pause status. `fastapi_mergen.operation.duration` is an optional millisecond histogram.
-`fastapi_mergen.backlog.oldest_age` is a seconds histogram populated by the read-only
+pause status. `fastapi_effects.operation.duration` is an optional millisecond histogram.
+`fastapi_effects.backlog.oldest_age` is a seconds histogram populated by the read-only
 `observe_backlog()` PostgreSQL probe; run it on the operator's chosen interval.
 Tenant, subject, event, delivery, attempt, handoff, command, and delegation identifiers
 are never metric labels. Lineage identifiers are trace-only; the structured JSON sink
@@ -25,7 +25,7 @@ tenant/subject IDs, URLs, or exception messages in attributes. The runtime enfor
 exact attribute-name allowlist and size/type limits. Application failure codes must be
 stable classifications rather than interpolated user data.
 
-Import `DelegationTelemetrySink` from `fastapi_mergen.observability.delegation` to adapt
+Import `DelegationTelemetrySink` from `fastapi_effects.observability.delegation` to adapt
 token-free delegation audit events. Keep the primary durable audit sink as well when
 policy requires it; metrics are not an audit log.
 

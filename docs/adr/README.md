@@ -3,7 +3,7 @@
 | ADR | Status | Decision |
 |---|---|---|
 | [0001](0001-trust-model.md) | Accepted | Fixed trust model and three PostgreSQL roles |
-| [0002](0002-explicit-uow-transaction.md) | Accepted | Mergen owns the explicit outer transaction |
+| [0002](0002-explicit-uow-transaction.md) | Accepted | FastAPI Effects owns the explicit outer transaction |
 | [0003](0003-event-delivery-attempt-model.md) | Accepted | Separate immutable event, delivery, and attempt history |
 | [0004](0004-routing-and-policy-snapshots.md) | Accepted | Exact frozen routes and immutable per-delivery policy |
 | [0005](0005-relay-state-machine.md) | Accepted | Polling lease relay with token-checked transitions |
@@ -18,6 +18,7 @@
 | [ADR-013](ADR-013-delegation.md) | Accepted | Target-bound delegated authority |
 | [ADR-014](ADR-014-webhook-retention.md) | Accepted | Tenant-bound bounded webhook retention |
 | [ADR-015](ADR-015-control-plane-budgets.md) | Accepted | Bounded control-plane, finalization, and shutdown work |
+| [ADR-016](ADR-016-fastapi-effects-name.md) | Accepted | FastAPI Effects product identity and compatibility boundary |
 
 ## Decision rule
 

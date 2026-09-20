@@ -11,24 +11,24 @@ import pytest
 from scripts.release_artifacts import create_manifest, verify_manifest
 
 COMMIT = "a" * 40
-WORKFLOW = "mergen-institute/fastapi-mergen/.github/workflows/release.yml@refs/tags/v1.0.0#123.2"
+WORKFLOW = "zsoltdome/fastapi-effects/.github/workflows/release.yml@refs/tags/v1.0.0#123.2"
 
 
 def _candidate(tmp_path: Path, *, distribution_version: str = "1.0.0") -> tuple[Path, Path]:
     root = tmp_path / "candidate"
     (root / "dist").mkdir(parents=True)
     metadata = (
-        f"Metadata-Version: 2.4\nName: fastapi-mergen\nVersion: {distribution_version}\n\n"
+        f"Metadata-Version: 2.4\nName: fastapi-effects\nVersion: {distribution_version}\n\n"
     ).encode()
-    wheel = root / "dist" / f"fastapi_mergen-{distribution_version}-py3-none-any.whl"
+    wheel = root / "dist" / f"fastapi_effects-{distribution_version}-py3-none-any.whl"
     with zipfile.ZipFile(wheel, "w") as archive:
         archive.writestr(
-            f"fastapi_mergen-{distribution_version}.dist-info/METADATA",
+            f"fastapi_effects-{distribution_version}.dist-info/METADATA",
             metadata,
         )
-    sdist = root / "dist" / f"fastapi_mergen-{distribution_version}.tar.gz"
+    sdist = root / "dist" / f"fastapi_effects-{distribution_version}.tar.gz"
     with tarfile.open(sdist, "w:gz") as archive:
-        info = tarfile.TarInfo(f"fastapi_mergen-{distribution_version}/PKG-INFO")
+        info = tarfile.TarInfo(f"fastapi_effects-{distribution_version}/PKG-INFO")
         info.size = len(metadata)
         archive.addfile(info, io.BytesIO(metadata))
     lock = tmp_path / "uv.lock"
@@ -384,7 +384,7 @@ def test_release_manifest_rejects_changed_promotion_input(
         evidence_files=evidence,
     )
     if mutation == "artifact":
-        (root / "dist" / "fastapi_mergen-1.0.0.tar.gz").write_bytes(b"changed")
+        (root / "dist" / "fastapi_effects-1.0.0.tar.gz").write_bytes(b"changed")
     elif mutation == "lock":
         lock.write_bytes(b"changed")
     else:
@@ -413,7 +413,7 @@ def test_release_manifest_rejects_changed_promotion_input(
         (
             COMMIT,
             "1.0.0",
-            "mergen-institute/fastapi-mergen/.github/workflows/release.yml@refs/tags/v1.0.0#123.3",
+            "zsoltdome/fastapi-effects/.github/workflows/release.yml@refs/tags/v1.0.0#123.3",
         ),
     ],
 )

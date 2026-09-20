@@ -24,8 +24,8 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from fastapi_mergen._version import __version__  # noqa: E402
-from fastapi_mergen.conformance import (  # noqa: E402
+from fastapi_effects._version import __version__  # noqa: E402
+from fastapi_effects.conformance import (  # noqa: E402
     CONTRACT_VERSION,
     Capability,
     CertificationProfile,
@@ -36,17 +36,18 @@ from fastapi_mergen.conformance import (  # noqa: E402
     decide,
     verify_evidence,
 )
-from fastapi_mergen.conformance.contract import PROFILE_INVARIANTS  # noqa: E402
-from fastapi_mergen.conformance.reporters import (  # noqa: E402
+from fastapi_effects.conformance.contract import PROFILE_INVARIANTS  # noqa: E402
+from fastapi_effects.conformance.reporters import (  # noqa: E402
     ReportFormat,
     render_report,
     write_report,
 )
-from fastapi_mergen.testing import Fault, ReferenceBoundaryDriver  # noqa: E402
+from fastapi_effects.testing import Fault, ReferenceBoundaryDriver  # noqa: E402
 
 MINIMUM_RELEASE = (0, 6, 0)
-AUTHOR_NAME = "mergen-institute"
-AUTHOR_EMAIL = "mergen-institute@users.noreply.github.com"
+AUTHOR_NAME = "zsoltdome"
+AUTHOR_EMAIL_SUFFIX = "@users.noreply.github.com"
+PROJECT_AUTHOR = "Zsolt Döme"
 RECOVERED_BASELINE_COMMIT = "6b8d3626445bd577cc6c5af80f3b84e30e2c7712"
 RECOVERED_BASELINE_EMAIL = "zsemed@gmail.com"
 ALLOWED_BRANCH_PREFIXES = {
@@ -60,23 +61,23 @@ ALLOWED_BRANCH_PREFIXES = {
     "test",
 }
 REQUIRED_PATHS = {
-    "src/fastapi_mergen/conformance/__init__.py",
-    "src/fastapi_mergen/conformance/certification.py",
-    "src/fastapi_mergen/conformance/cli.py",
-    "src/fastapi_mergen/conformance/contract.py",
-    "src/fastapi_mergen/conformance/loading.py",
-    "src/fastapi_mergen/conformance/manifest.py",
-    "src/fastapi_mergen/conformance/models.py",
-    "src/fastapi_mergen/conformance/protocols.py",
-    "src/fastapi_mergen/conformance/reporters.py",
-    "src/fastapi_mergen/conformance/runner.py",
-    "src/fastapi_mergen/conformance/safety.py",
-    "src/fastapi_mergen/conformance/scenarios.py",
-    "src/fastapi_mergen/conformance/spec/boundary-contract-v1.json",
-    "src/fastapi_mergen/conformance/spec/manifest-v1.schema.json",
-    "src/fastapi_mergen/conformance/spec/report-v1.schema.json",
-    "src/fastapi_mergen/testing/assertions.py",
-    "src/fastapi_mergen/testing/reference.py",
+    "src/fastapi_effects/conformance/__init__.py",
+    "src/fastapi_effects/conformance/certification.py",
+    "src/fastapi_effects/conformance/cli.py",
+    "src/fastapi_effects/conformance/contract.py",
+    "src/fastapi_effects/conformance/loading.py",
+    "src/fastapi_effects/conformance/manifest.py",
+    "src/fastapi_effects/conformance/models.py",
+    "src/fastapi_effects/conformance/protocols.py",
+    "src/fastapi_effects/conformance/reporters.py",
+    "src/fastapi_effects/conformance/runner.py",
+    "src/fastapi_effects/conformance/safety.py",
+    "src/fastapi_effects/conformance/scenarios.py",
+    "src/fastapi_effects/conformance/spec/boundary-contract-v1.json",
+    "src/fastapi_effects/conformance/spec/manifest-v1.schema.json",
+    "src/fastapi_effects/conformance/spec/report-v1.schema.json",
+    "src/fastapi_effects/testing/assertions.py",
+    "src/fastapi_effects/testing/reference.py",
     "tests/conformance/test_contract_models.py",
     "tests/conformance/test_fault_detection.py",
     "tests/conformance/test_reporters.py",
@@ -87,7 +88,6 @@ REQUIRED_PATHS = {
     "docs/reference/conformance-api.md",
     "docs/adr/0006-conformance-evidence.md",
     ".github/workflows/conformance.yml",
-    "IMPLEMENTATION_REPORT_M7.md",
 }
 _ACTION_PIN = re.compile(r"uses:\s*[^\s@]+@[0-9a-f]{40}(?:\s*#.*)?$")
 _BRANCH = re.compile(
@@ -134,21 +134,21 @@ def check_metadata() -> str:
     with (ROOT / "pyproject.toml").open("rb") as stream:
         project: dict[str, Any] = tomllib.load(stream)
     metadata = project["project"]
-    if metadata["name"] != "fastapi-mergen":
+    if metadata["name"] != "fastapi-effects":
         raise AssertionError("distribution name changed")
-    if metadata.get("authors") != [{"name": AUTHOR_NAME}]:
-        raise AssertionError("project author must be mergen-institute only")
+    if metadata.get("authors") != [{"name": PROJECT_AUTHOR}]:
+        raise AssertionError("project author must be Zsolt Döme only")
     match = re.match(r"^\d+\.\d+\.\d+", __version__)
     if match is None or tuple(int(item) for item in match.group().split(".")) < MINIMUM_RELEASE:
         raise AssertionError(f"version is {__version__}, expected M7 or later")
-    package_data = project["tool"]["setuptools"]["package-data"]["fastapi_mergen"]
+    package_data = project["tool"]["setuptools"]["package-data"]["fastapi_effects"]
     if "conformance/spec/*.json" not in package_data:
         raise AssertionError("conformance specifications are not packaged")
     return f"distribution metadata and version {__version__} are valid"
 
 
 def check_specifications() -> str:
-    spec_root = ROOT / "src" / "fastapi_mergen" / "conformance" / "spec"
+    spec_root = ROOT / "src" / "fastapi_effects" / "conformance" / "spec"
     contract = json.loads((spec_root / "boundary-contract-v1.json").read_text())
     manifest_schema = json.loads((spec_root / "manifest-v1.schema.json").read_text())
     report_schema = json.loads((spec_root / "report-v1.schema.json").read_text())
@@ -248,7 +248,7 @@ def check_reporters() -> str:
     markdown = render_report(report, ReportFormat.MARKDOWN)
     if "Certified: **yes**" not in markdown:
         raise AssertionError("Markdown reporter omitted certification decision")
-    with tempfile.TemporaryDirectory(prefix="mergen-m7-report-") as raw:
+    with tempfile.TemporaryDirectory(prefix="fastapi_effects_m7-report-") as raw:
         destination = write_report(Path(raw) / "report.json", json_report)
         if stat.S_IMODE(destination.stat().st_mode) != 0o600:
             raise AssertionError("written report is not private by default")
@@ -285,9 +285,9 @@ def literal_all(path: Path) -> set[str]:
 
 
 def check_public_surface() -> str:
-    root_exports = literal_all(ROOT / "src" / "fastapi_mergen" / "__init__.py")
+    root_exports = literal_all(ROOT / "src" / "fastapi_effects" / "__init__.py")
     conformance_exports = literal_all(
-        ROOT / "src" / "fastapi_mergen" / "conformance" / "__init__.py"
+        ROOT / "src" / "fastapi_effects" / "conformance" / "__init__.py"
     )
     if root_exports & conformance_exports:
         raise AssertionError("Milestone 7 leaked assurance symbols into the root API")
@@ -349,10 +349,11 @@ def check_git_governance() -> str:
             if recovered != expected_recovered:
                 bad_identities.append(f"{commit[:10]}:recovered baseline changed")
             continue
-        if (author, committer) != (AUTHOR_NAME, AUTHOR_NAME) or (
-            author_email,
-            committer_email,
-        ) != (AUTHOR_EMAIL, AUTHOR_EMAIL):
+        if (
+            (author, committer) != (AUTHOR_NAME, AUTHOR_NAME)
+            or author_email != committer_email
+            or not author_email.endswith(AUTHOR_EMAIL_SUFFIX)
+        ):
             bad_identities.append(f"{commit[:10]}:{subject}")
         words = subject.split()
         if not 3 <= len(words) <= 7:
@@ -399,7 +400,7 @@ def execute_gate(gate: Gate, callback: Callable[[], str]) -> None:
 def render_markdown(gates: list[Gate]) -> str:
     mandatory = all(gate.status == "PASS" for gate in gates if gate.required)
     lines = [
-        "# FastAPI-Mergen Milestone 7 audit",
+        "# FastAPI Effects Milestone 7 audit",
         "",
         f"**Version:** `{__version__}`  ",
         f"**Overall mandatory result:** {'PASS' if mandatory else 'FAIL'}",

@@ -17,20 +17,20 @@ if str(ROOT) not in sys.path:
 from sqlalchemy.ext.asyncio import create_async_engine
 from tests.integration.postgres import provision_test_database
 
-import fastapi_mergen
-from fastapi_mergen.conformance import (
+import fastapi_effects
+from fastapi_effects.conformance import (
     CertificationProfile,
     ConformanceRunner,
     RunnerConfiguration,
 )
-from fastapi_mergen.conformance.reporters import ReportFormat, render_report
-from fastapi_mergen.conformance.safety import JsonValue
-from fastapi_mergen.postgres.command_schema import install_command_schema
-from fastapi_mergen.postgres.executor_schema import install_executor_schema
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
-from fastapi_mergen.postgres.webhook_schema import install_webhook_schema
-from fastapi_mergen.testing.complete_driver import PostgresCompleteBoundaryDriver
+from fastapi_effects.conformance.reporters import ReportFormat, render_report
+from fastapi_effects.conformance.safety import JsonValue
+from fastapi_effects.postgres.command_schema import install_command_schema
+from fastapi_effects.postgres.executor_schema import install_executor_schema
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
+from fastapi_effects.postgres.webhook_schema import install_webhook_schema
+from fastapi_effects.testing.complete_driver import PostgresCompleteBoundaryDriver
 
 
 def _required_environment(name: str) -> str:
@@ -44,8 +44,8 @@ _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
 
 async def _generate(artifact_metadata: dict[str, JsonValue]) -> tuple[bool, str, str]:
-    admin_dsn = _required_environment("MERGEN_TEST_ADMIN_DSN")
-    redis_url = _required_environment("MERGEN_TEST_REDIS_URL")
+    admin_dsn = _required_environment("FASTAPI_EFFECTS_TEST_ADMIN_DSN")
+    redis_url = _required_environment("FASTAPI_EFFECTS_TEST_REDIS_URL")
     async with provision_test_database(admin_dsn) as database:
         migration_engine = create_async_engine(database.migration_sqlalchemy_dsn)
         app_engine = create_async_engine(database.app_sqlalchemy_dsn)
@@ -98,13 +98,13 @@ def main() -> int:
     ):
         if _DIGEST.fullmatch(value) is None:
             raise ValueError("Artifact certification digest must be lowercase SHA-256.")
-    package_path = Path(fastapi_mergen.__file__).resolve()
+    package_path = Path(fastapi_effects.__file__).resolve()
     prefix = args.expected_package_prefix.resolve()
     if not package_path.is_relative_to(prefix):
         raise RuntimeError(
             f"Certification imported outside the artifact environment: {package_path}"
         )
-    os.environ["MERGEN_EXPECTED_PACKAGE_PREFIX"] = str(prefix)
+    os.environ["FASTAPI_EFFECTS_EXPECTED_PACKAGE_PREFIX"] = str(prefix)
     artifact_metadata: dict[str, JsonValue] = {
         "artifact.kind": args.artifact_kind,
         "artifact.input_sha256": args.artifact_input_sha256,

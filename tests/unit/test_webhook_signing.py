@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from standardwebhooks.webhooks import Webhook
 
-from fastapi_mergen.webhooks.signing import sign_webhook, verify_webhook
+from fastapi_effects.webhooks.signing import sign_webhook, verify_webhook
 
 
 def test_standard_webhooks_verifies_exact_body() -> None:

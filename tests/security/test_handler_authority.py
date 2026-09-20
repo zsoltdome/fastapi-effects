@@ -8,18 +8,18 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fastapi_mergen import AuthorizationMode, EffectContext, Mergen, Principal, RetryPolicy
-from fastapi_mergen.core.context import current_principal
-from fastapi_mergen.core.delivery import (
+from fastapi_effects import AuthorizationMode, EffectContext, FastAPIEffects, Principal, RetryPolicy
+from fastapi_effects.core.context import current_principal
+from fastapi_effects.core.delivery import (
     AttemptOutcome,
     AttemptRecord,
     DeliveryRecord,
     DeliveryState,
 )
-from fastapi_mergen.core.event import EventRecord
-from fastapi_mergen.errors import AuthorizationExpired
-from fastapi_mergen.postgres.leasing import ClaimedDelivery
-from fastapi_mergen.sqlalchemy.canonical import canonical_sha256, versioned_canonical_bytes
+from fastapi_effects.core.event import EventRecord
+from fastapi_effects.errors import AuthorizationExpired
+from fastapi_effects.postgres.leasing import ClaimedDelivery
+from fastapi_effects.sqlalchemy.canonical import canonical_sha256, versioned_canonical_bytes
 
 NOW = datetime(2026, 8, 30, 12, 0, tzinfo=UTC)
 
@@ -46,8 +46,8 @@ async def principal_provider(request: object) -> Principal:
     raise AssertionError
 
 
-def _claim(mergen: Mergen, principal: Principal) -> ClaimedDelivery:
-    route = mergen.routes[0]
+def _claim(fastapi_effects: FastAPIEffects, principal: Principal) -> ClaimedDelivery:
+    route = fastapi_effects.routes[0]
     delivery_id = uuid4()
     token = uuid4()
     payload = {"invoice_id": "inv-1"}
@@ -119,13 +119,13 @@ async def test_revalidation_never_expands_authority_and_sessions_are_fresh() -> 
         scopes=frozenset({"invoice:read", "invoice:write"}),
         issued_at=NOW,
     )
-    mergen = Mergen(
+    fastapi_effects = FastAPIEffects(
         principal_provider=principal_provider,
         authorization_resolver=Resolver(),
         handler_session_provider=application_session,
         clock=FixedClock(),
     )
-    mergen.route(event_type="invoice.created", route_key="invoice.render").to_handler(
+    fastapi_effects.route(event_type="invoice.created", route_key="invoice.render").to_handler(
         handler,
         required_scopes={"invoice:read"},
         authorization=AuthorizationMode.REVALIDATE,
@@ -133,9 +133,9 @@ async def test_revalidation_never_expands_authority_and_sessions_are_fresh() -> 
             name="handler-test", handler_timeout_seconds=1, lease_duration_seconds=10
         ),
     )
-    executor = mergen.handler_executor()
-    await executor.execute(_claim(mergen, origin))
-    await executor.execute(_claim(mergen, origin))
+    executor = fastapi_effects.handler_executor()
+    await executor.execute(_claim(fastapi_effects, origin))
+    await executor.execute(_claim(fastapi_effects, origin))
 
     assert [principal.scopes for principal in principals] == [
         frozenset({"invoice:read"}),
@@ -163,12 +163,12 @@ async def test_snapshot_expiry_and_handler_failure_reset_context() -> None:
         scopes=frozenset({"invoice:read"}),
         issued_at=NOW - timedelta(minutes=2),
     )
-    mergen = Mergen(
+    fastapi_effects = FastAPIEffects(
         principal_provider=principal_provider,
         handler_session_provider=application_session,
         clock=FixedClock(),
     )
-    mergen.route(event_type="invoice.created", route_key="invoice.render").to_handler(
+    fastapi_effects.route(event_type="invoice.created", route_key="invoice.render").to_handler(
         handler,
         required_scopes={"invoice:read"},
         authorization=AuthorizationMode.SNAPSHOT,
@@ -177,9 +177,9 @@ async def test_snapshot_expiry_and_handler_failure_reset_context() -> None:
             name="handler-test", handler_timeout_seconds=1, lease_duration_seconds=10
         ),
     )
-    executor = mergen.handler_executor()
+    executor = fastapi_effects.handler_executor()
     with pytest.raises(AuthorizationExpired):
-        await executor.execute(_claim(mergen, expired))
+        await executor.execute(_claim(fastapi_effects, expired))
     assert current_principal(required=False) is None
 
     current = Principal(
@@ -189,5 +189,5 @@ async def test_snapshot_expiry_and_handler_failure_reset_context() -> None:
         issued_at=NOW,
     )
     with pytest.raises(RuntimeError, match="receiver-controlled"):
-        await executor.execute(_claim(mergen, current))
+        await executor.execute(_claim(fastapi_effects, current))
     assert current_principal(required=False) is None

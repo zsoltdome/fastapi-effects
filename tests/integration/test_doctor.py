@@ -4,9 +4,9 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from fastapi_mergen.postgres.diagnostics import inspect_runtime_database
-from fastapi_mergen.postgres.roles import RuntimeRoles
-from fastapi_mergen.postgres.schema import install_core_schema
+from fastapi_effects.postgres.diagnostics import inspect_runtime_database
+from fastapi_effects.postgres.roles import RuntimeRoles
+from fastapi_effects.postgres.schema import install_core_schema
 from tests.integration.postgres import ProvisionedDatabase, sqlalchemy_async_dsn
 
 pytestmark = pytest.mark.integration
@@ -36,13 +36,13 @@ async def test_doctor_probes_application_relay_and_unsafe_role(
                 text(f"GRANT SELECT ON public.doctor_business TO {test_database.app_role}")
             )
             await connection.execute(
-                text(f"GRANT USAGE ON SCHEMA fastapi_mergen TO {test_database.misconfigured_role}")
+                text(f"GRANT USAGE ON SCHEMA fastapi_effects TO {test_database.misconfigured_role}")
             )
             await connection.execute(
                 text(
-                    "GRANT SELECT ON fastapi_mergen.schema_revision, "
-                    "fastapi_mergen.events, fastapi_mergen.deliveries, "
-                    f"fastapi_mergen.attempts TO {test_database.misconfigured_role}"
+                    "GRANT SELECT ON fastapi_effects.schema_revision, "
+                    "fastapi_effects.events, fastapi_effects.deliveries, "
+                    f"fastapi_effects.attempts TO {test_database.misconfigured_role}"
                 )
             )
 

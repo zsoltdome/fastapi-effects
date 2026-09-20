@@ -1,12 +1,12 @@
-# FastAPI-Mergen — Product and Engineering Plan
+# FastAPI Effects — Product and Engineering Plan
 
 **Date:** 2026-08-24  
 **Current baseline:** 2026-09-07, production-hardening alpha `0.11.0a1`
 **Status:** substantial runtime exists; repaired behavior needs candidate-bound hosted
 and external verification before a production-support promise
-**Distribution:** `fastapi-mergen`  
-**Import package:** `fastapi_mergen`  
-**Console command:** `fastapi-mergen`  
+**Distribution:** `fastapi-effects`
+**Import package:** `fastapi_effects`
+**Console command:** `fastapi-effects`
 **Market category:** tenant-safe effects  
 **Technical category:** principal-preserving transactional eventing
 
@@ -26,7 +26,7 @@ local result implies those later gates.
 
 > **Verdict: build it.** The product is now narrow enough to execute, internally coherent enough to test, and differentiated enough to justify a separate library.
 >
-> **FastAPI-Mergen is the transaction boundary for tenant-safe side effects.** It records every deferred effect through the same PostgreSQL transaction as the business change, snapshots the originating principal and route policy, and delivers the effect without silently losing tenant context, obscuring authority provenance, or rewriting retry and replay history.
+> **FastAPI Effects is the transaction boundary for tenant-safe side effects.** It records every deferred effect through the same PostgreSQL transaction as the business change, snapshots the originating principal and route policy, and delivers the effect without silently losing tenant context, obscuring authority provenance, or rewriting retry and replay history.
 
 ---
 
@@ -35,7 +35,7 @@ local result implies those later gates.
 | Dimension | Score | Why the plan earns it |
 |---|---:|---|
 | **Core thesis** | **9/10** | One boundary problem, seven invariants, and three primitives explain the product. |
-| **Market differentiation** | **9/10** | Mergen owns the seam between tenant isolation, the ORM transaction, deferred execution, webhooks, and later delegation rather than replacing incumbents in each category. |
+| **Market differentiation** | **9/10** | FastAPI Effects owns the seam between tenant isolation, the ORM transaction, deferred execution, webhooks, and later delegation rather than replacing incumbents in each category. |
 | **Scope discipline** | **9/10** | The Minimum Differentiated Product is frozen. Queue adapters, inbound idempotency, MCP, workflows, ordering, tenant lifecycle, and non-PostgreSQL storage are explicitly post-MDP. |
 | **Data model** | **9/10** | Immutable events, independently retryable deliveries, append-only attempts, tenant-safe foreign keys, immutable route/policy snapshots, real dedupe constraints, and unambiguous replay lineage. |
 | **Delivery semantics** | **9/10** | Atomic local publication, at-least-once delivery, lease-token compare-and-set, explicit attempt accounting, bounded retry/dead-letter behavior, stale-worker rejection, and testable crash outcomes. |
@@ -70,7 +70,7 @@ The following are removed from the first product boundary: queue adapters, inbou
 
 ### 1.2 The transaction model is no longer implicit
 
-For the MDP, `MergenUnitOfWork` owns the outermost `AsyncSession` transaction. It:
+For the MDP, `FastAPIEffectsUnitOfWork` owns the outermost `AsyncSession` transaction. It:
 
 - rejects entry when the supplied session is already in a transaction;
 - starts the transaction explicitly;
@@ -85,11 +85,11 @@ The first implementation does not rely on global SQLAlchemy event listeners.
 
 There are exactly three required roles:
 
-- `mergen_migration` owns schema objects and is never a runtime credential;
-- `mergen_app` is RLS-restricted to one tenant and is used by request/handler application sessions;
-- `mergen_relay` can process all tenants only inside the `fastapi_mergen` schema and has no access to application business tables.
+- `fastapi_effects_migration` owns schema objects and is never a runtime credential;
+- `fastapi_effects_app` is RLS-restricted to one tenant and is used by request/handler application sessions;
+- `fastapi_effects_relay` can process all tenants only inside the `fastapi_effects` schema and has no access to application business tables.
 
-Neither runtime role is a superuser, owns Mergen tables, or has `BYPASSRLS`.
+Neither runtime role is a superuser, owns FastAPI Effects tables, or has `BYPASSRLS`.
 
 ### 1.4 Route and authorization semantics are immutable per delivery
 
@@ -130,7 +130,7 @@ The first marketable MDP is estimated at **21–26 part-time weeks** at approxim
 
 ### 2.1 One-sentence definition
 
-> **FastAPI-Mergen makes every deferred effect of a tenant-scoped FastAPI transaction durable, attributable, policy-aware, and safely deliverable.**
+> **FastAPI Effects makes every deferred effect of a tenant-scoped FastAPI transaction durable, attributable, policy-aware, and safely deliverable.**
 
 ### 2.2 Headline promise
 
@@ -165,7 +165,7 @@ A request may already be authenticated and tenant-isolated, yet correctness can 
 
 ### 2.4 Seven invariants
 
-For every committed effect, Mergen preserves:
+For every committed effect, FastAPI Effects preserves:
 
 1. **Atomic intent** — application state, event, and original deliveries commit together or not at all.
 2. **Tenant continuity** — event, delivery, attempt, and execution context remain bound to one tenant.
@@ -193,7 +193,7 @@ One independently retryable route from one effect to one destination.
 
 ## 3. Market position and differentiation
 
-Mergen is not a tenant manager, queue, webhook SaaS, workflow engine, authentication server, or MCP implementation. It supplies the missing effect-boundary contract between these systems.
+FastAPI Effects is not a tenant manager, queue, webhook SaaS, workflow engine, authentication server, or MCP implementation. It supplies the missing effect-boundary contract between these systems.
 
 | Product class | Tenant isolation | Same ORM transaction | Durable principal/policy | Independent multi-sink state | Authorization freshness | Embedded control plane |
 |---|---:|---:|---:|---:|---:|---:|
@@ -203,7 +203,7 @@ Mergen is not a tenant manager, queue, webhook SaaS, workflow engine, authentica
 | Generic outbox/CQRS package | No | Yes | Generic metadata | Usually one handler/broker model | No FastAPI tenant policy | Varies |
 | Webhook service | Product-level | Not normally the app ORM transaction | Delivery metadata | Webhooks only | No application authority model | Separate service |
 | MCP framework | MCP request identity | No | MCP-specific | MCP only | MCP-specific | No |
-| **FastAPI-Mergen** | **Provider-integrated** | **Yes** | **Yes** | **Handlers + webhooks first** | **Snapshot/revalidate/service policy** | **PostgreSQL** |
+| **FastAPI Effects** | **Provider-integrated** | **Yes** | **Yes** | **Handlers + webhooks first** | **Snapshot/revalidate/service policy** | **PostgreSQL** |
 
 ### 3.1 Defensible wedge
 
@@ -232,7 +232,7 @@ Mergen is not a tenant manager, queue, webhook SaaS, workflow engine, authentica
 The MDP ends after Milestone 3 and contains only:
 
 - immutable `Principal` and provider protocol;
-- explicit async SQLAlchemy `MergenUnitOfWork`;
+- explicit async SQLAlchemy `FastAPIEffectsUnitOfWork`;
 - PostgreSQL event, delivery, and attempt tables;
 - Alembic migrations for schema, roles, grants, RLS, and helper functions;
 - exact event-type route registry;
@@ -291,7 +291,7 @@ A feature may enter the MDP only when all are true:
 
 ## 5. Guarantee vocabulary
 
-Mergen does **not** promise generic exactly-once distributed execution.
+FastAPI Effects does **not** promise generic exactly-once distributed execution.
 
 | Boundary | Defensible guarantee |
 |---|---|
@@ -323,20 +323,20 @@ Recommended public wording:
                          trusted Principal
                                   │
                                   ▼
-                     MergenUnitOfWork owns
+                     FastAPIEffectsUnitOfWork owns
                     outer SQLAlchemy transaction
                                   │
                     SET LOCAL tenant context
                                   │
                   ┌───────────────┴────────────────┐
                   ▼                                ▼
-          application tables               fastapi_mergen.event
+          application tables               fastapi_effects.event
                                                     │
-                                         fastapi_mergen.delivery
+                                         fastapi_effects.delivery
                                                     │
                                                     ▼
                                   relay control-plane connection
-                                       role = mergen_relay
+                                       role = fastapi_effects_relay
                                                     │
                              ┌──────────────────────┴──────────────────────┐
                              ▼                                             ▼
@@ -353,21 +353,21 @@ Recommended public wording:
 | Application process | Trusted but fallible | Bugs are expected; RLS and database constraints contain query mistakes. |
 | PostgreSQL and migration role | Trusted | Cluster or migration-owner compromise invalidates the model. |
 | Request/handler role | Trusted service credential | Tenant setting is context propagation, not database-native authentication. |
-| Relay control-plane process | Trusted but least-privileged | May process all Mergen tenants, but cannot access application business tables. |
-| Handler application session | Trusted and tenant-bound | Uses `mergen_app`, not the relay connection, and receives only the execution principal. |
+| Relay control-plane process | Trusted but least-privileged | May process all FastAPI Effects tenants, but cannot access application business tables. |
+| Handler application session | Trusted and tenant-bound | Uses `fastapi_effects_app`, not the relay connection, and receives only the execution principal. |
 | Tenant input and payload | Untrusted | Validate schema, size, routing data, and identifiers. |
 | Webhook URL/receiver | Hostile by default | Apply SSRF, timeout, response-size, redirect, and concurrency controls. |
 | Logs/metrics backend | Lower-trust operational sink | Never emit secrets, credentials, or payloads by default. |
 
 ### 6.2 Fixed transaction model
 
-For the MDP, `MergenUnitOfWork` owns the outermost transaction:
+For the MDP, `FastAPIEffectsUnitOfWork` owns the outermost transaction:
 
 - entry fails if `AsyncSession.in_transaction()` is true;
 - the UoW calls `session.begin()` explicitly;
 - it executes transaction-local tenant binding before application queries;
 - `emit()` exists only on the active UoW;
-- nested Mergen UoWs are rejected;
+- nested FastAPI Effects UoWs are rejected;
 - application savepoints may be used after tenant binding;
 - exit commits on success and rolls back on exception;
 - principal context and session metadata reset in `finally`;
@@ -375,9 +375,9 @@ For the MDP, `MergenUnitOfWork` owns the outermost transaction:
 
 ### 6.3 Separate relay and handler sessions
 
-The relay uses a `mergen_relay` session only for claiming, reading Mergen-owned rows, renewing leases, writing attempts, and finalizing delivery state.
+The relay uses a `fastapi_effects_relay` session only for claiming, reading FastAPI Effects-owned rows, renewing leases, writing attempts, and finalizing delivery state.
 
-An in-process handler that needs application data receives a **new tenant-bound `mergen_app` session** through an application-provided handler session factory. The relay connection is never injected into handler code.
+An in-process handler that needs application data receives a **new tenant-bound `fastapi_effects_app` session** through an application-provided handler session factory. The relay connection is never injected into handler code.
 
 ---
 
@@ -387,12 +387,12 @@ An in-process handler that needs application data receives a **new tenant-bound 
 
 ```python
 from fastapi import FastAPI
-from fastapi_mergen import Mergen
-from fastapi_mergen.postgres import PostgresStore
+from fastapi_effects import FastAPIEffects
+from fastapi_effects.postgres import PostgresStore
 
 app = FastAPI()
 
-mergen = Mergen(
+fastapi_effects = FastAPIEffects(
     principal_provider=my_principal_provider,
     store=PostgresStore(),
     authorization_resolver=my_authorization_resolver,
@@ -404,7 +404,7 @@ The principal provider must authenticate the request, select an authorized tenan
 ### 7.2 Route declaration
 
 ```python
-mergen.route(
+fastapi_effects.route(
     event_type="invoice.created",
     route_key="invoice.render_pdf",
     version=1,
@@ -429,16 +429,16 @@ Rules:
 
 ```python
 from fastapi import Depends
-from fastapi_mergen import Event
-from fastapi_mergen.sqlalchemy import MergenUnitOfWork
+from fastapi_effects import Event
+from fastapi_effects.sqlalchemy import FastAPIEffectsUnitOfWork
 
-get_uow = mergen.uow_dependency(get_async_session)
+get_uow = fastapi_effects.uow_dependency(get_async_session)
 
 
 @app.post("/invoices")
 async def create_invoice(
     data: InvoiceIn,
-    uow: MergenUnitOfWork = Depends(get_uow),
+    uow: FastAPIEffectsUnitOfWork = Depends(get_uow),
 ) -> InvoiceOut:
     async with uow:
         invoice = Invoice(
@@ -472,10 +472,10 @@ Guarantee:
 ### 7.4 Handler
 
 ```python
-from fastapi_mergen import EffectContext
+from fastapi_effects import EffectContext
 
 
-@mergen.handler("invoice.render_pdf", version=1)
+@fastapi_effects.handler("invoice.render_pdf", version=1)
 async def render_invoice_pdf(
     ctx: EffectContext[InvoiceCreated],
 ) -> None:
@@ -483,7 +483,7 @@ async def render_invoice_pdf(
     invoice_id = ctx.event.data.invoice_id
 
     async with ctx.application_session() as session:
-        # Session uses mergen_app and is bound to principal.tenant_id.
+        # Session uses fastapi_effects_app and is bound to principal.tenant_id.
         ...
 ```
 
@@ -500,7 +500,7 @@ Public sink/handler exceptions include:
 - `DedupeConflict`;
 - `LeaseLost`;
 - `SchemaRevisionMismatch`;
-- `MergenConfigurationError`.
+- `FastAPIEffectsConfigurationError`.
 
 Unknown handler exceptions are retryable until policy limits are exhausted; authorization denial is terminal unless an application explicitly maps it otherwise.
 
@@ -508,12 +508,12 @@ Unknown handler exceptions are retryable until policy limits are exhausted; auth
 
 ## 8. Data model
 
-All Mergen-owned tables live in the `fastapi_mergen` schema, include `tenant_id`, use forced RLS, and use tenant-safe composite foreign keys.
+All FastAPI Effects-owned tables live in the `fastapi_effects` schema, include `tenant_id`, use forced RLS, and use tenant-safe composite foreign keys.
 
 ### 8.1 Event
 
 ```sql
-CREATE TABLE fastapi_mergen.event (
+CREATE TABLE fastapi_effects.event (
     id                       uuid PRIMARY KEY,
     tenant_id                uuid NOT NULL,
 
@@ -552,14 +552,14 @@ CREATE TABLE fastapi_mergen.event (
 );
 
 CREATE UNIQUE INDEX uq_event_dedupe
-    ON fastapi_mergen.event (tenant_id, dedupe_namespace, dedupe_key)
+    ON fastapi_effects.event (tenant_id, dedupe_namespace, dedupe_key)
     WHERE dedupe_key IS NOT NULL;
 
 CREATE INDEX ix_event_tenant_created
-    ON fastapi_mergen.event (tenant_id, created_at DESC, id);
+    ON fastapi_effects.event (tenant_id, created_at DESC, id);
 
 CREATE INDEX ix_event_type_created
-    ON fastapi_mergen.event (event_type, created_at DESC, id);
+    ON fastapi_effects.event (event_type, created_at DESC, id);
 ```
 
 Event rules:
@@ -576,7 +576,7 @@ Event rules:
 ### 8.2 Delivery
 
 ```sql
-CREATE TABLE fastapi_mergen.delivery (
+CREATE TABLE fastapi_effects.delivery (
     id                       uuid PRIMARY KEY,
     tenant_id                uuid NOT NULL,
     event_id                 uuid NOT NULL,
@@ -615,9 +615,9 @@ CREATE TABLE fastapi_mergen.delivery (
 
     UNIQUE (id, tenant_id),
     FOREIGN KEY (event_id, tenant_id)
-        REFERENCES fastapi_mergen.event(id, tenant_id) ON DELETE CASCADE,
+        REFERENCES fastapi_effects.event(id, tenant_id) ON DELETE CASCADE,
     FOREIGN KEY (replay_of, tenant_id)
-        REFERENCES fastapi_mergen.delivery(id, tenant_id),
+        REFERENCES fastapi_effects.delivery(id, tenant_id),
 
     CHECK (route_version > 0),
     CHECK (route_snapshot_version > 0),
@@ -638,7 +638,7 @@ CREATE TABLE fastapi_mergen.delivery (
 );
 
 CREATE UNIQUE INDEX uq_original_delivery_route
-    ON fastapi_mergen.delivery (
+    ON fastapi_effects.delivery (
         event_id,
         route_key,
         route_version,
@@ -647,18 +647,18 @@ CREATE UNIQUE INDEX uq_original_delivery_route
     WHERE replay_of IS NULL;
 
 CREATE INDEX ix_delivery_due
-    ON fastapi_mergen.delivery (next_attempt_at, created_at, id)
+    ON fastapi_effects.delivery (next_attempt_at, created_at, id)
     WHERE status IN ('pending', 'retry_wait');
 
 CREATE INDEX ix_delivery_expired_lease
-    ON fastapi_mergen.delivery (lease_until, id)
+    ON fastapi_effects.delivery (lease_until, id)
     WHERE status = 'leased';
 
 CREATE INDEX ix_delivery_tenant_status
-    ON fastapi_mergen.delivery (tenant_id, status, next_attempt_at, id);
+    ON fastapi_effects.delivery (tenant_id, status, next_attempt_at, id);
 
 CREATE INDEX ix_delivery_replay_of
-    ON fastapi_mergen.delivery (replay_of)
+    ON fastapi_effects.delivery (replay_of)
     WHERE replay_of IS NOT NULL;
 ```
 
@@ -709,7 +709,7 @@ No raw credential, plaintext webhook secret, or callable object is stored in a s
 ### 8.3 Delivery attempt
 
 ```sql
-CREATE TABLE fastapi_mergen.delivery_attempt (
+CREATE TABLE fastapi_effects.delivery_attempt (
     id                    uuid PRIMARY KEY,
     tenant_id             uuid NOT NULL,
     delivery_id           uuid NOT NULL,
@@ -733,7 +733,7 @@ CREATE TABLE fastapi_mergen.delivery_attempt (
     error_summary         text,
 
     FOREIGN KEY (delivery_id, tenant_id)
-        REFERENCES fastapi_mergen.delivery(id, tenant_id) ON DELETE CASCADE,
+        REFERENCES fastapi_effects.delivery(id, tenant_id) ON DELETE CASCADE,
 
     UNIQUE (delivery_id, attempt_no),
     CHECK (attempt_no > 0),
@@ -752,10 +752,10 @@ CREATE TABLE fastapi_mergen.delivery_attempt (
 );
 
 CREATE INDEX ix_attempt_delivery_started
-    ON fastapi_mergen.delivery_attempt (delivery_id, started_at, attempt_no);
+    ON fastapi_effects.delivery_attempt (delivery_id, started_at, attempt_no);
 
 CREATE INDEX ix_attempt_tenant_started
-    ON fastapi_mergen.delivery_attempt (tenant_id, started_at DESC, id);
+    ON fastapi_effects.delivery_attempt (tenant_id, started_at DESC, id);
 ```
 
 `attempt_count` means attempts **started**, not attempts completed. A successful claim increments the count and inserts the attempt row in the same transaction.
@@ -999,15 +999,15 @@ The conformance and security suites cover:
 
 | Role | Owns objects | RLS scope | Grants |
 |---|---:|---|---|
-| `mergen_migration` | Yes | Administrative | DDL and migration only; never runtime |
-| `mergen_app` | No | One bound tenant | Required application/Mergen request operations |
-| `mergen_relay` | No | All tenants on Mergen tables only | Claim/read event/delivery, insert/update attempts, update delivery state; no app tables, no delete |
+| `fastapi_effects_migration` | Yes | Administrative | DDL and migration only; never runtime |
+| `fastapi_effects_app` | No | One bound tenant | Required application/FastAPI Effects request operations |
+| `fastapi_effects_relay` | No | All tenants on FastAPI Effects tables only | Claim/read event/delivery, insert/update attempts, update delivery state; no app tables, no delete |
 
 Required conditions:
 
 - runtime roles are not superusers;
 - runtime roles have no `BYPASSRLS`;
-- runtime roles do not own Mergen or tenant application tables;
+- runtime roles do not own FastAPI Effects or tenant application tables;
 - the public schema and search path do not expose unsafe writable objects;
 - the relay role has no grants on configured application schemas.
 
@@ -1017,7 +1017,7 @@ Transaction-local tenant binding:
 
 ```sql
 SELECT pg_catalog.set_config(
-    'fastapi_mergen.tenant_id',
+    'fastapi_effects.tenant_id',
     :tenant_id,
     true
 );
@@ -1026,14 +1026,14 @@ SELECT pg_catalog.set_config(
 Fail-closed helper:
 
 ```sql
-CREATE FUNCTION fastapi_mergen.current_tenant_id()
+CREATE FUNCTION fastapi_effects.current_tenant_id()
 RETURNS uuid
 LANGUAGE sql
 STABLE
 PARALLEL SAFE
 AS $$
     SELECT NULLIF(
-        pg_catalog.current_setting('fastapi_mergen.tenant_id', true),
+        pg_catalog.current_setting('fastapi_effects.tenant_id', true),
         ''
     )::uuid
 $$;
@@ -1043,11 +1043,11 @@ Request-role policy pattern:
 
 ```sql
 CREATE POLICY event_app_policy
-ON fastapi_mergen.event
+ON fastapi_effects.event
 FOR ALL
-TO mergen_app
-USING (tenant_id = fastapi_mergen.current_tenant_id())
-WITH CHECK (tenant_id = fastapi_mergen.current_tenant_id());
+TO fastapi_effects_app
+USING (tenant_id = fastapi_effects.current_tenant_id())
+WITH CHECK (tenant_id = fastapi_effects.current_tenant_id());
 ```
 
 Every tenant table has both:
@@ -1057,11 +1057,11 @@ ALTER TABLE ... ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ... FORCE ROW LEVEL SECURITY;
 ```
 
-Relay policies are separate, explicit, and limited to Mergen-owned tables.
+Relay policies are separate, explicit, and limited to FastAPI Effects-owned tables.
 
 ### 11.4 Security limitation
 
-The tenant setting is context propagation, not authentication. A holder of the trusted application database credential can technically bind another tenant. Therefore Mergen protects against query mistakes and missing filters, but not against complete compromise of the application process or its server-side credential.
+The tenant setting is context propagation, not authentication. A holder of the trusted application database credential can technically bind another tenant. Therefore FastAPI Effects protects against query mistakes and missing filters, but not against complete compromise of the application process or its server-side credential.
 
 ### 11.5 Principal rules
 
@@ -1074,7 +1074,7 @@ The tenant setting is context propagation, not authentication. A holder of the t
 - conflicting tenant sources fail closed;
 - logs reveal only approved identifiers and counts.
 
-### 11.6 `fastapi-mergen doctor`
+### 11.6 `fastapi-effects doctor`
 
 The command performs live checks for:
 
@@ -1092,8 +1092,8 @@ The command performs live checks for:
 
 ### 11.7 Handler session isolation
 
-- control-plane relay session uses `mergen_relay`;
-- handler application session uses `mergen_app`;
+- control-plane relay session uses `fastapi_effects_relay`;
+- handler application session uses `fastapi_effects_app`;
 - tenant binding happens in a fresh handler transaction before application SQL;
 - handler dependencies are created and finalized per attempt;
 - no request session, relay session, or dependency cache crosses attempts.
@@ -1233,9 +1233,9 @@ Terminal by default:
 ### 13.1 One distribution
 
 ```text
-pip install fastapi-mergen
-pip install "fastapi-mergen[webhooks]"
-pip install "fastapi-mergen[otel]"
+pip install fastapi-effects
+pip install "fastapi-effects[webhooks]"
+pip install "fastapi-effects[otel]"
 ```
 
 Post-MDP extras may include `taskiq`, `fastmcp`, or additional DBAPI drivers only when those integrations exist.
@@ -1243,15 +1243,15 @@ Post-MDP extras may include `taskiq`, `fastmcp`, or additional DBAPI drivers onl
 ### 13.2 Import and CLI
 
 ```python
-import fastapi_mergen
+import fastapi_effects
 ```
 
-The top-level `mergen` import is not used because it is already occupied by another Python distribution.
+The top-level `fastapi_effects` import is not used because it is already occupied by another Python distribution.
 
 ```text
-fastapi-mergen doctor
-fastapi-mergen schema check
-fastapi-mergen relay run
+fastapi-effects doctor
+fastapi-effects schema check
+fastapi-effects relay run
 ```
 
 ### 13.3 Dependency boundary
@@ -1278,7 +1278,7 @@ The application selects the PostgreSQL async DBAPI. The first certified driver i
 ### 13.4 Repository layout
 
 ```text
-fastapi-mergen/
+fastapi-effects/
 ├── pyproject.toml
 ├── README.md
 ├── LICENSE
@@ -1301,7 +1301,7 @@ fastapi-mergen/
 │   │   └── retention.md
 │   ├── reference/
 │   └── adr/
-├── src/fastapi_mergen/
+├── src/fastapi_effects/
 │   ├── __init__.py
 │   ├── py.typed
 │   ├── api.py
@@ -1362,11 +1362,11 @@ fastapi-mergen/
 Root exports remain small:
 
 ```text
-Mergen
+FastAPI Effects
 Principal
 Event
 EffectContext
-MergenUnitOfWork
+FastAPIEffectsUnitOfWork
 AuthorizationMode
 RetryPolicy
 selected public exceptions
@@ -1423,7 +1423,7 @@ CI includes:
 
 ### 14.2 Isolation
 
-- tenant A cannot select, insert, update, or delete tenant B Mergen rows;
+- tenant A cannot select, insert, update, or delete tenant B FastAPI Effects rows;
 - missing tenant context is default-deny;
 - both `USING` and `WITH CHECK` behavior is tested;
 - table-owner, superuser, and `BYPASSRLS` misconfiguration fails diagnostics;
@@ -1480,7 +1480,7 @@ CI includes:
 - sdist and wheel produce equivalent behavior;
 - `py.typed` is present in built artifacts;
 - public API import contract is tested;
-- console command does not collide with the occupied `mergen` name;
+- console command does not collide with the occupied `fastapi_effects` name;
 - migration package data exists in the wheel.
 
 ---
@@ -1534,7 +1534,7 @@ Deliver:
 - bounded per-tenant fairness;
 - in-process handler sink with separate app sessions;
 - snapshot/revalidate/service-policy authorization;
-- `fastapi-mergen doctor`;
+- `fastapi-effects doctor`;
 - atomicity, isolation, authority, lifecycle, delivery, and packaging conformance suites;
 - crash harness and invoicing vertical slice.
 
@@ -1677,7 +1677,7 @@ Stop before queue, idempotency, or MCP work when no third party runs the MDP in 
 
 ### Pivot
 
-When users value the conformance/diagnostic layer more than the runtime, pivot toward the **Mergen Boundary Contract and Assurance Suite** rather than expanding into orchestration.
+When users value the conformance/diagnostic layer more than the runtime, pivot toward the **FastAPI Effects Boundary Contract and Assurance Suite** rather than expanding into orchestration.
 
 ---
 
@@ -1687,11 +1687,11 @@ When users value the conformance/diagnostic layer more than the runtime, pivot t
 2. PostgreSQL only through the MDP.
 3. Async SQLAlchemy only.
 4. `asyncpg` is the first certified driver.
-5. One distribution: `fastapi-mergen`.
-6. Import package: `fastapi_mergen`.
-7. CLI: `fastapi-mergen`.
+5. One distribution: `fastapi-effects`.
+6. Import package: `fastapi_effects`.
+7. CLI: `fastapi-effects`.
 8. `src` layout and `py.typed` marker.
-9. Mergen UoW owns the outer transaction.
+9. FastAPI Effects UoW owns the outer transaction.
 10. No global SQLAlchemy listener in the first implementation.
 11. Request, relay, and migration roles are separate.
 12. Relay connection never enters handler code.

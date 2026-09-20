@@ -5,7 +5,7 @@
   "doctor_healthy": true,
   "event_identity_preserved": true,
   "expected_major": 18,
-  "fastapi_mergen": "0.11.0a1",
+  "fastapi_effects": "0.11.0a1",
   "platform": "linux-x86_64",
   "postgresql_after": "18.6",
   "postgresql_before": "18.6",

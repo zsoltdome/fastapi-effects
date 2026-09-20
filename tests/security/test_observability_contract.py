@@ -7,11 +7,11 @@ from uuid import uuid4
 
 import pytest
 
-from fastapi_mergen.errors import MergenConfigurationError
-from fastapi_mergen.observability.events import RuntimeEvent, RuntimeEventKind, TraceLineage
-from fastapi_mergen.observability.logging import StructuredLogEventSink
-from fastapi_mergen.observability.otel import OpenTelemetryEventSink
-from fastapi_mergen.observability.protocols import record_safely
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
+from fastapi_effects.observability.events import RuntimeEvent, RuntimeEventKind, TraceLineage
+from fastapi_effects.observability.logging import StructuredLogEventSink
+from fastapi_effects.observability.otel import OpenTelemetryEventSink
+from fastapi_effects.observability.protocols import record_safely
 
 
 class Instrument:
@@ -32,14 +32,14 @@ class Meter:
         self.backlog = Instrument()
 
     def create_counter(self, name: str) -> Instrument:
-        assert name == "fastapi_mergen.runtime.events"
+        assert name == "fastapi_effects.runtime.events"
         return self.counter
 
     def create_histogram(self, name: str, *, unit: str) -> Instrument:
-        if name == "fastapi_mergen.operation.duration":
+        if name == "fastapi_effects.operation.duration":
             assert unit == "ms"
             return self.histogram
-        assert (name, unit) == ("fastapi_mergen.backlog.oldest_age", "s")
+        assert (name, unit) == ("fastapi_effects.backlog.oldest_age", "s")
         return self.backlog
 
 
@@ -53,7 +53,7 @@ class Tracer:
         *,
         attributes: dict[str, object],
     ) -> nullcontext[None]:
-        assert name == "fastapi_mergen.succeeded"
+        assert name == "fastapi_effects.succeeded"
         self.attributes = attributes
         return nullcontext()
 
@@ -76,8 +76,8 @@ def test_metrics_exclude_lineage_and_traces_retain_it() -> None:
     )
     OpenTelemetryEventSink(meter, tracer).record(event)
     metric_attributes = meter.counter.records[0][1]
-    assert "mergen.delivery.id" not in metric_attributes
-    assert tracer.attributes["mergen.delivery.id"] == str(delivery_id)
+    assert "fastapi_effects.delivery.id" not in metric_attributes
+    assert tracer.attributes["fastapi_effects.delivery.id"] == str(delivery_id)
     assert meter.histogram.records[0][0] == 12.5
 
 
@@ -86,9 +86,9 @@ def test_secret_payload_fields_are_rejected_before_logs_metrics_or_traces(
 ) -> None:
     canary = "observability-canary-never-emit"
     for key in ("payload", "body", "secret", "message", "tenant.id"):
-        with pytest.raises(MergenConfigurationError, match="unsafe"):
+        with pytest.raises(FastAPIEffectsConfigurationError, match="unsafe"):
             RuntimeEvent(RuntimeEventKind.DEAD, datetime.now(UTC), {key: canary})
-    logger = logging.getLogger("fastapi_mergen.test.observability")
+    logger = logging.getLogger("fastapi_effects.test.observability")
     with caplog.at_level(logging.INFO, logger=logger.name):
         StructuredLogEventSink(logger).record(
             RuntimeEvent(

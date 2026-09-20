@@ -12,7 +12,7 @@ async def wait(dsn: str, timeout_seconds: float) -> None:
     try:
         import asyncpg
     except ImportError as exc:
-        raise SystemExit("Install test dependencies with `uv sync --group test`.") from exc
+        raise SystemExit("Install test dependencies with `uv sync --locked --group test`.") from exc
 
     deadline = time.monotonic() + timeout_seconds
     last_error = "unavailable"

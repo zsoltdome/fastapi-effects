@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from fastapi_mergen.conformance import CertificationProfile, ConformanceRunner, RunnerConfiguration
-from fastapi_mergen.testing import Fault, ReferenceBoundaryDriver
+from fastapi_effects.conformance import CertificationProfile, ConformanceRunner, RunnerConfiguration
+from fastapi_effects.testing import Fault, ReferenceBoundaryDriver
 
 
 @pytest.mark.parametrize("fault", list(Fault))

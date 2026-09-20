@@ -1,4 +1,4 @@
-name: fastapi-mergen-tests
+name: fastapi_effects_tests
 
 services:
   redis:
@@ -20,7 +20,7 @@ services:
     environment:
       POSTGRES_DB: postgres
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: mergen-test-only
+      POSTGRES_PASSWORD: fastapi_effects_test_only
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
     ports:
       - "55416:5432"
@@ -40,7 +40,7 @@ services:
     environment:
       POSTGRES_DB: postgres
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: mergen-test-only
+      POSTGRES_PASSWORD: fastapi_effects_test_only
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
     ports:
       - "55418:5432"

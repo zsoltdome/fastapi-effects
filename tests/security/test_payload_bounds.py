@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel
 
-from fastapi_mergen.errors import MergenConfigurationError
-from fastapi_mergen.sqlalchemy.canonical import canonical_json_bytes, strict_json_loads
+from fastapi_effects.errors import FastAPIEffectsConfigurationError
+from fastapi_effects.sqlalchemy.canonical import canonical_json_bytes, strict_json_loads
 
 
 class Payload(BaseModel):
@@ -21,9 +21,9 @@ def test_typed_dto_serialization_is_explicit_and_stable() -> None:
 def test_cycles_invalid_unicode_and_excess_nesting_fail_closed() -> None:
     cycle: list[object] = []
     cycle.append(cycle)
-    with pytest.raises(MergenConfigurationError, match="cycle"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="cycle"):
         canonical_json_bytes(cycle)
-    with pytest.raises(MergenConfigurationError, match="invalid text"):
+    with pytest.raises(FastAPIEffectsConfigurationError, match="invalid text"):
         canonical_json_bytes({"value": "\ud800"})
-    with pytest.raises(MergenConfigurationError):
+    with pytest.raises(FastAPIEffectsConfigurationError):
         strict_json_loads(b"[" * 2000 + b"]" * 2000)
