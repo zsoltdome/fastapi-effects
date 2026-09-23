@@ -23,6 +23,7 @@ _REQUIRED_RUNTIME_EVIDENCE = frozenset(
     {
         "build/release/artifact-lock-constraints.txt",
         "build/release/artifact-runtime-results.json",
+        "build/release/historical-upgrade-results.json",
         "build/release/wheel-certification-manifest.json",
         "build/release/wheel-certification.json",
         "build/release/sdist-certification-manifest.json",
@@ -63,6 +64,7 @@ def create_manifest(
         lock_digest=lock_digest,
         package_version=package_version,
     )
+    _validate_historical_upgrade_evidence(root, distributions, evidence_paths)
     manifest: dict[str, Any] = {
         "schema_version": 2,
         "source_commit": source_commit,
@@ -175,6 +177,11 @@ def verify_manifest(
         tuple(expected_evidence.values()),
         lock_digest=lock_digest,
         package_version=package_version,
+    )
+    _validate_historical_upgrade_evidence(
+        root,
+        distributions,
+        tuple(expected_evidence.values()),
     )
     return value
 
@@ -358,6 +365,108 @@ def _validate_artifact_runtime_evidence(
         )
     if observed_kinds != {"wheel", "sdist"}:
         raise ValueError("Artifact runtime evidence must cover wheel and sdist.")
+
+
+def _validate_historical_upgrade_evidence(
+    root: Path,
+    distributions: tuple[Path, Path],
+    evidence_paths: tuple[Path, ...],
+) -> None:
+    evidence = {path.relative_to(root.resolve()).as_posix(): path for path in evidence_paths}
+    report_path = evidence.get("build/release/historical-upgrade-results.json")
+    if report_path is None:
+        raise ValueError("Historical artifact upgrade evidence is missing.")
+    value = _json_object(report_path, "Historical artifact upgrade evidence")
+    if set(value) != {"schema_version", "status", "historical", "candidate", "targets"} or (
+        value.get("schema_version") != 1 or value.get("status") != "passed"
+    ):
+        raise ValueError("Historical artifact upgrade evidence did not record a passing run.")
+    historical = value.get("historical")
+    if not isinstance(historical, dict) or set(historical) != {
+        "version",
+        "filename",
+        "url",
+        "sha256",
+    }:
+        raise ValueError("Historical artifact identity is incomplete.")
+    historical_digest = historical.get("sha256")
+    if (
+        not isinstance(historical.get("version"), str)
+        or not historical["version"]
+        or not isinstance(historical.get("filename"), str)
+        or Path(historical["filename"]).name != historical["filename"]
+        or not historical["filename"].endswith(".whl")
+        or not isinstance(historical.get("url"), str)
+        or not historical["url"].startswith("https://files.pythonhosted.org/")
+        or not isinstance(historical_digest, str)
+        or _DIGEST.fullmatch(historical_digest) is None
+    ):
+        raise ValueError("Historical artifact identity is unsafe.")
+    candidate = value.get("candidate")
+    wheel = next(path for path in distributions if path.name.endswith(".whl"))
+    if candidate != {"filename": wheel.name, "sha256": sha256_file(wheel)}:
+        raise ValueError("Historical upgrade evidence is not bound to the candidate wheel.")
+    targets = value.get("targets")
+    if not isinstance(targets, list) or len(targets) != 2:
+        raise ValueError("Historical upgrade evidence must cover PostgreSQL 16 and 18.")
+    required_checks = {
+        "historical_artifact_digest",
+        "historical_artifact_installed",
+        "historical_schema_created",
+        "historical_data_seeded",
+        "candidate_artifact_installed",
+        "candidate_schema_upgraded",
+        "seeded_data_preserved",
+        "ownership_preserved",
+        "runtime_roles_preserved",
+        "grants_preserved",
+        "forced_rls_preserved",
+        "constraints_preserved",
+        "indexes_preserved",
+        "revision_markers_current",
+    }
+    observed_majors: set[int] = set()
+    for target in targets:
+        if not isinstance(target, dict) or set(target) != {
+            "target",
+            "postgresql_major",
+            "server_version",
+            "status",
+            "checks",
+            "historical_contract_sha256",
+            "candidate_contract_sha256",
+            "seed_counts",
+            "revision_markers",
+            "alembic_versions",
+        }:
+            raise ValueError("Historical upgrade target evidence is incomplete.")
+        major = target.get("postgresql_major")
+        checks = target.get("checks")
+        if (
+            major not in {16, 18}
+            or isinstance(major, bool)
+            or major in observed_majors
+            or target.get("target") != f"postgresql-{major}"
+            or target.get("status") != "passed"
+            or not isinstance(target.get("server_version"), str)
+            or not target["server_version"].startswith(f"{major}.")
+            or not isinstance(checks, list)
+            or set(checks) != required_checks
+            or any(not isinstance(check, str) for check in checks)
+            or _DIGEST.fullmatch(str(target.get("historical_contract_sha256"))) is None
+            or _DIGEST.fullmatch(str(target.get("candidate_contract_sha256"))) is None
+            or not isinstance(target.get("seed_counts"), dict)
+            or not target["seed_counts"]
+            or any(count != 1 for count in target["seed_counts"].values())
+            or not isinstance(target.get("revision_markers"), dict)
+            or not target["revision_markers"]
+            or not isinstance(target.get("alembic_versions"), list)
+            or not target["alembic_versions"]
+        ):
+            raise ValueError("Historical upgrade target did not record the required checks.")
+        observed_majors.add(major)
+    if observed_majors != {16, 18}:
+        raise ValueError("Historical upgrade evidence must cover PostgreSQL 16 and 18.")
 
 
 def _validate_certification_evidence(

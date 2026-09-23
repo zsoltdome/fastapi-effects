@@ -85,6 +85,7 @@ jobs:
             --lock-file uv.lock \
             --evidence-file build/release/artifact-lock-constraints.txt \
             --evidence-file build/release/artifact-runtime-results.json \
+            --evidence-file build/release/historical-upgrade-results.json \
             --evidence-file build/release/wheel-certification-manifest.json \
             --evidence-file build/release/wheel-certification.json \
             --evidence-file build/release/sdist-certification-manifest.json \

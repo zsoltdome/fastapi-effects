@@ -1,0 +1,117 @@
+{
+  "schema_version": 2,
+  "recorded_at": "2026-09-23T13:34:00+02:00",
+  "distribution": "fastapi-effects",
+  "version": "0.11.0a1",
+  "source_repository": "https://github.com/zsoltdome/fastapi-effects",
+  "historical_inventory": {
+    "path": "docs/audits/2026-09-07/published-artifact-inventory.json",
+    "preserved": true,
+    "interpretation": "Accurate point-in-time evidence recorded before the public release; superseded only for current release-state decisions."
+  },
+  "release": {
+    "tag": "v0.11.0a1",
+    "commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
+    "url": "https://github.com/zsoltdome/fastapi-effects/releases/tag/v0.11.0a1",
+    "published_at": "2026-09-20T21:58:09Z",
+    "prerelease": true
+  },
+  "artifacts": [
+    {
+      "kind": "wheel",
+      "filename": "fastapi_effects-0.11.0a1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/94/dd/6f04f68af0446516a170b64ebe994ccdb11e0e2be2706f3ae6297847c2ce/fastapi_effects-0.11.0a1-py3-none-any.whl",
+      "sha256": "0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+      "size": 229555,
+      "uploaded_at": "2026-09-20T21:58:29.784722Z",
+      "trusted_publishing": true,
+      "pypi_publish_attestation": {
+        "status": "verified",
+        "subject_sha256": "0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+        "repository": "zsoltdome/fastapi-effects",
+        "commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
+        "workflow": ".github/workflows/publish.yml",
+        "run_id": 35540231354,
+        "run_attempt": 1,
+        "details_url": "https://pypi.org/project/fastapi-effects/0.11.0a1/#files",
+        "provenance_api_url": "https://pypi.org/integrity/fastapi-effects/0.11.0a1/fastapi_effects-0.11.0a1-py3-none-any.whl/provenance"
+      }
+    },
+    {
+      "kind": "sdist",
+      "filename": "fastapi_effects-0.11.0a1.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/b5/e6/91a330ae60fca5fd1d3712c124d6bd32b3552ae3d63dac2c0384f6cdc9f4/fastapi_effects-0.11.0a1.tar.gz",
+      "sha256": "386c300286088253d5df84523d0ef7d212b0f5e1aac5dcdf8bd9af3ecc63fdd1",
+      "size": 671829,
+      "uploaded_at": "2026-09-20T21:58:31.260553Z",
+      "trusted_publishing": true,
+      "pypi_publish_attestation": {
+        "status": "verified",
+        "subject_sha256": "386c300286088253d5df84523d0ef7d212b0f5e1aac5dcdf8bd9af3ecc63fdd1",
+        "repository": "zsoltdome/fastapi-effects",
+        "commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
+        "workflow": ".github/workflows/publish.yml",
+        "run_id": 35540231354,
+        "run_attempt": 1,
+        "details_url": "https://pypi.org/project/fastapi-effects/0.11.0a1/#files",
+        "provenance_api_url": "https://pypi.org/integrity/fastapi-effects/0.11.0a1/fastapi_effects-0.11.0a1.tar.gz/provenance"
+      }
+    }
+  ],
+  "release_evidence_workflow": {
+    "workflow": ".github/workflows/release.yml",
+    "run_id": 35539365216,
+    "run_attempt": 1,
+    "event": "push",
+    "head_sha": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
+    "status": "success",
+    "created_at": "2026-09-20T21:39:17Z",
+    "completed_at": "2026-09-20T21:43:58Z",
+    "url": "https://github.com/zsoltdome/fastapi-effects/actions/runs/35539365216",
+    "artifact": {
+      "id": 10613788085,
+      "name": "release-evidence-v0.11.0a1-attempt-1",
+      "archive_sha256": "f0e913257347e61416ab04bec97e7126d08168e051b5ee3089db54849c7b9c7c",
+      "size": 904375
+    }
+  },
+  "publish_workflow": {
+    "workflow": ".github/workflows/publish.yml",
+    "run_id": 35540231354,
+    "run_attempt": 1,
+    "event": "release",
+    "head_sha": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
+    "status": "success",
+    "created_at": "2026-09-20T21:58:11Z",
+    "completed_at": "2026-09-20T21:58:35Z",
+    "url": "https://github.com/zsoltdome/fastapi-effects/actions/runs/35540231354",
+    "identity": "PyPI Trusted Publishing via GitHub Actions OIDC"
+  },
+  "github_build_provenance": {
+    "status": "verified",
+    "predicate_type": "https://slsa.dev/provenance/v1",
+    "builder": "https://github.com/zsoltdome/fastapi-effects/.github/workflows/release.yml@refs/tags/v0.11.0a1",
+    "invocation": "https://github.com/zsoltdome/fastapi-effects/actions/runs/35539365216/attempts/1",
+    "source_commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
+    "subjects": {
+      "fastapi_effects-0.11.0a1-py3-none-any.whl": "0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+      "fastapi_effects-0.11.0a1.tar.gz": "386c300286088253d5df84523d0ef7d212b0f5e1aac5dcdf8bd9af3ecc63fdd1"
+    },
+    "rekor_log_index": "2903497879",
+    "api_url": "https://api.github.com/repos/zsoltdome/fastapi-effects/attestations/sha256:0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9"
+  },
+  "observations": [
+    {
+      "recorded_at": "2026-09-23T11:01:01Z",
+      "endpoint": "PyPI provenance API",
+      "status": 503,
+      "impact": "Raw provenance JSON was temporarily unavailable; PyPI file details still displayed both verified publish attestations."
+    }
+  ],
+  "historical_upgrade": {
+    "status": "REQUIRED_FOR_NEXT_CANDIDATE",
+    "baseline_version": "0.11.0a1",
+    "baseline_wheel_sha256": "0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+    "postgresql_majors": [16, 18]
+  }
+}

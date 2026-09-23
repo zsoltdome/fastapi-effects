@@ -41,10 +41,13 @@ Revision `0005_webhook_retention` has a data-preserving downgrade to `0004_comma
 it removes only the retention function and restores the webhook marker to revision 1.
 
 The 2026-09-07 [published-artifact inventory](../audits/2026-09-07/published-artifact-inventory.json)
-found no PyPI/TestPyPI release, local repository tag, or retained historical
-distribution. Upgrading from a historical published artifact is therefore recorded as
-`NOT_APPLICABLE`, with the explicit limitation that any privately retained artifact
-outside this workspace must be added to the inventory before candidate approval.
+is preserved as point-in-time evidence from before a public release existed. The
+[current release inventory](../audits/2026-09-23/release-inventory.json) records the
+schema-bearing `0.11.0a1` wheel published on September 20. Historical-artifact upgrade
+testing is therefore required for every later candidate: install the exact public
+wheel, create and seed its schema, then upgrade with the exact candidate wheel on
+PostgreSQL 16 and 18 while checking data, ownership, roles, grants, forced RLS,
+constraints, indexes, and component revision markers.
 
 For a production rollback, stop writers and relays, retain the old application artifact,
 take and verify a logical backup, restore it into a separate database, run the desired

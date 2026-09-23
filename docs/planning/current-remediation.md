@@ -1,6 +1,8 @@
 # Current remediation status
 
-**Baseline:** `0.11.0a1`, committed local-verification source
+**Released baseline:** `0.11.0a1`, tag `v0.11.0a1`, source commit
+`575f4f97769fdf6b3152822096ee1cae2668f0bf`
+**Historical local-verification source:**
 `24503cdcaf5cc204534e3aa8d8ec476804dcb11d`
 **Audit-origin record:** internal planning narratives are supplementary inputs, not
 public documentation dependencies. The clean historical summary and unavailable
@@ -27,9 +29,11 @@ historical evidence remains retained but is not treated as proof of the new boun
   tests pass locally on PostgreSQL 16 and 18, but must be rerun from the candidate artifact.
 - **A05 — IMPLEMENTED:** semantic PEP 440 phase selection covers later RC/stable
   releases and fails closed on unsupported forms or explicit-phase mismatch.
-- **A06 — IMPLEMENTED:** one manifest-bound wheel/sdist set is uploaded by the evidence
-  workflow and downloaded/verified by publication without rebuilding. Hosted
-  environment and trusted-publisher settings still require account-level verification.
+- **A06 — RELEASED:** one manifest-bound wheel/sdist set was built by the tag evidence
+  workflow, attested, downloaded and reverified without rebuilding, then uploaded by
+  PyPI Trusted Publishing. The public files match the immutable workflow artifact.
+  GitHub environment and branch protections were added after this release and remain a
+  required control for the next candidate.
 - **A07/A08 — IMPLEMENTED:** contributor CI no longer enforces institute impersonation;
   the invoicing consumer is transactionally idempotent and uses process-lifetime,
   role-separated pools.
@@ -37,8 +41,9 @@ historical evidence remains retained but is not treated as proof of the new boun
   the packaged schema-upgrade command and supported PostgreSQL composition surface are
   documented, and the sdist intentionally includes downstream test/document resources.
 
-These entries remain below `HOSTED_VERIFIED`; no external account, protected
-environment, publication, or partner evidence is inferred from local source changes.
+The `0.11.0a1` artifact and hosted release path have release evidence. Capability stages
+that require partner deployment or independent review remain below
+`EXTERNALLY_VALIDATED`; publishing the alpha does not promote those stages implicitly.
 
 ## Historical local verification at the source commit above
 
@@ -78,9 +83,14 @@ environment, publication, or partner evidence is inferred from local source chan
 - [x] The stale-old/current Taskiq scenario passes through Redis Streams and one
   separately started Taskiq CLI worker; stale A admits no handler and current B runs
   exactly once despite a queued duplicate.
-- [x] The published-artifact inventory found no public index release, repository tag,
-  or retained historical distribution, so historical-artifact upgrade testing is
-  explicitly `NOT_APPLICABLE`; every candidate revision is still covered.
+- [x] The September 7 published-artifact inventory accurately found no public index
+  release, repository tag, or retained historical distribution at that time. It is
+  preserved as historical evidence and superseded for current decisions by the
+  [September 23 release inventory](../audits/2026-09-23/README.md).
+- [ ] Because `0.11.0a1` is now a public schema-bearing artifact, the next candidate
+  must install that exact PyPI wheel, create and seed its database, and upgrade it with
+  the exact candidate wheel on PostgreSQL 16 and 18. Historical-artifact upgrade
+  testing is no longer `NOT_APPLICABLE`.
 - [x] The full integration selection passes locally on PostgreSQL 16 and 18: 45 tests
   on each version, with no skipped integration tests.
 - [x] Clean wheel/sdist installation checks pass for the base package and supported
@@ -95,11 +105,11 @@ The 2026-09-20 recheck is tracked separately under
 and regressions do not inherit the historical `LOCAL_VERIFIED` label until run against
 the recorded candidate and required live/hosted profiles.
 
-- [ ] Promote the committed source identity to a versioned candidate, build it through
-  the protected workflow, and rerun the database-backed quickstart, relay, webhook
-  lifecycle/replay, and Taskiq journeys from those exact artifacts.
-- [ ] Bind protected results to the candidate artifact digests and obtain hosted
-  verification, security scans, SBOM, and provenance.
+- [ ] Build the next increasing version through the approval-gated release workflow;
+  rerun the database-backed quickstart, relay, webhook lifecycle/replay, Taskiq, and
+  published-`0.11.0a1` upgrade journeys from the exact candidate artifacts.
+- [ ] Bind the next candidate's protected results to its artifact digests, hosted
+  verification, security scans, SBOM, GitHub provenance, and PyPI publish attestations.
 - [ ] Complete two distinct non-demo external deployments, independent review, exact-RC
   observation, and two-person go approval. The production-readiness record remains
   deliberately `no-go` until these exist.

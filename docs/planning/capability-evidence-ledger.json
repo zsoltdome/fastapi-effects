@@ -1,14 +1,17 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-09-08T12:53:48+02:00",
+  "recorded_at": "2026-09-23T13:34:00+02:00",
   "package_version": "0.11.0a1",
   "source": {
-    "base_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
-    "state": "committed_local_verification",
-    "release_evidence_authority": false
+    "base_commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
+    "state": "released_public_alpha",
+    "release_evidence_authority": true
   },
-  "lock_sha256": "b7fd3f0a58418806d1c39922c4899cef0d9ea45ef68bedd0425973aee9b3e3df",
-  "artifact_digests": [],
+  "lock_sha256": "af6e14ff7a517872add0bb69e234c4390400e3c858fefd66ff5e89656814410b",
+  "artifact_digests": [
+    "sha256:0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+    "sha256:386c300286088253d5df84523d0ef7d212b0f5e1aac5dcdf8bd9af3ecc63fdd1"
+  ],
   "local_non_authoritative_artifact_digests": {
     "fastapi_effects-0.11.0a1-py3-none-any.whl": "41481b472b29a6591b8e67419eafac8605c951cf7dfed1fe39a6a64fcf6a9b9a",
     "fastapi_effects-0.11.0a1.tar.gz": "14cccb2a755172246708a792f34015c7d57908e3b41667c47fa940de0fce8354"
@@ -17,148 +20,168 @@
     {
       "capability": "core_postgresql_runtime",
       "owner": "maintainer",
-      "status": "LOCAL_VERIFIED",
-      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
-      "artifact_digests": [],
+      "status": "HOSTED_VERIFIED",
+      "source_commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
+      "artifact_digests": [
+        "sha256:0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+        "sha256:386c300286088253d5df84523d0ef7d212b0f5e1aac5dcdf8bd9af3ecc63fdd1"
+      ],
       "applicable_stages": ["IMPLEMENTED", "LOCAL_VERIFIED", "HOSTED_VERIFIED", "RELEASED"],
-      "evidence_command": "FASTAPI_EFFECTS_TEST_ADMIN_DSN=<pg16-or-pg18> FASTAPI_EFFECTS_TEST_REDIS_URL=<redis> uv run pytest -q -m integration",
-      "infrastructure": ["postgresql:16-alpine", "postgresql:18-alpine", "asyncpg:locked"],
-      "dependency_versions": ["postgresql:16.15", "postgresql:18.6", "asyncpg:0.31.0", "sqlalchemy:2.0.52"],
-      "result": "PostgreSQL 16/18 integration selections passed without skips; finalization directly fences lease, handler, and delivery deadlines",
-      "evidence_location": "docs/audits/2026-09-07/local-verification.json",
-      "recorded_at": "2026-09-08T12:35:17+02:00"
+      "evidence_command": "GitHub Actions compatibility PostgreSQL 16/18 jobs plus release-evidence run 35539365216.1 exact-artifact runtime certification",
+      "infrastructure": ["github-hosted", "postgresql:16-alpine", "postgresql:18-alpine", "redis:7-alpine"],
+      "dependency_versions": ["asyncpg:0.31.0", "sqlalchemy:2.0.52"],
+      "result": "Hosted PostgreSQL 16/18 integration selections passed, and the tag run repeated PostgreSQL 18 integration and exact-artifact runtime journeys.",
+      "evidence_location": "docs/audits/2026-09-23/release-inventory.json",
+      "recorded_at": "2026-09-23T13:34:00+02:00"
     },
     {
       "capability": "webhooks",
       "owner": "maintainer",
-      "status": "LOCAL_VERIFIED",
-      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
-      "artifact_digests": [],
+      "status": "HOSTED_VERIFIED",
+      "source_commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
+      "artifact_digests": [
+        "sha256:0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+        "sha256:386c300286088253d5df84523d0ef7d212b0f5e1aac5dcdf8bd9af3ecc63fdd1"
+      ],
       "applicable_stages": ["IMPLEMENTED", "LOCAL_VERIFIED", "HOSTED_VERIFIED", "EXTERNALLY_VALIDATED", "RELEASED"],
-      "evidence_command": "uv run pytest -q tests/security/test_explicit_ip_tls.py tests/security/test_webhook_redirects.py tests/security/test_webhook_response_bounds.py; run integration selection on PostgreSQL 16/18",
-      "infrastructure": ["local TLS server", "postgresql:16-alpine", "postgresql:18-alpine"],
+      "evidence_command": "GitHub Actions security, compatibility, integration, and release-evidence run 35539365216.1 installed-artifact journeys",
+      "infrastructure": ["github-hosted", "postgresql:16-alpine", "postgresql:18-alpine"],
       "dependency_versions": ["fastapi:0.141.1", "starlette:1.6.0", "pydantic:2.13.5"],
-      "result": "local security regressions, complete-answer-set DNS validation, and public app-role replay passed",
-      "evidence_location": "docs/audits/2026-09-07/local-verification.json",
-      "recorded_at": "2026-09-08T12:35:17+02:00"
+      "result": "Hosted security, PostgreSQL 16/18, installed-artifact receiver, and replay journeys passed; design-partner evidence remains open.",
+      "evidence_location": "docs/audits/2026-09-23/release-inventory.json",
+      "recorded_at": "2026-09-23T13:34:00+02:00"
     },
     {
       "capability": "taskiq_executor",
       "owner": "maintainer",
-      "status": "LOCAL_VERIFIED",
-      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
-      "artifact_digests": [],
+      "status": "HOSTED_VERIFIED",
+      "source_commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
+      "artifact_digests": [
+        "sha256:0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+        "sha256:386c300286088253d5df84523d0ef7d212b0f5e1aac5dcdf8bd9af3ecc63fdd1"
+      ],
       "applicable_stages": ["IMPLEMENTED", "LOCAL_VERIFIED", "HOSTED_VERIFIED", "EXTERNALLY_VALIDATED", "RELEASED"],
-      "evidence_command": "uv run pytest -q tests/integration/test_taskiq_worker_claim.py tests/unit/test_relay_boundaries.py",
-      "infrastructure": ["postgresql:16-alpine", "postgresql:18-alpine", "redis:7-alpine", "separate Taskiq CLI worker process"],
-      "dependency_versions": ["taskiq:0.12.6", "taskiq-redis:1.2.3", "redis-client:8.1.0", "redis-server:7.4.11"],
-      "result": "old handoff was rejected after parent reclaim, current handoff executed once, queued duplicate was fenced, and execution-token replacement rejected stale finalization",
-      "evidence_location": "docs/audits/2026-09-07/local-verification.json",
-      "recorded_at": "2026-09-08T12:35:17+02:00"
+      "evidence_command": "GitHub Actions PostgreSQL/Redis integration and release-evidence run 35539365216.1",
+      "infrastructure": ["github-hosted", "postgresql:16-alpine", "postgresql:18-alpine", "redis:7-alpine", "separate Taskiq CLI worker process"],
+      "dependency_versions": ["taskiq:0.12.6", "taskiq-redis:1.2.3", "redis-client:8.1.0"],
+      "result": "Hosted stale/current handoff, duplicate fencing, and worker-process coverage passed; design-partner evidence remains open.",
+      "evidence_location": "docs/audits/2026-09-23/release-inventory.json",
+      "recorded_at": "2026-09-23T13:34:00+02:00"
     },
     {
       "capability": "commands_and_delegation",
       "owner": "maintainer",
-      "status": "LOCAL_VERIFIED",
-      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
-      "artifact_digests": [],
+      "status": "HOSTED_VERIFIED",
+      "source_commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
+      "artifact_digests": [
+        "sha256:0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+        "sha256:386c300286088253d5df84523d0ef7d212b0f5e1aac5dcdf8bd9af3ecc63fdd1"
+      ],
       "applicable_stages": ["IMPLEMENTED", "LOCAL_VERIFIED", "HOSTED_VERIFIED", "EXTERNALLY_VALIDATED", "RELEASED"],
-      "evidence_command": "FASTAPI_EFFECTS_TEST_ADMIN_DSN=<pg16-or-pg18> FASTAPI_EFFECTS_TEST_REDIS_URL=<redis> uv run pytest -q -m integration",
-      "infrastructure": ["postgresql:16-alpine", "postgresql:18-alpine", "redis:7-alpine"],
-      "dependency_versions": ["postgresql:16.15", "postgresql:18.6", "asyncpg:0.31.0"],
-      "result": "included in both passing integration selections",
-      "evidence_location": "docs/audits/2026-09-07/local-verification.json",
-      "recorded_at": "2026-09-08T12:35:17+02:00"
+      "evidence_command": "GitHub Actions PostgreSQL 16/18 integration, conformance, security, and release-evidence run 35539365216.1",
+      "infrastructure": ["github-hosted", "postgresql:16-alpine", "postgresql:18-alpine", "FastMCP:3.4.7"],
+      "dependency_versions": ["asyncpg:0.31.0", "fastmcp:3.4.7"],
+      "result": "Hosted command idempotency, delegation conformance, credential stripping, and installed-artifact imports passed.",
+      "evidence_location": "docs/audits/2026-09-23/release-inventory.json",
+      "recorded_at": "2026-09-23T13:34:00+02:00"
     },
     {
       "capability": "published_migrations_0001_0005",
       "owner": "maintainer",
-      "status": "LOCAL_VERIFIED",
-      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
-      "artifact_digests": [],
+      "status": "HOSTED_VERIFIED",
+      "source_commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
+      "artifact_digests": [
+        "sha256:0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9"
+      ],
       "applicable_stages": ["IMPLEMENTED", "LOCAL_VERIFIED", "HOSTED_VERIFIED", "RELEASED"],
-      "evidence_command": "FASTAPI_EFFECTS_TEST_ADMIN_DSN=<pg16-or-pg18> uv run pytest -q tests/migrations/test_revision_matrix.py tests/integration/test_core_migration.py; uv run pytest -q tests/unit/test_migration_immutability.py",
-      "infrastructure": ["postgresql:16-alpine", "postgresql:18-alpine"],
-      "dependency_versions": ["postgresql:16.15", "postgresql:18.6", "alembic:1.19.2", "sqlalchemy:2.0.52"],
-      "result": "revision matrix and frozen contract digest passed; no historical schema-bearing artifact was identifiable, recorded as NOT_APPLICABLE",
-      "evidence_location": "docs/audits/2026-09-07/published-artifact-inventory.json",
-      "recorded_at": "2026-09-08T12:35:17+02:00"
+      "evidence_command": "uv run --locked --no-sync python scripts/verify_published_upgrade.py --inventory docs/audits/2026-09-23/release-inventory.json --candidate-wheel <candidate-wheel> --constraints build/release/artifact-lock-constraints.txt --target postgresql-16=<admin-dsn> --target postgresql-18=<admin-dsn> --output build/release/historical-upgrade-results.json",
+      "infrastructure": ["postgresql:16-alpine", "postgresql:18-alpine", "PyPI public wheel"],
+      "dependency_versions": ["alembic:1.19.2", "sqlalchemy:2.0.52", "asyncpg:0.31.0"],
+      "result": "Candidate revisions and frozen definitions passed in hosted PostgreSQL 16/18 jobs. The released wheel is now the mandatory baseline for the next candidate; historical-artifact upgrade is no longer NOT_APPLICABLE.",
+      "evidence_location": "docs/audits/2026-09-23/release-inventory.json",
+      "recorded_at": "2026-09-23T13:34:00+02:00"
     },
     {
       "capability": "release_readiness_validation",
       "owner": "maintainer",
-      "status": "LOCAL_VERIFIED",
-      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
-      "artifact_digests": [],
+      "status": "HOSTED_VERIFIED",
+      "source_commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
+      "artifact_digests": [
+        "sha256:0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+        "sha256:386c300286088253d5df84523d0ef7d212b0f5e1aac5dcdf8bd9af3ecc63fdd1"
+      ],
       "applicable_stages": ["IMPLEMENTED", "LOCAL_VERIFIED", "HOSTED_VERIFIED", "RELEASED"],
-      "evidence_command": "uv run python scripts/check.py; uv run pytest -q tests/unit/test_release_gate.py tests/unit/test_milestone_thirteen_gate.py tests/unit/test_check_script.py",
-      "infrastructure": ["local locked Python environment"],
-      "dependency_versions": ["python:3.13.15"],
-      "result": "phase and malformed-evidence cases passed through automatic selection; both Git audits passed with the exact recovery exception and local-branch scope",
-      "evidence_location": "docs/audits/2026-09-07/local-verification.json",
-      "recorded_at": "2026-09-08T12:35:17+02:00"
+      "evidence_command": "GitHub Actions release-evidence run 35539365216.1 candidate gate and publish run 35540231354.1 artifact revalidation",
+      "infrastructure": ["github-hosted", "tag-bound release workflow"],
+      "dependency_versions": ["python:3.13.15", "uv:0.12.4"],
+      "result": "Automatic phase selection, evidence validation, immutable artifact selection, and pre-publication revalidation passed.",
+      "evidence_location": "docs/audits/2026-09-23/release-inventory.json",
+      "recorded_at": "2026-09-23T13:34:00+02:00"
     },
     {
       "capability": "packaging",
       "owner": "maintainer",
-      "status": "LOCAL_VERIFIED",
-      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
+      "status": "RELEASED",
+      "source_commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
       "artifact_digests": [
-        "sha256:41481b472b29a6591b8e67419eafac8605c951cf7dfed1fe39a6a64fcf6a9b9a",
-        "sha256:14cccb2a755172246708a792f34015c7d57908e3b41667c47fa940de0fce8354"
+        "sha256:0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+        "sha256:386c300286088253d5df84523d0ef7d212b0f5e1aac5dcdf8bd9af3ecc63fdd1"
       ],
       "applicable_stages": ["IMPLEMENTED", "LOCAL_VERIFIED", "HOSTED_VERIFIED", "RELEASED"],
-      "evidence_command": "uv run python scripts/check.py",
-      "infrastructure": ["local locked Python environment", "isolated virtual environments"],
-      "dependency_versions": ["twine:locked", "build:locked"],
-      "result": "base and supported-extra wheel/sdist installs passed; Twine accepted both distributions; local hashes are non-authoritative",
-      "evidence_location": "docs/audits/2026-09-07/local-verification.json",
-      "recorded_at": "2026-09-08T12:35:17+02:00"
+      "evidence_command": "GitHub Actions release-evidence run 35539365216.1 and Trusted Publishing run 35540231354.1",
+      "infrastructure": ["github-hosted", "isolated artifact virtual environments", "PyPI Trusted Publishing"],
+      "dependency_versions": ["pypa/gh-action-pypi-publish:v1.14.2", "actions/attest-build-provenance:v4.1.0"],
+      "result": "The manifest-bound wheel and sdist were attested, reverified without rebuilding, and published; public hashes match the immutable workflow artifact.",
+      "evidence_location": "docs/audits/2026-09-23/release-inventory.json",
+      "recorded_at": "2026-09-23T13:34:00+02:00"
     },
     {
       "capability": "documentation_journeys",
       "owner": "maintainer",
-      "status": "LOCAL_VERIFIED",
-      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
+      "status": "HOSTED_VERIFIED",
+      "source_commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
       "artifact_digests": [
-        "sha256:41481b472b29a6591b8e67419eafac8605c951cf7dfed1fe39a6a64fcf6a9b9a",
-        "sha256:14cccb2a755172246708a792f34015c7d57908e3b41667c47fa940de0fce8354"
+        "sha256:0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+        "sha256:386c300286088253d5df84523d0ef7d212b0f5e1aac5dcdf8bd9af3ecc63fdd1"
       ],
       "applicable_stages": ["LOCAL_VERIFIED", "HOSTED_VERIFIED", "EXTERNALLY_VALIDATED", "RELEASED"],
-      "evidence_command": "uv run python scripts/check_documentation.py; uv run python scripts/check.py",
-      "infrastructure": ["local locked Python environment", "isolated artifact virtual environments"],
+      "evidence_command": "GitHub Actions documentation checks and release-evidence run 35539365216.1 exact-artifact journeys",
+      "infrastructure": ["github-hosted", "isolated artifact virtual environments", "postgresql:18-alpine"],
       "dependency_versions": ["python:3.13.15"],
-      "result": "all 40 executable-language Markdown blocks are inventoried with repository-contained evidence; seven required journeys have explicit evidence, but database journeys still require exact-candidate artifact execution",
-      "evidence_location": "docs/planning/documentation-scenario-inventory.json",
-      "recorded_at": "2026-09-08T12:35:17+02:00"
+      "result": "Documentation checks and selected database-backed journeys passed from the exact released artifacts; partner journeys remain open.",
+      "evidence_location": "docs/audits/2026-09-23/release-inventory.json",
+      "recorded_at": "2026-09-23T13:34:00+02:00"
     },
     {
       "capability": "hosted_security_provenance",
       "owner": "maintainer",
-      "status": "OPEN",
-      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
-      "artifact_digests": [],
+      "status": "RELEASED",
+      "source_commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
+      "artifact_digests": [
+        "sha256:0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+        "sha256:386c300286088253d5df84523d0ef7d212b0f5e1aac5dcdf8bd9af3ecc63fdd1"
+      ],
       "applicable_stages": ["HOSTED_VERIFIED", "RELEASED"],
-      "evidence_command": null,
-      "infrastructure": ["protected hosted workflow"],
-      "dependency_versions": [],
-      "result": "protected hosted checks, security scans, SBOM, attestations, and candidate-bound hashes remain unrecorded",
-      "evidence_location": null,
-      "recorded_at": "2026-09-08T12:35:17+02:00"
+      "evidence_command": "Verify GitHub attestation subjects for release-evidence run 35539365216.1 and PyPI file attestations for publish run 35540231354.1",
+      "infrastructure": ["github-hosted", "GitHub artifact attestations", "PyPI Trusted Publishing"],
+      "dependency_versions": ["actions/attest-build-provenance:v4.1.0", "pypa/gh-action-pypi-publish:v1.14.2"],
+      "result": "Hosted checks, security scans, SBOM, SLSA provenance, and two PyPI publish attestations are bound to the released files.",
+      "evidence_location": "docs/audits/2026-09-23/release-inventory.json",
+      "recorded_at": "2026-09-23T13:34:00+02:00"
     },
     {
       "capability": "external_validation",
       "owner": "external_owners_unassigned",
       "status": "OPEN",
-      "source_commit": "24503cdcaf5cc204534e3aa8d8ec476804dcb11d",
+      "source_commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
       "artifact_digests": [],
       "applicable_stages": ["EXTERNALLY_VALIDATED", "RELEASED"],
       "evidence_command": null,
       "infrastructure": ["two independent non-demo deployments"],
       "dependency_versions": [],
-      "result": "two partners, independent review, exact-RC observation, and two-person approval remain unrecorded",
+      "result": "Two partners, independent review, exact-RC observation, and two-person approval remain unrecorded.",
       "evidence_location": null,
-      "recorded_at": "2026-09-08T12:35:17+02:00"
+      "recorded_at": "2026-09-23T13:34:00+02:00"
     }
   ]
 }

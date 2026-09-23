@@ -114,7 +114,60 @@ def _runtime_evidence(root: Path, lock: Path) -> tuple[Path, ...]:
         json.dumps({"schema_version": 1, "status": "passed", "artifacts": entries}) + "\n",
         encoding="utf-8",
     )
-    return (runtime_path, constraints_path, *evidence)
+    checks = [
+        "historical_artifact_digest",
+        "historical_artifact_installed",
+        "historical_schema_created",
+        "historical_data_seeded",
+        "candidate_artifact_installed",
+        "candidate_schema_upgraded",
+        "seeded_data_preserved",
+        "ownership_preserved",
+        "runtime_roles_preserved",
+        "grants_preserved",
+        "forced_rls_preserved",
+        "constraints_preserved",
+        "indexes_preserved",
+        "revision_markers_current",
+    ]
+    wheel = next((root / "dist").glob("*.whl"))
+    historical_upgrade = root / "build" / "release" / "historical-upgrade-results.json"
+    historical_upgrade.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "status": "passed",
+                "historical": {
+                    "version": "0.11.0a1",
+                    "filename": "fastapi_effects-0.11.0a1-py3-none-any.whl",
+                    "url": "https://files.pythonhosted.org/example.whl",
+                    "sha256": "e" * 64,
+                },
+                "candidate": {
+                    "filename": wheel.name,
+                    "sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),
+                },
+                "targets": [
+                    {
+                        "target": f"postgresql-{major}",
+                        "postgresql_major": major,
+                        "server_version": f"{major}.1",
+                        "status": "passed",
+                        "checks": checks,
+                        "historical_contract_sha256": "a" * 64,
+                        "candidate_contract_sha256": "b" * 64,
+                        "seed_counts": {"events": 1},
+                        "revision_markers": {"core": 1},
+                        "alembic_versions": ["0005_webhook_retention"],
+                    }
+                    for major in (16, 18)
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return (runtime_path, constraints_path, historical_upgrade, *evidence)
 
 
 def test_release_manifest_binds_and_verifies_exact_distribution_bytes(tmp_path: Path) -> None:
@@ -200,7 +253,7 @@ def test_release_manifest_validates_per_artifact_certification(tmp_path: Path) -
         evidence_files=evidence,
     )
 
-    assert len(created["evidence"]) == 6
+    assert len(created["evidence"]) == 7
     verify_manifest(
         root=root,
         manifest_path=manifest,
@@ -246,6 +299,7 @@ def test_release_manifest_verifies_with_cli_style_relative_root(
     [
         "artifact-lock-constraints.txt",
         "artifact-runtime-results.json",
+        "historical-upgrade-results.json",
         "wheel-certification-manifest.json",
         "wheel-certification.json",
         "sdist-certification-manifest.json",
@@ -353,6 +407,43 @@ def test_release_manifest_rejects_invalid_artifact_runtime_evidence(
             report_path.read_bytes()
         ).hexdigest()
     runtime_path.write_text(json.dumps(runtime) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        create_manifest(
+            root=root,
+            output=root / "build" / "release" / "artifact-manifest.json",
+            source_commit=COMMIT,
+            package_version="1.0.0",
+            workflow_identity=WORKFLOW,
+            lock_file=lock,
+            evidence_files=evidence,
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("candidate_digest", "candidate wheel"),
+        ("failed_target", "required checks"),
+        ("missing_pg16", "PostgreSQL 16 and 18"),
+    ],
+)
+def test_release_manifest_rejects_invalid_historical_upgrade_evidence(
+    tmp_path: Path,
+    mutation: str,
+    message: str,
+) -> None:
+    root, lock = _candidate(tmp_path)
+    evidence = _runtime_evidence(root, lock)
+    path = next(path for path in evidence if path.name == "historical-upgrade-results.json")
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if mutation == "candidate_digest":
+        value["candidate"]["sha256"] = "0" * 64
+    elif mutation == "failed_target":
+        value["targets"][0]["status"] = "failed"
+    else:
+        value["targets"] = value["targets"][1:]
+    path.write_text(json.dumps(value) + "\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match=message):
         create_manifest(

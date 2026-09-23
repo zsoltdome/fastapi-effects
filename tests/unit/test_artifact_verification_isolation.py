@@ -42,6 +42,10 @@ def test_release_workflow_does_not_reinstall_candidates_into_project_environment
     assert "GITHUB_RUN_ATTEMPT" in workflow
     assert "actions: read" in workflow
     assert "artifact-lock-constraints.txt" in workflow
+    assert "historical-upgrade-results.json" in workflow
+    assert "scripts/verify_published_upgrade.py" in workflow
+    assert "postgres:16-alpine" in workflow
+    assert "postgres:18-alpine" in workflow
     assert "github.run_attempt" in workflow
 
 

@@ -17,6 +17,17 @@ jobs:
     environment: release
     timeout-minutes: 30
     services:
+      postgres16:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 55431:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
       postgres:
         image: postgres:18-alpine
         env:
@@ -78,6 +89,15 @@ jobs:
           --runtime-test tests/integration/test_webhook_receiver_inbox.py
           --runtime-test tests/integration/test_core_concurrency.py::test_fanout_failure_rolls_back_business_and_event_rows
           --runtime-test tests/integration/test_core_concurrency.py::test_finalization_refreshes_database_time_after_waiting_for_row_lock
+      - name: Upgrade the exact public 0.11.0a1 wheel to the candidate on PostgreSQL 16 and 18
+        run: >-
+          uv run --no-sync python scripts/verify_published_upgrade.py
+          --inventory docs/audits/2026-09-23/release-inventory.json
+          --candidate-wheel dist/fastapi_effects-*.whl
+          --constraints build/release/artifact-lock-constraints.txt
+          --target postgresql-16=postgresql://postgres:postgres@127.0.0.1:55431/postgres
+          --target postgresql-18=postgresql://postgres:postgres@127.0.0.1:55432/postgres
+          --output build/release/historical-upgrade-results.json
       - name: Generate SBOM, checksums, schemas, and evidence manifest
         run: |
           mkdir -p build/release
@@ -94,6 +114,7 @@ jobs:
             --lock-file uv.lock \
             --evidence-file build/release/artifact-lock-constraints.txt \
             --evidence-file build/release/artifact-runtime-results.json \
+            --evidence-file build/release/historical-upgrade-results.json \
             --evidence-file build/release/wheel-certification-manifest.json \
             --evidence-file build/release/wheel-certification.json \
             --evidence-file build/release/sdist-certification-manifest.json \
