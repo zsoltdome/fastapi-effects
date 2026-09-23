@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 
@@ -36,11 +37,16 @@ class _Sink:
         del claim
 
 
+class _ReadyPollingRelay(PollingRelay):
+    async def run(self) -> None:
+        ready_file = os.environ.get("FASTAPI_EFFECTS_SIGNAL_READY_FILE")
+        if ready_file:
+            await asyncio.to_thread(Path(ready_file).touch)
+        await super().run()
+
+
 def create_relay() -> PollingRelay:
-    ready_file = os.environ.get("FASTAPI_EFFECTS_SIGNAL_READY_FILE")
-    if ready_file:
-        Path(ready_file).touch()
-    return PollingRelay(
+    return _ReadyPollingRelay(
         sessions=_Sessions(),  # type: ignore[arg-type]
         sink=_Sink(),
         leases=_Leases(),  # type: ignore[arg-type]

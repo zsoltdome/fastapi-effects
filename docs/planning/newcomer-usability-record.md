@@ -16,9 +16,13 @@ necessary.
 ## Candidate identity
 
 - Candidate version: `0.11.0a2`
-- Tag and source commit: pending
-- Wheel filename and SHA-256: pending
-- Release-evidence run and attempt: pending
+- Tag and source commit: `v0.11.0a2` at
+  `28f2e4d58d0ea03eda9e9acd031c92602b42c091`
+- Wheel filename and SHA-256:
+  `fastapi_effects-0.11.0a2-py3-none-any.whl`,
+  `ca1028f7ad90967ee40657295648d56ac69fc95db7fde6a34976911348a63d24`
+- Release-evidence run and attempt: [`35876379003.2`](https://github.com/zsoltdome/fastapi-effects/actions/runs/35876379003),
+  retained artifact `release-evidence-v0.11.0a2-attempt-2` (ID `10758940987`)
 - Test date and environment summary: pending
 
 ## Participant independence
