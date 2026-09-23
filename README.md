@@ -16,7 +16,7 @@ best-effort background task.
 [Security](https://github.com/zsoltdome/fastapi-effects/blob/main/SECURITY.md) ·
 [License](https://github.com/zsoltdome/fastapi-effects/blob/main/LICENSE)
 
-> **Status:** production-hardening alpha `0.11.0a1`; v1 external gates are open.
+> **Status:** production-hardening alpha `0.11.0a2`; v1 external gates are open.
 
 Application changes and effect intent use the same SQLAlchemy transaction. After
 commit, a fenced PostgreSQL relay executes immutable delivery snapshots through fresh,
@@ -27,12 +27,12 @@ tenant-bound application sessions.
 FastAPI Effects supports Python 3.11 through 3.14.
 
 ```bash
-python -m pip install fastapi-effects
+python -m pip install "fastapi-effects==0.11.0a2"
 ```
 
 Install only the integrations you use: `webhooks`, `otel`, `taskiq`, and `fastmcp`.
-For example, `python -m pip install "fastapi-effects[webhooks]"` adds signed webhook
-delivery without forcing that dependency set on every installation.
+For example, `python -m pip install "fastapi-effects[webhooks]==0.11.0a2"` adds signed
+webhook delivery without forcing that dependency set on every installation.
 
 ## Check the contract in 30 seconds
 
@@ -101,7 +101,7 @@ FastAPI Effects does not promise generic exactly-once distributed execution.
 
 ## Capability maturity
 
-| Capability | Status in `0.11.0a1` |
+| Capability | Status in `0.11.0a2` |
 |---|---|
 | Boundary Contract and conformance profiles | Implemented |
 | Real PostgreSQL transactional runtime | Implemented |
@@ -111,7 +111,7 @@ FastAPI Effects does not promise generic exactly-once distributed execution.
 | Signed webhook delivery and receiver replay protection | Beta |
 | Durable Taskiq external executor | Alpha |
 | Transactional inbound command idempotency | Alpha |
-| Compatibility, recovery, telemetry, and release evidence | Locally verified |
+| Compatibility, recovery, telemetry, and release evidence | Candidate-bound; external gates open |
 | Two external deployments, independent review, and RC observation | Required; open |
 
 The in-memory driver is a reference oracle, not a production store. Detailed evidence

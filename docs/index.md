@@ -5,7 +5,7 @@ FastAPI Effects defines a transaction boundary and executable assurance contract
 
 > **Durable, tenant-aware side effects for FastAPI and PostgreSQL.**
 
-Version `0.11.0a1` is the production-hardening alpha. The repository now includes the
+Version `0.11.0a2` is the production-hardening alpha. The repository now includes the
 real PostgreSQL runtime, webhooks, Taskiq handoffs, command idempotency, target-bound
 delegation/FastMCP, and their executable conformance profiles. v1 promotion remains
 blocked on external partner, independent review, and RC observation evidence.
@@ -35,6 +35,8 @@ FastAPI Effects is authored by Zsolt Döme and distributed under the MIT License
 - **Normative:** Boundary Contract v1 and certification semantics.
 - **Executable:** reference driver, profiles, scenarios, reporters, CLI, and audit.
 - **Implemented:** PostgreSQL, handlers, webhook, Taskiq, command, and delegation paths.
-- **Externally blocked:** production partner validation, independent review, RC
-  observation, and trusted publication.
+- **Released baseline:** `0.11.0a1` was published by Trusted Publishing with public
+  attestations; `0.11.0a2` repeats the protected artifact path.
+- **Externally blocked:** production partner validation, independent review, and RC
+  observation.
 - **Not claimed:** formal verification or universal exactly-once effects.

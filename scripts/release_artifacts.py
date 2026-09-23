@@ -19,15 +19,22 @@ _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.!+_-]{0,127}$")
 _WORKFLOW = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/@#+-]{0,511}$")
 _WORKFLOW_RUN = re.compile(r"#(?P<run_id>[1-9][0-9]*)\.(?P<run_attempt>[1-9][0-9]*)$")
+_HISTORICAL_BASELINE_VERSION = "0.11.0a1"
 _REQUIRED_RUNTIME_EVIDENCE = frozenset(
     {
         "build/release/artifact-lock-constraints.txt",
         "build/release/artifact-runtime-results.json",
-        "build/release/historical-upgrade-results.json",
         "build/release/wheel-certification-manifest.json",
         "build/release/wheel-certification.json",
         "build/release/sdist-certification-manifest.json",
         "build/release/sdist-certification.json",
+    }
+)
+_REQUIRED_POST_BASELINE_EVIDENCE = frozenset(
+    {
+        "build/release/historical-upgrade-results.json",
+        "build/release/postgres-restart-16.json",
+        "build/release/postgres-restart-18.json",
     }
 )
 _MAXIMUM_METADATA_BYTES = 1024 * 1024
@@ -64,7 +71,9 @@ def create_manifest(
         lock_digest=lock_digest,
         package_version=package_version,
     )
-    _validate_historical_upgrade_evidence(root, distributions, evidence_paths)
+    if package_version != _HISTORICAL_BASELINE_VERSION:
+        _validate_historical_upgrade_evidence(root, distributions, evidence_paths)
+        _validate_restart_evidence(root, evidence_paths, package_version=package_version)
     manifest: dict[str, Any] = {
         "schema_version": 2,
         "source_commit": source_commit,
@@ -178,11 +187,17 @@ def verify_manifest(
         lock_digest=lock_digest,
         package_version=package_version,
     )
-    _validate_historical_upgrade_evidence(
-        root,
-        distributions,
-        tuple(expected_evidence.values()),
-    )
+    if package_version != _HISTORICAL_BASELINE_VERSION:
+        _validate_historical_upgrade_evidence(
+            root,
+            distributions,
+            tuple(expected_evidence.values()),
+        )
+        _validate_restart_evidence(
+            root,
+            tuple(expected_evidence.values()),
+            package_version=package_version,
+        )
     return value
 
 
@@ -281,7 +296,10 @@ def _validate_artifact_runtime_evidence(
     package_version: str,
 ) -> None:
     evidence = {path.relative_to(root.resolve()).as_posix(): path for path in evidence_paths}
-    missing = _REQUIRED_RUNTIME_EVIDENCE - evidence.keys()
+    required = _REQUIRED_RUNTIME_EVIDENCE
+    if package_version != _HISTORICAL_BASELINE_VERSION:
+        required = required | _REQUIRED_POST_BASELINE_EVIDENCE
+    missing = required - evidence.keys()
     if missing:
         raise ValueError(f"Release artifact runtime evidence is missing: {sorted(missing)}")
     runtime_path = evidence.get("build/release/artifact-runtime-results.json")
@@ -467,6 +485,67 @@ def _validate_historical_upgrade_evidence(
         observed_majors.add(major)
     if observed_majors != {16, 18}:
         raise ValueError("Historical upgrade evidence must cover PostgreSQL 16 and 18.")
+
+
+def _validate_restart_evidence(
+    root: Path,
+    evidence_paths: tuple[Path, ...],
+    *,
+    package_version: str,
+) -> None:
+    evidence = {path.relative_to(root.resolve()).as_posix(): path for path in evidence_paths}
+    required_fields = {
+        "schema_version",
+        "captured_on",
+        "platform",
+        "fastapi_effects",
+        "postgresql_before",
+        "postgresql_after",
+        "expected_major",
+        "result",
+        "restart_observed",
+        "backend_replaced",
+        "schema_compatible",
+        "doctor_healthy",
+        "event_identity_preserved",
+        "delivery_identity_preserved",
+    }
+    required_passes = {
+        "restart_observed",
+        "backend_replaced",
+        "schema_compatible",
+        "doctor_healthy",
+        "event_identity_preserved",
+        "delivery_identity_preserved",
+    }
+    for major in (16, 18):
+        relative = f"build/release/postgres-restart-{major}.json"
+        report_path = evidence.get(relative)
+        if report_path is None:
+            raise ValueError(f"PostgreSQL {major} restart evidence is missing.")
+        value = _json_object(report_path, f"PostgreSQL {major} restart evidence")
+        before = value.get("postgresql_before")
+        after = value.get("postgresql_after")
+        if (
+            set(value) != required_fields
+            or value.get("schema_version") != 1
+            or value.get("fastapi_effects") != package_version
+            or value.get("expected_major") != major
+            or isinstance(value.get("expected_major"), bool)
+            or value.get("result") != "pass"
+            or not isinstance(value.get("captured_on"), str)
+            or not value["captured_on"]
+            or not isinstance(value.get("platform"), str)
+            or not value["platform"]
+            or not isinstance(before, str)
+            or not before.startswith(f"{major}.")
+            or not isinstance(after, str)
+            or not after.startswith(f"{major}.")
+            or any(value.get(field) is not True for field in required_passes)
+        ):
+            raise ValueError(
+                f"PostgreSQL {major} restart evidence did not record the required pass."
+            )
 
 
 def _validate_certification_evidence(

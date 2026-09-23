@@ -5,6 +5,51 @@ with explicit pre-1.0 contract and evidence-schema notes.
 
 ## Unreleased
 
+## 0.11.0a2 - 2026-09-23
+
+### Added
+
+- Required exact-public-`0.11.0a1`-wheel to exact-candidate-wheel upgrade evidence on
+  PostgreSQL 16 and 18, covering seeded data, ownership, roles, grants, forced RLS,
+  constraints, indexes, Alembic revisions, and component revision markers.
+- Real PostgreSQL webhook key-lifecycle coverage for revoked and expired-retiring keys,
+  wrong-tenant access, terminal-finalization interruption, sibling progress, and
+  immutable attempt history.
+- Live control-boundary backend-loss tests and a PostgreSQL wire-protocol proxy that
+  drops commit acknowledgements only after the server reports completion.
+- Candidate-bound persistent PostgreSQL 16/18 restart reports, signal shutdown checks,
+  Taskiq duplicate-worker coverage, and durable release-asset retention.
+- A narrow PostgreSQL/signed-webhook release-scope ADR, numeric validator inventory,
+  and published-package-first version-matched consumer quickstart.
+
+### Changed
+
+- Relay polling, control-plane, finalization, and shutdown timing configuration now
+  rejects non-finite values, booleans, nonnumeric inputs, and out-of-range values at
+  construction time. The documented `(0, 60]` and `(0, 300]` bounds and defaults are
+  unchanged.
+- Webhook transport and HTTP response timeout configuration now applies explicit
+  finite-number and type checks. Webhook retention and Taskiq worker/recovery numeric
+  controls reject booleans and wrong runtime types through the configuration-error
+  path.
+- Release manifests require historical-upgrade and PostgreSQL 16/18 restart evidence
+  for every post-`0.11.0a1` candidate while preserving verification of the historical
+  baseline artifact.
+- The release and publish paths use approval-gated, tag-restricted environments; `main`
+  and release tags are protected, and publication promotes and archives only the exact
+  selected evidence artifact.
+
+### Security
+
+- T05 and T09 evidence now covers cross-tenant key denial, backend termination at
+  reconciliation/claim/finalization boundaries, stale-finalizer rejection, and
+  server-committed/client-unknown outcomes without claiming exactly-once delivery.
+- Private vulnerability reporting is enabled. The repository remains single-owner, so
+  independent review, two external deployments, RC observation, and two-person stable
+  approval remain open.
+
+## 0.11.0a1 - 2026-09-20
+
 ### Added
 
 - Real async SQLAlchemy outer unit of work with transaction-local tenant and subject

@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-23T15:50:00+02:00",
+  "repository": "zsoltdome/fastapi-effects",
+  "verified_by": {
+    "github_login": "zsoltdome",
+    "repository_role": "admin",
+    "method": "authenticated GitHub API readback"
+  },
+  "main_branch": {
+    "strict_status_checks": true,
+    "required_checks": [
+      "Static quality / Python 3.13",
+      "Tests and branch coverage / Python 3.13",
+      "PostgreSQL 16 / Python 3.11",
+      "PostgreSQL 18 / Python 3.14",
+      "Documentation and examples",
+      "Minimum direct dependencies",
+      "Reference assurance suite",
+      "Real complete / PostgreSQL 16",
+      "Real complete / PostgreSQL 18",
+      "artifacts",
+      "audit",
+      "compat-latest-all",
+      "compat-min-fastmcp"
+    ],
+    "enforce_admins": true,
+    "required_pull_request_reviews": true,
+    "required_approving_review_count": 0,
+    "dismiss_stale_reviews": true,
+    "conversation_resolution": true,
+    "linear_history": true,
+    "force_pushes": false,
+    "deletions": false
+  },
+  "release_tags": {
+    "ruleset_id": 23878358,
+    "ruleset_name": "Protect release tags",
+    "enforcement": "active",
+    "pattern": "refs/tags/v*",
+    "rules": ["creation", "update", "deletion", "non_fast_forward"],
+    "owner_role_can_bypass": true
+  },
+  "environments": {
+    "release": {
+      "required_reviewer": "zsoltdome",
+      "prevent_self_review": false,
+      "deployment_policy": {"type": "tag", "pattern": "v*"}
+    },
+    "pypi": {
+      "required_reviewer": "zsoltdome",
+      "prevent_self_review": false,
+      "deployment_policy": {"type": "tag", "pattern": "v*"}
+    }
+  },
+  "actions": {
+    "default_workflow_permissions": "read",
+    "can_approve_pull_request_reviews": false
+  },
+  "security_reporting": {
+    "private_vulnerability_reporting": true,
+    "documented_route": "SECURITY.md"
+  },
+  "publisher": {
+    "configured_identity_readable_by_repository_api": false,
+    "last_verified_execution": {
+      "version": "0.11.0a1",
+      "workflow": ".github/workflows/publish.yml",
+      "environment": "pypi",
+      "run_id": 35540231354,
+      "run_attempt": 1,
+      "identity": "PyPI Trusted Publishing via GitHub Actions OIDC"
+    },
+    "next_required_proof": "successful protected 0.11.0a2 publish plus both PyPI attestations"
+  },
+  "remaining_controls": [
+    {
+      "control": "independent pull-request and deployment approval",
+      "owner": "repository owner",
+      "disposition": "open until a second authorized maintainer is added; required before stable two-person approval, not represented as complete for this alpha"
+    },
+    {
+      "control": "current PyPI trusted-publisher configuration readback",
+      "owner": "repository and PyPI project owner",
+      "disposition": "repository API cannot read it; require the protected 0.11.0a2 OIDC publish and both PyPI attestations as execution proof"
+    },
+    {
+      "control": "history and rights review",
+      "owner": "repository owner",
+      "disposition": "open external review item before stable promotion"
+    }
+  ],
+  "open_limits": [
+    "The repository has one administrator/collaborator, so pull requests require the protected checks but have no independent approving reviewer.",
+    "The release and pypi environments provide an explicit approval pause, but their only reviewer can approve their own deployment.",
+    "Two-person final-release approval remains unavailable until a second authorized person is added; this does not block an honestly labelled pre-v1 alpha.",
+    "A separate history and rights review has not been recorded."
+  ]
+}

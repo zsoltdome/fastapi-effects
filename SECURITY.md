@@ -2,7 +2,7 @@
 
 ## Supported status
 
-FastAPI Effects `0.11.0a1` is a production-hardening alpha. Core, webhook, Taskiq,
+FastAPI Effects `0.11.0a2` is a production-hardening alpha. Core, webhook, Taskiq,
 command-idempotency, and delegation claims are covered by real implementations and
 conformance, but v1 promotion remains blocked on external design-partner and independent
 review evidence. Supported Python/database versions are listed in `docs/compatibility.md`.

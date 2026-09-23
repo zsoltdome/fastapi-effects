@@ -19,11 +19,12 @@ historical evidence remains retained but is not treated as proof of the new boun
   terminal per-delivery errors. Direct and concurrent-relay regressions are local.
 - **A02 — IMPLEMENTED:** reconcile, claim, finalization, Taskiq control work, and relay
   shutdown have separate cooperative budgets. SIGTERM and SIGINT are exercised in a
-  subprocess. Live database cleanup/ambiguous-commit rehearsals remain required.
+  subprocess, and the T09 source matrix now covers live cleanup and ambiguous commit.
+  The protected candidate-artifact rerun remains required.
 - **A03 — IMPLEMENTED:** reviewed invalidated-connection and SQLSTATE classification
   replaces the narrow exception tuple; programming/schema defects still escape.
-  Persistent-storage restart rehearsals pass locally on PostgreSQL 16 and 18; live
-  backend termination/restart across every boundary remains required.
+  Persistent-storage restart and live backend-termination recovery pass locally on
+  PostgreSQL 16 and 18. The protected candidate-artifact rerun remains required.
 - **A04 — IMPLEMENTED:** PostgreSQL `clock_timestamp()` is sampled after finalization
   locks and drives recorded transition time. Real lock-delay and application-clock-skew
   tests pass locally on PostgreSQL 16 and 18, but must be rerun from the candidate artifact.
@@ -44,6 +45,15 @@ historical evidence remains retained but is not treated as proof of the new boun
 The `0.11.0a1` artifact and hosted release path have release evidence. Capability stages
 that require partner deployment or independent review remain below
 `EXTERNALLY_VALIDATED`; publishing the alpha does not promote those stages implicitly.
+
+On 2026-09-23 the original `0.11.0a1` evidence ZIP and every manifest-bound file were
+attached to the GitHub release without rebuilding. A fresh public download matched the
+original archive digest and passed manifest verification. The authenticated repository
+owner also enabled strict `main` checks with admin enforcement, protected `v*` tags,
+tag-restricted approval gates for both `release` and `pypi`, read-only default Actions
+permissions, and private vulnerability reporting. The exact bounded state and its
+single-owner limitations are in the
+[repository-controls snapshot](../audits/2026-09-23/repository-controls.json).
 
 ## Historical local verification at the source commit above
 
@@ -87,15 +97,17 @@ that require partner deployment or independent review remain below
   release, repository tag, or retained historical distribution at that time. It is
   preserved as historical evidence and superseded for current decisions by the
   [September 23 release inventory](../audits/2026-09-23/README.md).
-- [ ] Because `0.11.0a1` is now a public schema-bearing artifact, the next candidate
-  must install that exact PyPI wheel, create and seed its database, and upgrade it with
-  the exact candidate wheel on PostgreSQL 16 and 18. Historical-artifact upgrade
-  testing is no longer `NOT_APPLICABLE`.
-- [x] The full integration selection passes locally on PostgreSQL 16 and 18: 45 tests
+- [x] The local diagnostic installs the public `0.11.0a1` wheel with SHA-256
+  `0e7dce9106334a99c54ca79ba4748884cdbf9858c8e64f423a293bf45f3013c9`,
+  creates and seeds its database, and upgrades it with the locally built candidate
+  wheel on PostgreSQL 16 and 18. It checks data, ownership, roles, grants, forced RLS,
+  constraints, indexes, Alembic revision, and component markers. This does not replace
+  the required protected candidate-artifact result.
+- [x] The full integration selection passes locally on PostgreSQL 16 and 18: 57 tests
   on each version, with no skipped integration tests.
 - [x] Clean wheel/sdist installation checks pass for the base package and supported
   extras, followed by Twine validation of both distribution files.
-- [x] Every one of the 40 executable-language Markdown blocks is classified and
+- [x] Every one of the 50 executable-language Markdown blocks is classified and
   content-hashed, and all seven required documentation journeys have local evidence.
 
 ## Still open
@@ -108,11 +120,40 @@ the recorded candidate and required live/hosted profiles.
 - [ ] Build the next increasing version through the approval-gated release workflow;
   rerun the database-backed quickstart, relay, webhook lifecycle/replay, Taskiq, and
   published-`0.11.0a1` upgrade journeys from the exact candidate artifacts.
+- [ ] Have an unfamiliar developer complete the candidate-bound quickstart and recovery
+  journey, then fill the sanitized
+  [newcomer usability record](newcomer-usability-record.md). Automated tests do not
+  satisfy this FE-008 gate.
 - [ ] Bind the next candidate's protected results to its artifact digests, hosted
   verification, security scans, SBOM, GitHub provenance, and PyPI publish attestations.
 - [ ] Complete two distinct non-demo external deployments, independent review, exact-RC
   observation, and two-person go approval. The production-readiness record remains
   deliberately `no-go` until these exist.
+
+The corrected-alpha source work selects `0.11.0a2`. Its local T05/T09, restart,
+artifact-binding, and exact-public-wheel upgrade results are diagnostics until the tag's
+protected evidence run succeeds; the ledger remains bound to released `0.11.0a1` in the
+meantime.
+
+## Promotion-process walkthrough
+
+- **Alpha:** a protected `v*` tag pauses in the `release` environment, builds and tests
+  one wheel/sdist set, binds the source/tag/run/attempt/lock/reports into the manifest,
+  and attests it. Publishing a GitHub prerelease then pauses in `pypi`, selects that
+  exact successful attempt and artifact ID, revalidates the manifest, publishes through
+  a fail-closed durable-asset step, and only then publishes through OIDC Trusted
+  Publishing. A rerun accepts an existing release asset only when its SHA-256 matches.
+- **RC:** the same byte-binding path applies, but the readiness validator additionally
+  requires two completed independent partner records, completed independent review,
+  and no unresolved promotion-blocking findings. Those records remain absent.
+- **Final:** the existing final gate additionally requires candidate observation and
+  two distinct authorized approvers. The repository currently has only one authorized
+  owner, so this path remains deliberately unavailable.
+- **Self-reference boundary:** the tagged source contains rules and pointers, not its
+  own future hashes. The post-build manifest binds commit, workflow run/attempt, lock,
+  distributions, and reports. Post-publication inventories bind public hashes and
+  attestations without rebuilding or changing the tagged candidate. FE-047 must extend
+  this separation for observed RC-to-final promotion.
 
 See [the capability ledger](capability-evidence-ledger.md) and
 [findings register](../security-review/findings.md) for stage-specific status and

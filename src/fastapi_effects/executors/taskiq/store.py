@@ -333,8 +333,14 @@ class TaskiqHandoffStore:
         batch_size: int = 100,
     ) -> int:
         _require_idle(session)
-        if not 1 <= batch_size <= 10_000:
+        if (
+            not isinstance(batch_size, int)
+            or isinstance(batch_size, bool)
+            or not 1 <= batch_size <= 10_000
+        ):
             raise FastAPIEffectsConfigurationError("Taskiq recovery batch size is invalid.")
+        if not isinstance(enqueue_timeout, timedelta) or enqueue_timeout <= timedelta(0):
+            raise FastAPIEffectsConfigurationError("Taskiq enqueue timeout is invalid.")
         recovered = 0
         async with session.begin():
             selection_time = await self._database_clock.now(session, observed_at=now)

@@ -58,7 +58,7 @@ class RealDelegationBoundaryDriver:
     def manifest(self) -> CapabilityManifest:
         return CapabilityManifest(
             adapter_name="fastapi_effects_delegation",
-            adapter_version="0.11.0a1",
+            adapter_version="0.11.0a2",
             implementation=(
                 "fastapi_effects.testing.delegation_driver.RealDelegationBoundaryDriver"
             ),

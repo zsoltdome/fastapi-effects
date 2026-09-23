@@ -75,6 +75,37 @@
       "size": 904375
     }
   },
+  "durable_release_storage": {
+    "location": "https://github.com/zsoltdome/fastapi-effects/releases/tag/v0.11.0a1",
+    "retention_owner": "repository owner",
+    "uploaded_at": "2026-09-23T13:15:17Z",
+    "archive": {
+      "asset_id": 583807035,
+      "filename": "release-evidence-v0.11.0a1-attempt-1.zip",
+      "url": "https://github.com/zsoltdome/fastapi-effects/releases/download/v0.11.0a1/release-evidence-v0.11.0a1-attempt-1.zip",
+      "sha256": "f0e913257347e61416ab04bec97e7126d08168e051b5ee3089db54849c7b9c7c",
+      "size": 904375
+    },
+    "manifest_bound_assets": [
+      {"filename": "fastapi_effects-0.11.0a1-py3-none-any.whl", "sha256": "0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9", "size": 229555},
+      {"filename": "fastapi_effects-0.11.0a1.tar.gz", "sha256": "386c300286088253d5df84523d0ef7d212b0f5e1aac5dcdf8bd9af3ecc63fdd1", "size": 671829},
+      {"filename": "SHA256SUMS", "sha256": "4b880d6de7fdbc843606a6d3bd18088285900f8ba87d98281493a39a724e8a46", "size": 216},
+      {"filename": "artifact-lock-constraints.txt", "sha256": "1931a686472a097fa9551f4b742b8e093d1be0bfec0465f78d130e352d8289c5", "size": 2378},
+      {"filename": "artifact-runtime-results.json", "sha256": "4a0841909546d80b3fb4c249a0504e92a4bc181261a93c97d1c30ad55eaf15cd", "size": 2983},
+      {"filename": "sbom.cdx.json", "sha256": "0caa6cf67ed5d8db46daf78ba5ba3dbc2689e6788c42a6f0e1e8420b9d7289c3", "size": 36734},
+      {"filename": "sdist-certification-manifest.json", "sha256": "1a7a2afa69fa5930b5151801633e9110ee6213fc22287440f413f8e910c95d0b", "size": 1825},
+      {"filename": "sdist-certification.json", "sha256": "1b02d5ed6adaba40e6cd95591336ac2b7a42afd1cc8e32dcda530082691e36d4", "size": 8326},
+      {"filename": "wheel-certification-manifest.json", "sha256": "e4741aa289bb433b898bb6fc2db07bb1559e535df80331665993d5ff6d14f133", "size": 1825},
+      {"filename": "wheel-certification.json", "sha256": "fdf62e677f818dcfd8a0015f478ce64dfe7faf460b18149529dbab769698e6ca", "size": 8326}
+    ],
+    "retrieval_verification": {
+      "retrieved_at": "2026-09-23T13:17:00Z",
+      "route": "unauthenticated GitHub release download",
+      "archive_sha256_match": true,
+      "manifest_verification": "passed with the v0.11.0a1 lock and original workflow identity",
+      "all_manifest_bound_files_present": true
+    }
+  },
   "publish_workflow": {
     "workflow": ".github/workflows/publish.yml",
     "run_id": 35540231354,

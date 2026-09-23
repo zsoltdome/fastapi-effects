@@ -43,10 +43,27 @@ def test_release_workflow_does_not_reinstall_candidates_into_project_environment
     assert "actions: read" in workflow
     assert "artifact-lock-constraints.txt" in workflow
     assert "historical-upgrade-results.json" in workflow
+    assert "postgres-restart-16.json" in workflow
+    assert "postgres-restart-18.json" in workflow
     assert "scripts/verify_published_upgrade.py" in workflow
+    assert "scripts/rehearse_postgres_restart.py" in workflow
+    assert "test_webhook_key_lifecycle.py" in workflow
+    assert "test_webhook_replay_works_with_exact_application_role_grants" in workflow
+    assert "test_postgres_control_boundaries.py" in workflow
+    assert "test_postgres_ambiguous_commit.py" in workflow
     assert "postgres:16-alpine" in workflow
     assert "postgres:18-alpine" in workflow
     assert "github.run_attempt" in workflow
+
+
+def test_publish_workflow_retains_the_selected_archive_and_its_contents() -> None:
+    workflow = (ROOT / ".github/workflows/publish.yml").read_text(encoding="utf-8")
+
+    assert "contents: write" in workflow
+    assert "approved/release-evidence-" in workflow
+    assert 'gh release upload "${RELEASE_TAG}"' in workflow
+    assert "approved/dist/*" in workflow
+    assert "approved/build/release/*" in workflow
 
 
 def test_artifact_builds_use_the_lock_export_for_pep517_dependencies() -> None:

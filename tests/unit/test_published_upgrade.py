@@ -9,6 +9,8 @@ from scripts.verify_published_upgrade import (
     _BASELINE_REVISIONS,
     _RUNTIME_ROLES,
     _SEEDED_TABLES,
+    ROOT,
+    _display_path,
     assert_upgrade_contract,
     load_historical_wheel,
     parse_targets,
@@ -222,3 +224,13 @@ def test_upgrade_targets_require_both_supported_postgresql_lines() -> None:
 
     with pytest.raises(ValueError, match="exactly PostgreSQL 16 and 18"):
         parse_targets(["postgresql-18=postgresql://postgres@localhost/postgres"])
+
+
+def test_report_display_path_accepts_repository_and_external_destinations(
+    tmp_path: Path,
+) -> None:
+    repository_report = ROOT / "build" / "release" / "upgrade.json"
+    external_report = tmp_path / "upgrade.json"
+
+    assert _display_path(repository_report) == Path("build/release/upgrade.json")
+    assert _display_path(external_report) == external_report

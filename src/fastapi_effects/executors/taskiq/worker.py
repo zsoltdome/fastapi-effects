@@ -56,7 +56,9 @@ class TaskiqWorkerBridge:
 
     def __post_init__(self) -> None:
         if (
-            self.execution_timeout <= timedelta(0)
+            not isinstance(self.execution_timeout, timedelta)
+            or not isinstance(self.control_plane_timeout, timedelta)
+            or self.execution_timeout <= timedelta(0)
             or self.execution_timeout > timedelta(hours=1)
             or self.control_plane_timeout <= timedelta(0)
             or self.control_plane_timeout > timedelta(minutes=5)
