@@ -6,12 +6,33 @@ This record is the human evidence required by roadmap task FE-008. Automated
 installed-artifact tests do not fill it. The participant must be unfamiliar with the
 project, follow the version-matched quickstart without changing library internals, and
 record what actually happened. Before publication, use the exact retained candidate
-wheel and matching tagged source archive from the protected release-evidence run.
+wheel from the protected release-evidence run and the matching tagged source checkout.
 
 Do not include credentials, DSNs, payloads, response bodies, private repository data,
 or personally identifying information. A maintainer should replace the prompts below
 with a sanitized result and retain the private raw notes outside the repository when
 necessary.
+
+## Participant handoff
+
+The participant should receive this record and the
+[installed-package quickstart](../tutorials/quickstart.md), but no undocumented setup
+instructions. On the protected [release-evidence run](https://github.com/zsoltdome/fastapi-effects/actions/runs/35876379003),
+download and extract `release-evidence-v0.11.0a2-attempt-2`. GitHub may require the
+participant to sign in before the artifact download is available.
+
+Before starting the journey, verify that
+`dist/fastapi_effects-0.11.0a2-py3-none-any.whl` in the extracted artifact has the
+SHA-256 recorded below. Clone tag `v0.11.0a2` as directed by quickstart step 1 and
+confirm that it resolves to the recorded source commit. Because the candidate is not
+yet on PyPI, replace only the step-1 package installation argument with
+`fastapi-effects[webhooks] @ file:///absolute/path/to/fastapi_effects-0.11.0a2-py3-none-any.whl`.
+Do not build from the checkout, install moving `main`, or substitute another wheel.
+
+Record prerequisite provisioning separately. Start the library timing only after
+Python, Docker, and the disposable PostgreSQL prerequisites are ready. If any handoff
+instruction is insufficient, record that as friction and ask the maintainer only after
+capturing the visible symptom and attempted documented step.
 
 ## Candidate identity
 
