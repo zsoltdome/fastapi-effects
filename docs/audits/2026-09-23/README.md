@@ -1,4 +1,4 @@
-# 0.11.0a1 public-release inventory
+# Release and candidate inventories
 
 This inventory closes the public-artifact gap identified after the September 7 local
 verification. The earlier
@@ -12,7 +12,7 @@ PyPI match the immutable artifact selected from the successful tag evidence run.
 records Trusted Publishing attestations for both distribution files, and GitHub records
 one SLSA provenance statement covering both files and the bound release evidence.
 
-The machine-readable [release inventory](release-inventory.json) records the public
+The machine-readable [0.11.0a1 release inventory](release-inventory.json) records the public
 URLs, hashes, workflow runs, immutable Actions artifact, and attestation identities.
 PyPI's raw provenance endpoint returned `503` during the recheck, while the normal file
 details page continued to show both verified attestations. This availability failure
@@ -35,3 +35,11 @@ Because this release contains the bundled migrations and PostgreSQL role contrac
 historical-artifact upgrade testing is no longer `NOT_APPLICABLE`. Every later
 candidate must create and seed a database using this exact public wheel, then upgrade
 that database using the exact candidate wheel on PostgreSQL 16 and 18.
+
+The separate [0.11.0a2 inventory](release-inventory-v0.11.0a2.json) records the exact
+tagged candidate without rewriting either historical record. Protected release-evidence
+run `35876379003.2` passed, including the public-`0.11.0a1` upgrade journey on
+PostgreSQL 16 and 18, and GitHub records SLSA provenance for the candidate files. The
+inventory deliberately records GitHub release publication, durable release assets,
+PyPI publication, and both PyPI file attestations as pending until FE-008 is completed
+by an unfamiliar developer and the protected publish workflow succeeds.
