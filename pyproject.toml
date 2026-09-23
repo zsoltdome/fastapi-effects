@@ -59,7 +59,7 @@ taskiq = [
   "taskiq-redis>=1.2,<2",
 ]
 fastmcp = [
-  "fastmcp>=3.4.7,<4",
+  "fastmcp>=3.4.7,<5",
 ]
 
 [dependency-groups]
@@ -71,7 +71,7 @@ build = [
 test = [
   "asyncpg>=0.31,<1",
   "cryptography>=46,<51",
-  "fastmcp>=3.4.7,<4",
+  "fastmcp>=3.4.7,<5",
   "httpx>=0.28.1,<1",
   "pytest>=9,<10",
   "pytest-asyncio>=1.3,<2",
