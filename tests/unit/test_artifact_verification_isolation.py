@@ -56,7 +56,7 @@ def test_artifact_builds_use_the_lock_export_for_pep517_dependencies() -> None:
     assert '"build",' in source
     assert '"--build-constraints"' in source
     assert "build = [" in project
-    assert '"setuptools>=82,<83"' in project
+    assert '"setuptools>=82,<85"' in project
 
 
 def test_runtime_harness_sanitizes_source_import_environment(
