@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-09-23T13:34:00+02:00",
+  "recorded_at": "2026-09-23T16:55:00+02:00",
   "package_version": "0.11.0a1",
   "source": {
     "base_commit": "575f4f97769fdf6b3152822096ee1cae2668f0bf",
@@ -15,6 +15,29 @@
   "local_non_authoritative_artifact_digests": {
     "fastapi_effects-0.11.0a1-py3-none-any.whl": "41481b472b29a6591b8e67419eafac8605c951cf7dfed1fe39a6a64fcf6a9b9a",
     "fastapi_effects-0.11.0a1.tar.gz": "14cccb2a755172246708a792f34015c7d57908e3b41667c47fa940de0fce8354"
+  },
+  "candidate": {
+    "package_version": "0.11.0a2",
+    "state": "hosted_verified_candidate",
+    "tag": "v0.11.0a2",
+    "source_commit": "28f2e4d58d0ea03eda9e9acd031c92602b42c091",
+    "release_evidence_run": "35876379003.2",
+    "artifact_id": 10758940987,
+    "artifact_digests": [
+      "sha256:ca1028f7ad90967ee40657295648d56ac69fc95db7fde6a34976911348a63d24",
+      "sha256:e7ab5fde92e72d0f3d0209cb0675896d990b3f77ab6c781253e67fd1afe7ff58"
+    ],
+    "artifact_archive_sha256": "7451f1345fc6589901b7c4c382fa484f79cf408b4eca9a8b81d5c7adde3af8d3",
+    "github_build_provenance": "verified",
+    "pypi_publish_attestations": "pending_publication",
+    "historical_upgrade": {
+      "baseline_version": "0.11.0a1",
+      "baseline_wheel_sha256": "0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+      "postgresql_16": "passed",
+      "postgresql_18": "passed"
+    },
+    "evidence_location": "docs/audits/2026-09-23/release-inventory-v0.11.0a2.json",
+    "remaining_gate": "FE-008 unfamiliar-developer usability evidence before publication"
   },
   "entries": [
     {

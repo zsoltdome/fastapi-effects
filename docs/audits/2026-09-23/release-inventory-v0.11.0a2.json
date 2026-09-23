@@ -1,0 +1,150 @@
+{
+  "schema_version": 2,
+  "recorded_at": "2026-09-23T16:55:00+02:00",
+  "distribution": "fastapi-effects",
+  "version": "0.11.0a2",
+  "state": "hosted_verified_candidate",
+  "source_repository": "https://github.com/zsoltdome/fastapi-effects",
+  "historical_inventory": {
+    "path": "docs/audits/2026-09-07/published-artifact-inventory.json",
+    "preserved": true,
+    "interpretation": "Accurate point-in-time evidence recorded before 0.11.0a1 was public; never rewritten to describe either later alpha."
+  },
+  "released_upgrade_baseline": {
+    "inventory": "docs/audits/2026-09-23/release-inventory.json",
+    "version": "0.11.0a1",
+    "wheel_sha256": "0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9"
+  },
+  "release": {
+    "tag": "v0.11.0a2",
+    "commit": "28f2e4d58d0ea03eda9e9acd031c92602b42c091",
+    "tag_url": "https://github.com/zsoltdome/fastapi-effects/tree/v0.11.0a2",
+    "github_release_status": "not_published",
+    "pypi_status": "not_published",
+    "prerelease": true
+  },
+  "artifacts": [
+    {
+      "kind": "wheel",
+      "filename": "fastapi_effects-0.11.0a2-py3-none-any.whl",
+      "sha256": "ca1028f7ad90967ee40657295648d56ac69fc95db7fde6a34976911348a63d24",
+      "size": 229923,
+      "public_url": null,
+      "pypi_publish_attestation": {
+        "status": "pending_publication"
+      }
+    },
+    {
+      "kind": "sdist",
+      "filename": "fastapi_effects-0.11.0a2.tar.gz",
+      "sha256": "e7ab5fde92e72d0f3d0209cb0675896d990b3f77ab6c781253e67fd1afe7ff58",
+      "size": 708081,
+      "public_url": null,
+      "pypi_publish_attestation": {
+        "status": "pending_publication"
+      }
+    }
+  ],
+  "release_evidence_workflow": {
+    "workflow": ".github/workflows/release.yml",
+    "run_id": 35876379003,
+    "run_attempt": 2,
+    "event": "push",
+    "head_sha": "28f2e4d58d0ea03eda9e9acd031c92602b42c091",
+    "status": "success",
+    "created_at": "2026-09-23T14:44:17Z",
+    "run_started_at": "2026-09-23T14:46:44Z",
+    "completed_at": "2026-09-23T14:52:07Z",
+    "url": "https://github.com/zsoltdome/fastapi-effects/actions/runs/35876379003",
+    "artifact": {
+      "id": 10758940987,
+      "name": "release-evidence-v0.11.0a2-attempt-2",
+      "archive_sha256": "7451f1345fc6589901b7c4c382fa484f79cf408b4eca9a8b81d5c7adde3af8d3",
+      "size": 943297,
+      "expires_at": "2026-12-22T14:46:46Z"
+    },
+    "manifest": {
+      "schema_version": 2,
+      "sha256": "b18ec353a6d2528500072693f71f718585331acc40e52918a814dbf217e365f4",
+      "lock_sha256": "ecb5e96d7314d0be8b10984d20719871dd1ae39af40ca7e0ea9fb13f1b8c229e",
+      "workflow_identity": "zsoltdome/fastapi-effects/.github/workflows/release.yml@refs/tags/v0.11.0a2#35876379003.2",
+      "independent_download_verification": "passed"
+    }
+  },
+  "candidate_results": {
+    "artifact_runtime": {
+      "status": "passed",
+      "wheel_origin_verified": true,
+      "sdist_derived_wheel_origin_verified": true,
+      "selected_pytest_cases_per_artifact": 18,
+      "report_sha256": "157193eb8de71094fed7ce993c4087dc74800c11c0603017306ddb23e2a2d6bf"
+    },
+    "historical_upgrade": {
+      "status": "passed",
+      "baseline_version": "0.11.0a1",
+      "baseline_wheel_sha256": "0e7dce419004d5b5595a2dcecef3df67a0f82c3d016a0a1d14bb5db9203013c9",
+      "candidate_wheel_sha256": "ca1028f7ad90967ee40657295648d56ac69fc95db7fde6a34976911348a63d24",
+      "postgresql_versions": [
+        "16.15",
+        "18.6"
+      ],
+      "checks_per_target": 14,
+      "report_sha256": "f0987baf1c8a28720508a7eb4ad81259f3911936b76e2134bec6afa215eef5d2"
+    },
+    "persistent_restart": {
+      "status": "passed",
+      "postgresql_majors": [
+        16,
+        18
+      ]
+    }
+  },
+  "github_build_provenance": {
+    "status": "verified",
+    "predicate_type": "https://slsa.dev/provenance/v1",
+    "builder": "https://github.com/zsoltdome/fastapi-effects/.github/workflows/release.yml@refs/tags/v0.11.0a2",
+    "invocation": "https://github.com/zsoltdome/fastapi-effects/actions/runs/35876379003/attempts/2",
+    "source_commit": "28f2e4d58d0ea03eda9e9acd031c92602b42c091",
+    "subjects": {
+      "fastapi_effects-0.11.0a2-py3-none-any.whl": "ca1028f7ad90967ee40657295648d56ac69fc95db7fde6a34976911348a63d24",
+      "fastapi_effects-0.11.0a2.tar.gz": "e7ab5fde92e72d0f3d0209cb0675896d990b3f77ab6c781253e67fd1afe7ff58",
+      "sbom.cdx.json": "843ba769448808e42f4f218d6402cdb37771d79bc91706039dca50e6f68cf00a"
+    },
+    "rekor_log_index": "2921337503",
+    "api_url": "https://api.github.com/repos/zsoltdome/fastapi-effects/attestations/sha256:ca1028f7ad90967ee40657295648d56ac69fc95db7fde6a34976911348a63d24"
+  },
+  "durable_release_storage": {
+    "status": "pending_publication",
+    "required_archive_sha256": "7451f1345fc6589901b7c4c382fa484f79cf408b4eca9a8b81d5c7adde3af8d3"
+  },
+  "publish_workflow": {
+    "workflow": ".github/workflows/publish.yml",
+    "status": "pending_publication",
+    "run_id": null,
+    "run_attempt": null,
+    "identity": "PyPI Trusted Publishing via GitHub Actions OIDC"
+  },
+  "remaining_gates": {
+    "newcomer_usability": {
+      "roadmap_task": "FE-008",
+      "status": "OPEN",
+      "record": "docs/planning/newcomer-usability-record.md"
+    },
+    "publication": {
+      "roadmap_task": "FE-020",
+      "status": "BLOCKED_BY_FE_008"
+    }
+  },
+  "observations": [
+    {
+      "run_attempt": 1,
+      "status": "failed_closed",
+      "reason": "The tag workflow queried required conformance checks before the main-push jobs on the squash-merge SHA had completed. No artifact was uploaded by this attempt."
+    },
+    {
+      "run_attempt": 2,
+      "status": "success",
+      "reason": "All required checks were complete and successful on the tagged SHA before the protected rerun was approved."
+    }
+  ]
+}
