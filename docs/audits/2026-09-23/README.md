@@ -18,6 +18,19 @@ PyPI's raw provenance endpoint returned `503` during the recheck, while the norm
 details page continued to show both verified attestations. This availability failure
 does not change the recorded artifact identity.
 
+On September 23 the original Actions ZIP, both distributions, the manifest, checksums,
+certification reports, lock constraints, SBOM, and conformance schemas were attached to
+the GitHub release without rebuilding them. A fresh unauthenticated download of the ZIP
+matched SHA-256
+`f0e913257347e61416ab04bec97e7126d08168e051b5ee3089db54849c7b9c7c`;
+extracting it and verifying the original manifest with the tag's lock file passed. The
+inventory records every manifest-bound asset hash and the durable download route.
+
+The bounded [repository-controls snapshot](repository-controls.json) records the
+authenticated owner readback of branch, tag, environment, Actions, reporting, and last
+observed publisher controls. It also records the single-owner limitations instead of
+mistaking an approval pause for independent review.
+
 Because this release contains the bundled migrations and PostgreSQL role contract,
 historical-artifact upgrade testing is no longer `NOT_APPLICABLE`. Every later
 candidate must create and seed a database using this exact public wheel, then upgrade

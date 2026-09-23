@@ -53,6 +53,7 @@ def test_key_provider_outage_denies_verification_and_stops_issuance() -> None:
 
 def test_chaos_manifest_covers_required_boundaries_without_exactly_once_claims() -> None:
     manifest = json.loads(Path(__file__).with_name("scenarios.json").read_text(encoding="utf-8"))
+    assert manifest["schema_version"] == 2
     scenario_ids = {item["id"] for item in manifest["scenarios"]}
     assert {
         "before-command-commit",
@@ -61,9 +62,48 @@ def test_chaos_manifest_covers_required_boundaries_without_exactly_once_claims()
         "delegation-key-provider-outage",
         "database-connection-loss-transaction-boundary",
         "database-restart",
-        "database-failover-ambiguous-commit",
+        "database-application-commit-ack-lost",
+        "database-claim-finalization-ack-lost",
+        "webhook-revoked-key",
+        "webhook-expired-retiring-key",
+        "database-reconcile-backend-loss",
+        "database-claim-backend-loss",
+        "database-application-session-backend-loss",
+        "database-success-finalization-backend-loss",
+        "managed-database-failover",
     } <= scenario_ids
     assert "exactly-once" not in json.dumps(manifest).lower()
+
+
+def test_chaos_manifest_has_bounded_reproducible_fault_records() -> None:
+    manifest = json.loads(Path(__file__).with_name("scenarios.json").read_text(encoding="utf-8"))
+    required = {
+        "id",
+        "mode",
+        "node",
+        "boundary",
+        "injected_fault",
+        "trigger",
+        "expected_state",
+        "recovery",
+        "deadline_seconds",
+        "cleanup",
+        "evidence_class",
+    }
+    for scenario in manifest["scenarios"]:
+        assert required <= scenario.keys()
+        assert scenario["mode"] in {"injected", "postgres", "external"}
+        assert isinstance(scenario["deadline_seconds"], int)
+        assert 0 < scenario["deadline_seconds"] <= 300
+        if scenario["mode"] == "external":
+            assert scenario["node"] is None
+            assert scenario["evidence_class"] in {
+                "external_prerequisite",
+                "operator_rehearsal",
+            }
+        else:
+            assert isinstance(scenario["node"], str)
+            assert scenario["node"]
 
 
 def test_operator_restart_rehearsal_has_pairwise_passing_evidence() -> None:

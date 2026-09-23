@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from collections.abc import Awaitable
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -64,20 +65,28 @@ class RelayConfig:
         ):
             if not isinstance(value, int) or isinstance(value, bool) or value < 1:
                 raise ValueError("Relay integer bounds must be positive.")
-        if self.poll_interval_seconds <= 0 or self.poll_interval_seconds > 60:
-            raise ValueError("Relay poll interval must be in (0, 60].")
-        for budget in (
-            self.control_plane_timeout_seconds,
-            self.finalization_timeout_seconds,
-            self.shutdown_grace_seconds,
+        _bounded_seconds(
+            "Relay poll interval",
+            self.poll_interval_seconds,
+            maximum=60,
+        )
+        for name, budget in (
+            ("Relay control-plane timeout", self.control_plane_timeout_seconds),
+            ("Relay finalization timeout", self.finalization_timeout_seconds),
+            ("Relay shutdown grace", self.shutdown_grace_seconds),
         ):
-            if (
-                not isinstance(budget, (int, float))
-                or isinstance(budget, bool)
-                or budget <= 0
-                or budget > 300
-            ):
-                raise ValueError("Relay operation budgets must be in (0, 300].")
+            _bounded_seconds(name, budget, maximum=300)
+
+
+def _bounded_seconds(name: str, value: object, *, maximum: int) -> None:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or (isinstance(value, float) and not math.isfinite(value))
+        or value <= 0
+        or value > maximum
+    ):
+        raise ValueError(f"{name} must be in (0, {maximum}].")
 
 
 @dataclass(slots=True)

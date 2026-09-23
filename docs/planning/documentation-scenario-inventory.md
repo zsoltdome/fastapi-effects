@@ -8,13 +8,18 @@ fails when a block is added or changed without reviewing that classification and
 evidence.
 
 The maintained end-to-end journey set is installation, quickstart, relay, webhook
-lifecycle, replay, Taskiq, and FastMCP. All seven have local evidence. Clean
-wheel/sdist installation and optional imports cross an artifact boundary; the
-database-backed journeys currently run from the working tree. They must therefore be
-rerun from an exact committed candidate artifact before R2.4 or release promotion can
-be complete.
+lifecycle, replay, Taskiq, and FastMCP. All seven have local evidence and a clean
+wheel/sdist-derived-wheel harness. The protected tag workflow reruns the selected
+database, relay, replay, key-lifecycle, Taskiq-worker, and conformance journeys from
+each exact candidate environment and binds the reports into the release manifest.
+Local execution has no release authority; only the protected report does.
 
 Manual/operator commands remain explicit rather than being counted as executed. These
 include backup/restore, commands using deployment DSNs, custom application adapters,
 and the webhook receiver process. Historical planning snippets are preserved but are
 not current user instructions.
+
+The automated journey verifies commands, package origin, transaction behavior, and
+recovery semantics. It is not a substitute for FE-008's unfamiliar-developer usability
+record; time-to-first-effect and author intervention remain unclaimed until a real
+participant records them.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -53,8 +54,13 @@ def test_schema_upgrade_uses_the_packaged_migration_configuration(
 @pytest.mark.parametrize("signum", [signal.SIGTERM, signal.SIGINT])
 def test_relay_cli_drains_on_stop_signal(tmp_path: Path, signum: signal.Signals) -> None:
     ready = tmp_path / "ready"
+    shutil.copyfile(
+        Path(__file__).with_name("_relay_signal_fixture.py"),
+        tmp_path / "relay_signal_fixture.py",
+    )
     environment = os.environ.copy()
     environment["FASTAPI_EFFECTS_SIGNAL_READY_FILE"] = str(ready)
+    environment["PYTHONPATH"] = str(tmp_path)
     process = subprocess.Popen(
         [
             sys.executable,
@@ -63,7 +69,7 @@ def test_relay_cli_drains_on_stop_signal(tmp_path: Path, signum: signal.Signals)
             "relay",
             "run",
             "--factory",
-            "tests.unit._relay_signal_fixture:create_relay",
+            "relay_signal_fixture:create_relay",
         ],
         env=environment,
     )

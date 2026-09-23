@@ -1,18 +1,30 @@
 # Installed-package PostgreSQL quickstart
 
-This journey runs a persistent FastAPI process and relay from an installed wheel. It
-keeps administrator, migration, application, and relay credentials separate. Commands
-assume a checkout only for the example application; `fastapi_effects` itself is imported
-from the wheel, not `src/`.
+This journey installs an exact public release, checks out examples from the matching
+tag, and runs a persistent FastAPI process and relay. It keeps administrator,
+migration, application, and relay credentials separate. The example checkout is never
+installed as the library: `fastapi_effects` must resolve inside `.quickstart`.
 
-## 1. Build and install the package
+## 1. Install the exact published package and matching examples
 
 ```console
-uv build
+export FASTAPI_EFFECTS_VERSION=0.11.0a2
+git clone --depth 1 --branch "v${FASTAPI_EFFECTS_VERSION}" \
+  https://github.com/zsoltdome/fastapi-effects.git \
+  "fastapi-effects-${FASTAPI_EFFECTS_VERSION}"
+cd "fastapi-effects-${FASTAPI_EFFECTS_VERSION}"
 python -m venv .quickstart
-.quickstart/bin/python -m pip install dist/*.whl uvicorn
+.quickstart/bin/python -m pip install --no-cache-dir \
+  "fastapi-effects[webhooks]==${FASTAPI_EFFECTS_VERSION}" uvicorn
+.quickstart/bin/python -c \
+  'from importlib.metadata import version; print(version("fastapi-effects"))'
+git describe --tags --exact-match
 cp examples/deployment/.env.example examples/deployment/.env
 ```
+
+Both commands must print the selected version/tag. For a not-yet-published candidate,
+use only the exact retained candidate wheel and matching source archive supplied by the
+release workflow; never combine a candidate artifact with moving `main` examples.
 
 Replace every password in `.env`; these local demo values are not production secret
 management. Start PostgreSQL:
@@ -88,12 +100,13 @@ recoverable.
 The executable integration journey exercises facts that are awkward to trigger by
 hand: an application exception rolls back business/event/delivery rows; a consumer
 commit followed by lost relay finalization retries with the same delivery ID and a new
-attempt ID; the conflict-safe render remains one row. Run it against a disposable test
-database when developing:
+attempt ID; the conflict-safe render remains one row. Install the test runner into the
+same consumer environment and run the journey against a disposable test database:
 
 ```console
+.quickstart/bin/python -m pip install "pytest>=9,<10" "pytest-asyncio>=1.3,<2"
 FASTAPI_EFFECTS_TEST_ADMIN_DSN=postgresql://postgres:postgres@127.0.0.1:55432/postgres \
-  uv run --locked pytest -q tests/integration/test_invoicing_postgres_boot.py \
+  .quickstart/bin/python -m pytest -q tests/integration/test_invoicing_postgres_boot.py \
   tests/integration/test_core_concurrency.py::test_fanout_failure_rolls_back_business_and_event_rows
 ```
 
@@ -106,3 +119,15 @@ delivery/message ID linked through `replay_of`; the invoice example deliberately
 Continue with the [webhook vertical slice](webhook-vertical-slice.md) and the runnable
 signature-verifying receiver in `examples/webhook_receiver`. The core quickstart does
 not require Redis, Taskiq, or FastMCP.
+
+## Contributor build appendix
+
+Contributors validating an unpublished source change can build it locally. This is not
+the consumer installation path and its output has no release authority until the
+protected artifact workflow certifies the exact bytes.
+
+```console
+uv sync --locked --all-extras --all-groups
+uv build --no-sources
+uv run --locked --no-sync python scripts/check.py
+```

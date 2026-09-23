@@ -268,7 +268,11 @@ class WebhookOperations:
             raise FastAPIEffectsConfigurationError(
                 "Webhook retention cutoff must be timezone-aware."
             )
-        if not 1 <= batch_size <= 10_000:
+        if (
+            not isinstance(batch_size, int)
+            or isinstance(batch_size, bool)
+            or not 1 <= batch_size <= 10_000
+        ):
             raise FastAPIEffectsConfigurationError("Webhook retention batch size is invalid.")
         async with session.begin():
             await session.execute(

@@ -42,3 +42,6 @@ database-object migration from earlier development snapshots.
 
 See [Public API](reference/public-api.md) for compatibility semantics and
 [Migrations](operations/migrations.md) for the independent database revision contract.
+The [quarter release-scope decision](adr/ADR-017-quarter-release-scope.md) separates the
+narrow PostgreSQL/webhook stable target from provisional optional helper APIs without
+weakening their shipped security and recovery obligations.

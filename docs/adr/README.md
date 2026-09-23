@@ -19,6 +19,7 @@
 | [ADR-014](ADR-014-webhook-retention.md) | Accepted | Tenant-bound bounded webhook retention |
 | [ADR-015](ADR-015-control-plane-budgets.md) | Accepted | Bounded control-plane, finalization, and shutdown work |
 | [ADR-016](ADR-016-fastapi-effects-name.md) | Accepted | FastAPI Effects product identity and compatibility boundary |
+| [ADR-017](ADR-017-quarter-release-scope.md) | Accepted | Narrow core and signed-webhook release scope with provisional optional helpers |
 
 ## Decision rule
 

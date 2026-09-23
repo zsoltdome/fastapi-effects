@@ -39,6 +39,7 @@ nav:
       - Idempotent Commands: tutorials/idempotent-commands.md
   - Reference:
       - Public API: reference/public-api.md
+      - Numeric Configuration: reference/numeric-configuration.md
       - Runtime API: reference/runtime-api.md
       - Glossary: reference/glossary.md
       - UoW Lifecycle: reference/uow-lifecycle.md
@@ -52,6 +53,7 @@ nav:
       - Conformance Map: reference/conformance-map.md
   - Security Review: security-review/README.md
   - Release Readiness:
+      - Corrected Alpha Notes: release-notes/0.11.0a2.md
       - Design Partner Protocol: planning/design-partner-protocol.md
       - Readiness Record: planning/production-readiness-record.md
       - Known Limitations: planning/known-limitations.md

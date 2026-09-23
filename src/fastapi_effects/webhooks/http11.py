@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -24,7 +25,16 @@ class ResponseLimits:
     maximum_body_bytes: int = 64 * 1024
 
     def __post_init__(self) -> None:
-        if not 0 < self.read_timeout_seconds <= 300:
+        if (
+            isinstance(self.read_timeout_seconds, bool)
+            or not isinstance(self.read_timeout_seconds, (int, float))
+            or (
+                isinstance(self.read_timeout_seconds, float)
+                and not math.isfinite(self.read_timeout_seconds)
+            )
+            or self.read_timeout_seconds <= 0
+            or self.read_timeout_seconds > 300
+        ):
             raise ValueError("HTTP read timeout must be in (0, 300].")
         for value in (
             self.maximum_header_bytes,

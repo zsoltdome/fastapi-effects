@@ -701,8 +701,15 @@ async def async_main(args: argparse.Namespace) -> int:
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"Published-artifact upgrade evidence written to {output.relative_to(ROOT)}")
+    print(f"Published-artifact upgrade evidence written to {_display_path(output)}")
     return 0
+
+
+def _display_path(path: Path) -> Path:
+    try:
+        return path.relative_to(ROOT)
+    except ValueError:
+        return path
 
 
 def main() -> int:

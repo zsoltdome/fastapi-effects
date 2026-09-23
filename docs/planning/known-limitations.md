@@ -12,6 +12,10 @@
   key provider and availability/rotation runbook.
 - Feature implementation modules remain provisional as listed in the public API inventory.
 - Taskiq handoff retention is intentionally not automated in v1.
-- No external design-partner deployment, independent security review, RC observation, or
-  trusted publication has been recorded. Every supported `1.x` or later RC and final
-  version is evaluated semantically and fails closed when its bound evidence is absent.
+- The public `0.11.0a1` baseline has Trusted Publishing and provenance evidence, but the
+  next candidate must repeat that path through the protected release and `pypi`
+  environments. No external design-partner deployment, independent security review, or
+  RC observation has been recorded. Every supported `1.x` or later RC and final version
+  is evaluated semantically and fails closed when its bound evidence is absent.
+- The repository currently has one authorized owner. Alpha deployment approvals are
+  explicit but not independent; two-person stable approval remains unavailable.

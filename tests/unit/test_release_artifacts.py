@@ -48,7 +48,13 @@ def _canonical_digest(value: dict[str, object]) -> str:
     ).hexdigest()
 
 
-def _runtime_evidence(root: Path, lock: Path) -> tuple[Path, ...]:
+def _runtime_evidence(
+    root: Path,
+    lock: Path,
+    *,
+    package_version: str = "1.0.0",
+    include_historical_upgrade: bool = True,
+) -> tuple[Path, ...]:
     entries: list[dict[str, object]] = []
     evidence: list[Path] = []
     constraints_path = root / "build" / "release" / "artifact-lock-constraints.txt"
@@ -64,7 +70,7 @@ def _runtime_evidence(root: Path, lock: Path) -> tuple[Path, ...]:
         installed_digest = input_digest if kind == "wheel" else "d" * 64
         manifest = {
             "metadata": {
-                "package.version": "1.0.0",
+                "package.version": package_version,
                 "artifact.kind": kind,
                 "artifact.input_sha256": input_digest,
                 "artifact.installed_sha256": installed_digest,
@@ -167,7 +173,74 @@ def _runtime_evidence(root: Path, lock: Path) -> tuple[Path, ...]:
         + "\n",
         encoding="utf-8",
     )
-    return (runtime_path, constraints_path, historical_upgrade, *evidence)
+    if include_historical_upgrade:
+        restart_evidence: list[Path] = []
+        for major in (16, 18):
+            restart_path = root / "build" / "release" / f"postgres-restart-{major}.json"
+            restart_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "captured_on": "2026-09-23",
+                        "platform": "linux-x86_64",
+                        "fastapi_effects": package_version,
+                        "postgresql_before": f"{major}.1",
+                        "postgresql_after": f"{major}.1",
+                        "expected_major": major,
+                        "result": "pass",
+                        "restart_observed": True,
+                        "backend_replaced": True,
+                        "schema_compatible": True,
+                        "doctor_healthy": True,
+                        "event_identity_preserved": True,
+                        "delivery_identity_preserved": True,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            restart_evidence.append(restart_path)
+        return (
+            runtime_path,
+            constraints_path,
+            historical_upgrade,
+            *restart_evidence,
+            *evidence,
+        )
+    return (runtime_path, constraints_path, *evidence)
+
+
+def test_historical_baseline_manifest_remains_verifiable_without_future_upgrade_evidence(
+    tmp_path: Path,
+) -> None:
+    root, lock = _candidate(tmp_path, distribution_version="0.11.0a1")
+    evidence = _runtime_evidence(
+        root,
+        lock,
+        package_version="0.11.0a1",
+        include_historical_upgrade=False,
+    )
+    manifest = root / "build" / "release" / "artifact-manifest.json"
+
+    create_manifest(
+        root=root,
+        output=manifest,
+        source_commit=COMMIT,
+        package_version="0.11.0a1",
+        workflow_identity=WORKFLOW,
+        lock_file=lock,
+        evidence_files=evidence,
+    )
+
+    verify_manifest(
+        root=root,
+        manifest_path=manifest,
+        source_commit=COMMIT,
+        package_version="0.11.0a1",
+        workflow_identity=WORKFLOW,
+        lock_file=lock,
+        evidence_files=evidence,
+    )
 
 
 def test_release_manifest_binds_and_verifies_exact_distribution_bytes(tmp_path: Path) -> None:
@@ -253,7 +326,7 @@ def test_release_manifest_validates_per_artifact_certification(tmp_path: Path) -
         evidence_files=evidence,
     )
 
-    assert len(created["evidence"]) == 7
+    assert len(created["evidence"]) == 9
     verify_manifest(
         root=root,
         manifest_path=manifest,
@@ -300,6 +373,8 @@ def test_release_manifest_verifies_with_cli_style_relative_root(
         "artifact-lock-constraints.txt",
         "artifact-runtime-results.json",
         "historical-upgrade-results.json",
+        "postgres-restart-16.json",
+        "postgres-restart-18.json",
         "wheel-certification-manifest.json",
         "wheel-certification.json",
         "sdist-certification-manifest.json",
@@ -313,7 +388,7 @@ def test_release_manifest_requires_every_runtime_evidence_file(
     root, lock = _candidate(tmp_path)
     evidence = tuple(path for path in _runtime_evidence(root, lock) if path.name != missing_name)
 
-    with pytest.raises(ValueError, match="runtime evidence is missing"):
+    with pytest.raises(ValueError, match="evidence is missing"):
         create_manifest(
             root=root,
             output=root / "build" / "release" / "artifact-manifest.json",
@@ -446,6 +521,33 @@ def test_release_manifest_rejects_invalid_historical_upgrade_evidence(
     path.write_text(json.dumps(value) + "\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match=message):
+        create_manifest(
+            root=root,
+            output=root / "build" / "release" / "artifact-manifest.json",
+            source_commit=COMMIT,
+            package_version="1.0.0",
+            workflow_identity=WORKFLOW,
+            lock_file=lock,
+            evidence_files=evidence,
+        )
+
+
+@pytest.mark.parametrize("mutation", ["wrong_version", "failed_restart"])
+def test_release_manifest_rejects_invalid_restart_evidence(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    root, lock = _candidate(tmp_path)
+    evidence = _runtime_evidence(root, lock)
+    path = next(path for path in evidence if path.name == "postgres-restart-16.json")
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if mutation == "wrong_version":
+        value["fastapi_effects"] = "9.9.9"
+    else:
+        value["restart_observed"] = False
+    path.write_text(json.dumps(value) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="restart evidence"):
         create_manifest(
             root=root,
             output=root / "build" / "release" / "artifact-manifest.json",

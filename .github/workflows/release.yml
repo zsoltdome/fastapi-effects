@@ -15,7 +15,7 @@ jobs:
   evidence:
     runs-on: ubuntu-latest
     environment: release
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       postgres16:
         image: postgres:16-alpine
@@ -81,14 +81,33 @@ jobs:
           uv run --no-sync python scripts/security_scan.py
       - name: Verify candidate gate
         run: uv run --no-sync python scripts/audit_release_candidate.py --phase auto
+      - name: Rehearse persistent PostgreSQL 16 and 18 service restarts
+        run: |
+          mkdir -p build/release
+          uv run --no-sync python scripts/rehearse_postgres_restart.py \
+            --container "${{ job.services.postgres16.id }}" \
+            --expected-major 16 \
+            --admin-dsn postgresql://postgres:postgres@127.0.0.1:55431/postgres \
+            --output build/release/postgres-restart-16.json
+          uv run --no-sync python scripts/rehearse_postgres_restart.py \
+            --container "${{ job.services.postgres.id }}" \
+            --expected-major 18 \
+            --admin-dsn postgresql://postgres:postgres@127.0.0.1:55432/postgres \
+            --output build/release/postgres-restart-18.json
       - name: Build, smoke, and run database journeys from the exact wheel and sdist-derived wheel in isolated environments
         run: >-
           uv run --no-sync python scripts/build_and_test_artifacts.py
           --runtime-certification
           --runtime-test tests/integration/test_invoicing_postgres_boot.py
           --runtime-test tests/integration/test_webhook_receiver_inbox.py
+          --runtime-test tests/integration/test_webhook_snapshotting.py::test_webhook_replay_works_with_exact_application_role_grants
           --runtime-test tests/integration/test_core_concurrency.py::test_fanout_failure_rolls_back_business_and_event_rows
           --runtime-test tests/integration/test_core_concurrency.py::test_finalization_refreshes_database_time_after_waiting_for_row_lock
+          --runtime-test tests/integration/test_webhook_key_lifecycle.py
+          --runtime-test tests/chaos/test_postgres_control_boundaries.py
+          --runtime-test tests/chaos/test_postgres_ambiguous_commit.py
+          --runtime-test tests/unit/test_cli.py::test_relay_cli_drains_on_stop_signal
+          --runtime-test tests/integration/test_taskiq_worker_claim.py::test_real_taskiq_broker_duplicate_is_fenced_and_context_is_reset
       - name: Upgrade the exact public 0.11.0a1 wheel to the candidate on PostgreSQL 16 and 18
         run: >-
           uv run --no-sync python scripts/verify_published_upgrade.py
@@ -115,6 +134,8 @@ jobs:
             --evidence-file build/release/artifact-lock-constraints.txt \
             --evidence-file build/release/artifact-runtime-results.json \
             --evidence-file build/release/historical-upgrade-results.json \
+            --evidence-file build/release/postgres-restart-16.json \
+            --evidence-file build/release/postgres-restart-18.json \
             --evidence-file build/release/wheel-certification-manifest.json \
             --evidence-file build/release/wheel-certification.json \
             --evidence-file build/release/sdist-certification-manifest.json \

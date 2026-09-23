@@ -1,14 +1,15 @@
 # FastMCP delegation integration
 
-Install the certified stable line:
+Install the versioned provisional integration:
 
 ```bash
-pip install "fastapi-effects[fastmcp]"
+pip install "fastapi-effects[fastmcp]==0.11.0a2"
 ```
 
-The `0.11.0a1` integration range is FastMCP `>=3.4.7,<5`, FastAPI
-`>=0.141,<0.142`, and Starlette `>=1.0.1,<2`. FastMCP 4 is prerelease and is not in
-this certification matrix.
+The `0.11.0a2` integration range is FastMCP `>=3.4.7,<5`, FastAPI
+`>=0.141,<0.142`, and Starlette `>=1.0.1,<2`. Hosted compatibility runs the minimum
+FastMCP 3.4.7 line and the lock-resolved FastMCP 4 line against the bridge and real MCP
+protocol conformance. The helper API remains provisional under ADR-017.
 
 Use a host authentication callback to produce `TrustedCallerMetadata`; do not add
 tenant, subject, parent depth, or scopes to a tool's model-visible arguments. Inside

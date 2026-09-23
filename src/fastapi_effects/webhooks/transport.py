@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import socket
 import ssl
 from collections.abc import Mapping
@@ -71,11 +72,28 @@ class TransportLimits:
     response: ResponseLimits = field(default_factory=ResponseLimits)
 
     def __post_init__(self) -> None:
-        if not 0 < self.connect_timeout_seconds <= self.total_timeout_seconds <= 300:
+        for name, value in (
+            ("connect timeout", self.connect_timeout_seconds),
+            ("write timeout", self.write_timeout_seconds),
+            ("total timeout", self.total_timeout_seconds),
+        ):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or (isinstance(value, float) and not math.isfinite(value))
+                or value <= 0
+                or value > 300
+            ):
+                raise ValueError(f"Webhook {name} must be in (0, 300].")
+        if self.connect_timeout_seconds > self.total_timeout_seconds:
             raise ValueError("Webhook connect/total timeouts are invalid.")
-        if not 0 < self.write_timeout_seconds <= self.total_timeout_seconds:
+        if self.write_timeout_seconds > self.total_timeout_seconds:
             raise ValueError("Webhook write timeout is invalid.")
-        if not isinstance(self.maximum_request_bytes, int) or self.maximum_request_bytes < 1:
+        if (
+            not isinstance(self.maximum_request_bytes, int)
+            or isinstance(self.maximum_request_bytes, bool)
+            or self.maximum_request_bytes < 1
+        ):
             raise ValueError("Webhook maximum request size must be positive.")
         if (
             not isinstance(self.maximum_addresses, int)

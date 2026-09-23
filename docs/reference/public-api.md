@@ -1,12 +1,16 @@
 # Public API and compatibility status
 
-This page is the v1 compatibility inventory. A symbol is contractual only when it is
-listed here or exported by one of the listed namespace `__all__` values. Everything
-else under `fastapi_effects` is internal, even when Python can import it.
+This page is the v1 compatibility inventory and the alpha maturity map. A symbol is a
+documented v1 target only when it is listed here or exported by one of the listed
+namespace `__all__` values. The current alpha classification is governed by
+[ADR-017](../adr/ADR-017-quarter-release-scope.md); “v1 target” does not imply that a
+`0.x` alpha helper is already frozen. Everything else under `fastapi_effects` is
+internal, even when Python can import it.
 
-## Stable root surface
+## Stable-target root surface
 
-The following typed imports are stable for the v1 line:
+The following typed imports are the quarter's stable target and the committed v1 root
+surface:
 
 | Category | Symbols |
 | --- | --- |
@@ -25,9 +29,9 @@ classification supplied by an application remains in the separate instance `code
 field of `RetryableDeliveryError` and `PermanentDeliveryError`. Exception messages,
 summaries, and reprs are not machine contracts and must not be used for branching.
 
-## Stable integration namespaces
+## Namespace maturity
 
-The exports in these namespace `__all__` values are stable and import-tested:
+The exports in these namespace `__all__` values are documented and import-tested:
 
 - `fastapi_effects.postgres`: store, explicit schema compatibility/install gates,
   runtime roles, and polling relay/sink composition;
@@ -39,17 +43,21 @@ The exports in these namespace `__all__` values are stable and import-tested:
 - `fastapi_effects.conformance` and `fastapi_effects.testing`: contract and adapter
   certification APIs.
 
-The supported PostgreSQL composition symbols are `PostgresStore`, `PollingRelay`,
+The PostgreSQL and SQLAlchemy entries above are the narrow stable target. The supported
+PostgreSQL composition symbols are `PostgresStore`, `PollingRelay`,
 `RelayConfig`, `DeliverySink`, `SinkDisposition`, `ClaimedDelivery`, `RuntimeRoles`,
 `install_core_schema`, `check_core_schema`, `check_schema_revisions`, `MIGRATION_HEAD`,
 and `SCHEMA_REVISION_REGISTRY`.
 
+The `idempotency`, `delegation`, `executors`, `observability`, `conformance`, and
+`testing` namespace exports remain documented v1 targets, but their optional helper
+APIs are provisional during this alpha and are outside the quarter's narrow freeze.
 Integration implementation modules such as `webhooks.*`, `executors.taskiq.*`,
-`delegation.fastapi`, and `integrations.fastmcp` are supported through their documented
-examples but remain provisional in the first v1 line. Their persisted data, security
-invariants, CLI behavior, and conformance profiles are contractual; their Python helper
-signatures may receive compatible refinements before they are promoted to a namespace
-surface.
+`delegation.fastapi`, and `integrations.fastmcp` are likewise provisional. Their
+persisted data, security invariants, CLI behavior, versioned evidence formats, and
+conformance profiles are contractual; helper signatures may receive compatible
+refinements before promotion. Existing commitments cannot be removed without the
+deprecation policy.
 
 ## Non-contractual internals
 

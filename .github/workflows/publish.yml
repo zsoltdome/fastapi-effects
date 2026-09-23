@@ -16,7 +16,7 @@ jobs:
     environment: pypi
     timeout-minutes: 10
     permissions:
-      contents: read
+      contents: write
       checks: read
       actions: read
       id-token: write
@@ -72,6 +72,8 @@ jobs:
           printf '%s  %s\n' "${{ steps.artifact.outputs.artifact_digest }}" "${archive}" \
             | sha256sum --check --strict
           mkdir approved
+          cp "${archive}" \
+            "approved/release-evidence-${{ github.event.release.tag_name }}-attempt-${{ steps.evidence.outputs.run_attempt }}.zip"
           unzip -q "${archive}" -d approved
       - name: Verify promoted artifact identity
         run: |
@@ -86,6 +88,8 @@ jobs:
             --evidence-file build/release/artifact-lock-constraints.txt \
             --evidence-file build/release/artifact-runtime-results.json \
             --evidence-file build/release/historical-upgrade-results.json \
+            --evidence-file build/release/postgres-restart-16.json \
+            --evidence-file build/release/postgres-restart-18.json \
             --evidence-file build/release/wheel-certification-manifest.json \
             --evidence-file build/release/wheel-certification.json \
             --evidence-file build/release/sdist-certification-manifest.json \
@@ -121,6 +125,24 @@ jobs:
             --expected-artifact-id "${{ steps.artifact.outputs.artifact_id }}" \
             --expected-digest "${{ steps.artifact.outputs.artifact_digest }}" \
             --github-output /dev/null
+      - name: Retain the exact published artifacts and evidence with the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          assets_file="$(mktemp)"
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" \
+            --jq '.assets[] | [.name, .digest] | @tsv' > "${assets_file}"
+          for path in approved/release-evidence-*.zip approved/dist/* approved/build/release/*; do
+            name="$(basename "${path}")"
+            digest="sha256:$(sha256sum "${path}" | cut -d ' ' -f 1)"
+            existing="$(awk -F '\t' -v name="${name}" '$1 == name {print $2}' "${assets_file}")"
+            if test -n "${existing}"; then
+              test "${existing}" = "${digest}"
+            else
+              gh release upload "${RELEASE_TAG}" "${path}"
+            fi
+          done
       - name: Publish with trusted identity
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
