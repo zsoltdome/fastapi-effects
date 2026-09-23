@@ -66,7 +66,7 @@ fastmcp = [
 build = [
   # Keep the PEP 517 backend in uv.lock so release artifact builds can use an
   # exact build constraint instead of resolving an arbitrary newer backend.
-  "setuptools>=82,<83",
+  "setuptools>=82,<85",
 ]
 test = [
   "asyncpg>=0.31,<1",
