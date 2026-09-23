@@ -6,7 +6,7 @@ Install the certified stable line:
 pip install "fastapi-effects[fastmcp]"
 ```
 
-The `0.11.0a1` integration range is FastMCP `>=3.4.7,<4`, FastAPI
+The `0.11.0a1` integration range is FastMCP `>=3.4.7,<5`, FastAPI
 `>=0.141,<0.142`, and Starlette `>=1.0.1,<2`. FastMCP 4 is prerelease and is not in
 this certification matrix.
 

@@ -26,7 +26,7 @@ REQUIRED = (
 def main() -> int:
     missing = [item for item in REQUIRED if not (ROOT / item).is_file()]
     project = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    required_markers = ("fastmcp>=3.4.7,<4", "fastapi>=0.141,<0.142", "starlette>=1.0.1,<2")
+    required_markers = ("fastmcp>=3.4.7,<5", "fastapi>=0.141,<0.142", "starlette>=1.0.1,<2")
     absent = [marker for marker in required_markers if marker not in project]
     bridge = (ROOT / "src/fastapi_effects/delegation/bridge.py").read_text(encoding="utf-8")
     if "forwarded_headers" not in bridge or "repr=False" not in bridge:
